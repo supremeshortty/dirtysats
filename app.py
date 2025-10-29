@@ -12,6 +12,13 @@ from flask import Flask, jsonify, render_template, request
 import config
 from database import Database
 from miners import MinerDetector, Miner
+from energy import (
+    BitcoinDataFetcher,
+    ProfitabilityCalculator,
+    EnergyRateManager,
+    MiningScheduler,
+    ENERGY_COMPANY_PRESETS
+)
 
 # Setup logging
 logging.basicConfig(
@@ -34,6 +41,15 @@ class FleetManager:
         self.lock = Lock()
         self.monitoring_thread = None
         self.monitoring_active = False
+
+        # Energy management components
+        self.btc_fetcher = BitcoinDataFetcher()
+        self.profitability_calc = ProfitabilityCalculator(self.btc_fetcher)
+        self.energy_rate_mgr = EnergyRateManager(self.db)
+        self.mining_scheduler = MiningScheduler(self.db, self.energy_rate_mgr)
+
+        self.last_energy_log_time = None
+        self.last_profitability_log_time = None
 
         # Load miners from database
         self._load_miners_from_db()
@@ -139,6 +155,113 @@ class FleetManager:
                 except Exception as e:
                     logger.error(f"Error in update: {e}")
 
+    def _apply_mining_schedule(self):
+        """Apply mining schedule (frequency control based on time/rates)"""
+        try:
+            should_mine, target_frequency = self.mining_scheduler.should_mine_now()
+
+            if target_frequency > 0:  # 0 means no change
+                logger.info(f"Applying schedule: target_frequency={target_frequency}")
+                with self.lock:
+                    for miner in self.miners.values():
+                        # Only apply to Bitaxe miners (support frequency control)
+                        if miner.type == 'Bitaxe' and miner.last_status:
+                            try:
+                                miner.apply_settings({'frequency': target_frequency})
+                                logger.info(f"Set {miner.ip} frequency to {target_frequency}")
+                            except Exception as e:
+                                logger.error(f"Failed to set frequency on {miner.ip}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error applying mining schedule: {e}")
+
+    def _log_energy_consumption(self):
+        """Log energy consumption every 15 minutes"""
+        now = datetime.now()
+
+        if self.last_energy_log_time:
+            minutes_elapsed = (now - self.last_energy_log_time).total_seconds() / 60
+            if minutes_elapsed < 15:
+                return
+
+        try:
+            # Get current fleet stats
+            stats = self.get_fleet_stats()
+            total_power = stats['total_power']  # Watts
+
+            if total_power > 0:
+                # Get current energy rate
+                current_rate = self.energy_rate_mgr.get_current_rate()
+
+                # Calculate energy consumed in last 15 minutes (or since last log)
+                if self.last_energy_log_time:
+                    hours_elapsed = (now - self.last_energy_log_time).total_seconds() / 3600
+                else:
+                    hours_elapsed = 0.25  # Assume 15 minutes
+
+                energy_kwh = (total_power / 1000) * hours_elapsed
+                cost = energy_kwh * current_rate
+
+                # Save to database
+                self.db.add_energy_consumption(
+                    total_power_watts=total_power,
+                    energy_kwh=energy_kwh,
+                    cost=cost,
+                    current_rate=current_rate
+                )
+
+                logger.debug(f"Logged energy: {energy_kwh:.3f} kWh at ${current_rate:.3f}/kWh = ${cost:.2f}")
+
+            self.last_energy_log_time = now
+
+        except Exception as e:
+            logger.error(f"Error logging energy consumption: {e}")
+
+    def _log_profitability(self):
+        """Log profitability metrics every hour"""
+        now = datetime.now()
+
+        if self.last_profitability_log_time:
+            hours_elapsed = (now - self.last_profitability_log_time).total_seconds() / 3600
+            if hours_elapsed < 1:
+                return
+
+        try:
+            # Get current fleet stats
+            stats = self.get_fleet_stats()
+            total_hashrate = stats['total_hashrate']
+            total_power = stats['total_power']
+
+            if total_hashrate > 0 and total_power > 0:
+                # Get current energy rate
+                current_rate = self.energy_rate_mgr.get_current_rate()
+
+                # Calculate profitability
+                prof = self.profitability_calc.calculate_profitability(
+                    total_hashrate=total_hashrate,
+                    total_power_watts=total_power,
+                    energy_rate_per_kwh=current_rate
+                )
+
+                if 'error' not in prof:
+                    # Save to database
+                    self.db.add_profitability_log(
+                        btc_price=prof['btc_price'],
+                        network_difficulty=prof['network_difficulty'],
+                        total_hashrate=prof['total_hashrate_ths'],
+                        estimated_btc_per_day=prof['btc_per_day'],
+                        energy_cost_per_day=prof['energy_cost_per_day'],
+                        profit_per_day=prof['profit_per_day']
+                    )
+
+                    logger.info(f"Profitability: ${prof['profit_per_day']:.2f}/day " +
+                              f"({prof['profit_margin']:.1f}% margin)")
+
+            self.last_profitability_log_time = now
+
+        except Exception as e:
+            logger.error(f"Error logging profitability: {e}")
+
     def start_monitoring(self):
         """Start background monitoring thread"""
         if self.monitoring_active:
@@ -151,7 +274,18 @@ class FleetManager:
             logger.info("Monitoring thread started")
             while self.monitoring_active:
                 try:
+                    # Check if mining schedule requires frequency changes
+                    self._apply_mining_schedule()
+
+                    # Update all miners
                     self.update_all_miners()
+
+                    # Log energy consumption (every 15 minutes)
+                    self._log_energy_consumption()
+
+                    # Log profitability (every hour)
+                    self._log_profitability()
+
                 except Exception as e:
                     logger.error(f"Error in monitoring loop: {e}")
 
@@ -295,6 +429,244 @@ def delete_miner(ip: str):
             'success': False,
             'error': 'Miner not found'
         }), 404
+
+
+# Energy Management Routes
+
+@app.route('/api/energy/config', methods=['GET', 'POST'])
+def energy_config():
+    """Get or set energy configuration"""
+    if request.method == 'GET':
+        config_data = fleet.db.get_energy_config()
+        return jsonify({
+            'success': True,
+            'config': config_data
+        })
+    else:
+        data = request.get_json()
+        try:
+            fleet.db.set_energy_config(
+                location=data.get('location', ''),
+                energy_company=data.get('energy_company', ''),
+                rate_structure=data.get('rate_structure', 'tou'),
+                currency=data.get('currency', 'USD')
+            )
+            return jsonify({
+                'success': True,
+                'message': 'Energy configuration saved'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+
+@app.route('/api/energy/rates', methods=['GET', 'POST', 'DELETE'])
+def energy_rates():
+    """Manage energy rates"""
+    if request.method == 'GET':
+        rates = fleet.db.get_energy_rates()
+        current_rate = fleet.energy_rate_mgr.get_current_rate()
+        return jsonify({
+            'success': True,
+            'rates': rates,
+            'current_rate': current_rate
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        try:
+            # Check if using preset
+            if 'preset' in data:
+                preset_name = data['preset']
+                if preset_name in ENERGY_COMPANY_PRESETS:
+                    preset = ENERGY_COMPANY_PRESETS[preset_name]
+                    fleet.energy_rate_mgr.set_tou_rates(preset['rates'])
+                    fleet.db.set_energy_config(
+                        location=preset['location'],
+                        energy_company=preset_name
+                    )
+                    return jsonify({
+                        'success': True,
+                        'message': f'Applied {preset_name} rate preset'
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Invalid preset name'
+                    }), 400
+
+            # Custom rates
+            rates = data.get('rates', [])
+            fleet.energy_rate_mgr.set_tou_rates(rates)
+            return jsonify({
+                'success': True,
+                'message': f'Set {len(rates)} energy rates'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    else:  # DELETE
+        try:
+            fleet.db.delete_all_energy_rates()
+            return jsonify({
+                'success': True,
+                'message': 'All energy rates deleted'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+
+@app.route('/api/energy/presets', methods=['GET'])
+def energy_presets():
+    """Get available energy company presets"""
+    return jsonify({
+        'success': True,
+        'presets': list(ENERGY_COMPANY_PRESETS.keys())
+    })
+
+
+@app.route('/api/energy/profitability', methods=['GET'])
+def get_profitability():
+    """Calculate current profitability"""
+    try:
+        stats = fleet.get_fleet_stats()
+        current_rate = fleet.energy_rate_mgr.get_current_rate()
+
+        prof = fleet.profitability_calc.calculate_profitability(
+            total_hashrate=stats['total_hashrate'],
+            total_power_watts=stats['total_power'],
+            energy_rate_per_kwh=current_rate
+        )
+
+        return jsonify({
+            'success': True,
+            'profitability': prof
+        })
+    except Exception as e:
+        logger.error(f"Error calculating profitability: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/energy/consumption', methods=['GET'])
+def get_energy_consumption():
+    """Get energy consumption history"""
+    try:
+        hours = int(request.args.get('hours', 24))
+        history = fleet.db.get_energy_consumption_history(hours)
+
+        # Calculate totals
+        total_kwh = sum(h['energy_kwh'] for h in history if h['energy_kwh'])
+        total_cost = sum(h['cost'] for h in history if h['cost'])
+
+        return jsonify({
+            'success': True,
+            'history': history,
+            'total_kwh': total_kwh,
+            'total_cost': total_cost
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/energy/profitability/history', methods=['GET'])
+def get_profitability_history():
+    """Get profitability history"""
+    try:
+        days = int(request.args.get('days', 7))
+        history = fleet.db.get_profitability_history(days)
+
+        return jsonify({
+            'success': True,
+            'history': history
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/energy/schedule', methods=['GET', 'POST', 'DELETE'])
+def mining_schedule():
+    """Manage mining schedule"""
+    if request.method == 'GET':
+        schedules = fleet.db.get_mining_schedules()
+        return jsonify({
+            'success': True,
+            'schedules': schedules
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        try:
+            # Auto-create schedule from rates
+            if 'auto_from_rates' in data:
+                max_rate = data.get('max_rate_threshold', 0.20)
+                low_freq = data.get('low_frequency', 0)
+                high_freq = data.get('high_frequency', 0)
+
+                fleet.mining_scheduler.create_schedule_from_rates(
+                    max_rate_threshold=max_rate,
+                    low_frequency=low_freq,
+                    high_frequency=high_freq
+                )
+                return jsonify({
+                    'success': True,
+                    'message': 'Schedule auto-created from energy rates'
+                })
+
+            # Manual schedule
+            schedule = data
+            fleet.db.add_mining_schedule(
+                start_time=schedule['start_time'],
+                end_time=schedule['end_time'],
+                target_frequency=schedule['target_frequency'],
+                day_of_week=schedule.get('day_of_week'),
+                enabled=schedule.get('enabled', 1)
+            )
+            return jsonify({
+                'success': True,
+                'message': 'Schedule added'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    else:  # DELETE
+        schedule_id = request.args.get('id')
+        if schedule_id:
+            try:
+                fleet.db.delete_mining_schedule(int(schedule_id))
+                return jsonify({
+                    'success': True,
+                    'message': 'Schedule deleted'
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Missing schedule id'
+            }), 400
 
 
 if __name__ == '__main__':

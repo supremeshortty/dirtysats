@@ -16,44 +16,139 @@
             </div>
         </header>
 
-        <!-- Fleet Statistics -->
-        <section class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total Miners</div>
-                <div class="stat-value" id="total-miners">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Online</div>
-                <div class="stat-value online" id="online-miners">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Offline</div>
-                <div class="stat-value offline" id="offline-miners">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total Hashrate</div>
-                <div class="stat-value" id="total-hashrate">0 GH/s</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Total Power</div>
-                <div class="stat-value" id="total-power">0 W</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Avg Temperature</div>
-                <div class="stat-value" id="avg-temp">0°C</div>
-            </div>
-        </section>
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="fleet">Fleet</button>
+            <button class="tab-btn" data-tab="energy">Energy</button>
+        </div>
 
-        <!-- Miners List -->
-        <section class="miners-section">
-            <h2>Miners</h2>
-            <div id="miners-container">
-                <p class="loading">Loading miners...</p>
-            </div>
-        </section>
+        <!-- Fleet Tab -->
+        <div id="fleet-tab" class="tab-content active">
+            <!-- Fleet Statistics -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Miners</div>
+                    <div class="stat-value" id="total-miners">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Online</div>
+                    <div class="stat-value online" id="online-miners">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Offline</div>
+                    <div class="stat-value offline" id="offline-miners">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Hashrate</div>
+                    <div class="stat-value" id="total-hashrate">0 GH/s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Power</div>
+                    <div class="stat-value" id="total-power">0 W</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Temperature</div>
+                    <div class="stat-value" id="avg-temp">0°C</div>
+                </div>
+            </section>
 
-        <!-- Discovery Status -->
-        <div id="discovery-status" class="alert" style="display: none;"></div>
+            <!-- Miners List -->
+            <section class="miners-section">
+                <h2>Miners</h2>
+                <div id="miners-container">
+                    <p class="loading">Loading miners...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Energy Tab -->
+        <div id="energy-tab" class="tab-content">
+            <!-- Energy Configuration -->
+            <section class="energy-config-section">
+                <h2>Energy Configuration</h2>
+                <div class="config-card">
+                    <h3>Location & Company</h3>
+                    <form id="energy-config-form">
+                        <div class="form-group">
+                            <label for="energy-company">Energy Company:</label>
+                            <select id="energy-company" name="energy_company">
+                                <option value="">Select preset...</option>
+                                <option value="PG&E (California)">PG&E (California)</option>
+                                <option value="ConEd (New York)">ConEd (New York)</option>
+                                <option value="Texas Electric (Texas)">Texas Electric (Texas)</option>
+                                <option value="Custom (Manual Entry)">Custom (Manual Entry)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="location">Location:</label>
+                            <input type="text" id="location" name="location" placeholder="e.g., California">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply Preset</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Current Rate & Schedule -->
+            <section class="rate-info-section">
+                <h2>Current Status</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Current Rate</div>
+                        <div class="stat-value" id="current-rate">$0.12/kWh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Energy Today</div>
+                        <div class="stat-value" id="energy-today">0 kWh</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Cost Today</div>
+                        <div class="stat-value" id="cost-today">$0.00</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profitability Calculator -->
+            <section class="profitability-section">
+                <h2>Profitability</h2>
+                <div id="profitability-container">
+                    <p class="loading">Calculating profitability...</p>
+                </div>
+            </section>
+
+            <!-- Rate Schedule -->
+            <section class="rate-schedule-section">
+                <h2>Rate Schedule</h2>
+                <div id="rate-schedule-container">
+                    <p class="loading">Loading rate schedule...</p>
+                </div>
+            </section>
+
+            <!-- Mining Schedule Configuration -->
+            <section class="mining-schedule-section">
+                <h2>Mining Schedule (Frequency Control)</h2>
+                <div class="config-card">
+                    <p>Automatically adjust miner frequency based on energy rates:</p>
+                    <form id="mining-schedule-form">
+                        <div class="form-group">
+                            <label for="max-rate-threshold">Turn Off When Rate Exceeds ($/kWh):</label>
+                            <input type="number" id="max-rate-threshold" step="0.01" value="0.25" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="high-rate-frequency">High Rate Frequency (0 = OFF):</label>
+                            <input type="number" id="high-rate-frequency" value="0" min="0" max="600">
+                        </div>
+                        <div class="form-group">
+                            <label for="low-rate-frequency">Low Rate Frequency (0 = MAX):</label>
+                            <input type="number" id="low-rate-frequency" value="0" min="0" max="600">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Auto-Create Schedule</button>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <!-- Alert Box -->
+        <div id="alert-box" class="alert" style="display: none;"></div>
     </div>
 
     <script src="/static/script.js"></script>
