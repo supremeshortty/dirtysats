@@ -92,3 +92,83 @@ class BitaxeAPIHandler(MinerAPIHandler):
         except Exception as e:
             logger.error(f"Failed to restart Bitaxe at {ip}: {e}")
             return False
+
+    def get_pools(self, ip: str) -> Dict:
+        """Get pool configuration from Bitaxe"""
+        try:
+            response = requests.get(
+                f"http://{ip}/api/system/info",
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Bitaxe supports 3 pools
+            pools = []
+            for i in range(3):
+                pool_url = data.get(f'stratumURL' if i == 0 else f'stratumURL{i}', '')
+                pool_port = data.get(f'stratumPort' if i == 0 else f'stratumPort{i}', 3333)
+                pool_user = data.get(f'stratumUser' if i == 0 else f'stratumUser{i}', '')
+                pool_pass = data.get(f'stratumPassword' if i == 0 else f'stratumPassword{i}', 'x')
+
+                if pool_url:
+                    pools.append({
+                        'url': f"{pool_url}:{pool_port}",
+                        'user': pool_user,
+                        'password': pool_pass
+                    })
+
+            return {
+                'pools': pools,
+                'active_pool': 0  # Bitaxe doesn't expose which pool is active
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get pools from Bitaxe at {ip}: {e}")
+            return None
+
+    def set_pools(self, ip: str, pools: list) -> bool:
+        """Set pool configuration on Bitaxe"""
+        try:
+            settings = {}
+
+            # Update up to 3 pools
+            for i, pool in enumerate(pools[:3]):
+                if i >= 3:
+                    break
+
+                # Parse pool URL and port
+                pool_url = pool.get('url', '')
+                if ':' in pool_url:
+                    url_parts = pool_url.rsplit(':', 1)
+                    pool_host = url_parts[0]
+                    pool_port = int(url_parts[1]) if url_parts[1].isdigit() else 3333
+                else:
+                    pool_host = pool_url
+                    pool_port = 3333
+
+                # Set pool fields
+                if i == 0:
+                    settings['stratumURL'] = pool_host
+                    settings['stratumPort'] = pool_port
+                    settings['stratumUser'] = pool.get('user', '')
+                    settings['stratumPassword'] = pool.get('password', 'x')
+                else:
+                    settings[f'stratumURL{i}'] = pool_host
+                    settings[f'stratumPort{i}'] = pool_port
+                    settings[f'stratumUser{i}'] = pool.get('user', '')
+                    settings[f'stratumPassword{i}'] = pool.get('password', 'x')
+
+            # Apply settings
+            response = requests.patch(
+                f"http://{ip}/api/system",
+                json=settings,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            logger.info(f"Updated pool configuration on Bitaxe at {ip}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to set pools on Bitaxe at {ip}: {e}")
+            return False

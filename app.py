@@ -96,16 +96,25 @@ class FleetManager:
             subnet = config.NETWORK_SUBNET
 
         logger.info(f"Starting network discovery on {subnet}")
-        network = ipaddress.IPv4Network(subnet, strict=False)
+
+        try:
+            network = ipaddress.IPv4Network(subnet, strict=False)
+        except ValueError as e:
+            logger.error(f"Invalid subnet format '{subnet}': {e}")
+            raise ValueError(f"Invalid network subnet: {subnet}. Expected format: '10.0.0.0/24'")
 
         discovered = []
 
         def check_ip(ip_str: str) -> Miner:
             """Check single IP for miner"""
-            miner = self.detector.detect(ip_str)
-            if miner:
-                logger.info(f"Found miner at {ip_str}")
-            return miner
+            try:
+                miner = self.detector.detect(ip_str)
+                if miner:
+                    logger.info(f"Found miner at {ip_str}")
+                return miner
+            except Exception as e:
+                logger.debug(f"No miner at {ip_str}: {e}")
+                return None
 
         # Parallel scan
         with ThreadPoolExecutor(max_workers=config.DISCOVERY_THREADS) as executor:
@@ -597,6 +606,87 @@ def delete_miner(ip: str):
             'success': False,
             'error': 'Miner not found'
         }), 404
+
+
+@app.route('/api/miner/<ip>/pools', methods=['GET'])
+def get_miner_pools(ip: str):
+    """Get pool configuration for a specific miner"""
+    with fleet.lock:
+        miner = fleet.miners.get(ip)
+        if not miner:
+            return jsonify({
+                'success': False,
+                'error': 'Miner not found'
+            }), 404
+
+        pools_info = miner.api_handler.get_pools(ip)
+        if pools_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Pool management not supported for this miner type'
+            }), 400
+
+        return jsonify({
+            'success': True,
+            'pools': pools_info.get('pools', []),
+            'active_pool': pools_info.get('active_pool', 0)
+        })
+
+
+@app.route('/api/miner/<ip>/pools', methods=['POST'])
+def set_miner_pools(ip: str):
+    """Set pool configuration for a specific miner"""
+    data = request.get_json()
+    pools = data.get('pools', [])
+
+    if not pools:
+        return jsonify({
+            'success': False,
+            'error': 'No pools provided'
+        }), 400
+
+    with fleet.lock:
+        miner = fleet.miners.get(ip)
+        if not miner:
+            return jsonify({
+                'success': False,
+                'error': 'Miner not found'
+            }), 404
+
+        success = miner.api_handler.set_pools(ip, pools)
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to set pool configuration'
+            }), 500
+
+        return jsonify({
+            'success': True,
+            'message': 'Pool configuration updated successfully'
+        })
+
+
+@app.route('/api/pools', methods=['GET'])
+def get_all_pools():
+    """Get pool configuration for all miners"""
+    pools_data = []
+
+    with fleet.lock:
+        for ip, miner in fleet.miners.items():
+            pools_info = miner.api_handler.get_pools(ip)
+            if pools_info:
+                pools_data.append({
+                    'ip': ip,
+                    'model': miner.model,
+                    'type': miner.type,
+                    'pools': pools_info.get('pools', []),
+                    'active_pool': pools_info.get('active_pool', 0)
+                })
+
+    return jsonify({
+        'success': True,
+        'miners': pools_data
+    })
 
 
 # Energy Management Routes

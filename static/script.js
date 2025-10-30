@@ -59,6 +59,8 @@ function switchTab(tabName) {
         loadAlertsTab();
     } else if (tabName === 'weather') {
         loadWeatherTab();
+    } else if (tabName === 'pools') {
+        loadPoolsTab();
     } else if (tabName === 'fleet') {
         loadDashboard();
     }
@@ -218,7 +220,8 @@ async function discoverMiners() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({})
         });
 
         const data = await response.json();
@@ -531,79 +534,128 @@ function updateLastUpdateTime() {
 // ============================================================================
 
 // Chart instances
-let temperatureChart = null;
-let hashrateChart = null;
+let combinedChart = null;
 let powerChart = null;
 let profitabilityChart = null;
 
 // Load Charts Tab
 async function loadChartsTab() {
     const hours = parseInt(document.getElementById('chart-time-range').value);
-    await loadTemperatureChart(hours);
-    await loadHashrateChart(hours);
+    await loadCombinedChart(hours);
     await loadPowerChart(hours);
     await loadProfitabilityChart();
 }
 
-// Load Temperature Chart
-async function loadTemperatureChart(hours = 24) {
+// Load Combined Hashrate & Temperature Chart (AxeOS-style)
+async function loadCombinedChart(hours = 24) {
     try {
-        const response = await fetch(`${API_BASE}/api/history/temperature?hours=${hours}`);
-        const result = await response.json();
+        // Fetch both temperature and hashrate data in parallel
+        const [tempResponse, hashrateResponse] = await Promise.all([
+            fetch(`${API_BASE}/api/history/temperature?hours=${hours}`),
+            fetch(`${API_BASE}/api/history/hashrate?hours=${hours}`)
+        ]);
 
-        if (!result.success) {
-            console.error('Error loading temperature history:', result.error);
+        const tempResult = await tempResponse.json();
+        const hashrateResult = await hashrateResponse.json();
+
+        if (!tempResult.success || !hashrateResult.success) {
+            console.error('Error loading chart data');
             return;
         }
 
-        const ctx = document.getElementById('temperature-chart').getContext('2d');
+        const ctx = document.getElementById('combined-chart').getContext('2d');
 
-        // Group data by miner IP
-        const minerData = {};
-        result.data.forEach(point => {
-            if (!minerData[point.miner_ip]) {
-                minerData[point.miner_ip] = {
-                    labels: [],
-                    data: []
-                };
+        // Prepare hashrate dataset (single line, total hashrate)
+        const hashrateData = hashrateResult.data.map(point => ({
+            x: new Date(point.timestamp),
+            y: point.hashrate_ths
+        }));
+
+        // Group temperature data by miner IP
+        const minerTempData = {};
+        tempResult.data.forEach(point => {
+            if (!minerTempData[point.miner_ip]) {
+                minerTempData[point.miner_ip] = [];
             }
-            minerData[point.miner_ip].labels.push(new Date(point.timestamp));
-            minerData[point.miner_ip].data.push(point.temperature);
+            minerTempData[point.miner_ip].push({
+                x: new Date(point.timestamp),
+                y: point.temperature
+            });
         });
 
         // Create datasets
-        const datasets = Object.keys(minerData).map((ip, index) => {
-            const colors = ['#4CAF50', '#2196F3', '#ff9800', '#f44336', '#9c27b0'];
-            return {
-                label: ip,
-                data: minerData[ip].labels.map((time, i) => ({
-                    x: time,
-                    y: minerData[ip].data[i]
-                })),
-                borderColor: colors[index % colors.length],
-                backgroundColor: colors[index % colors.length] + '20',
-                tension: 0.4
-            };
+        const datasets = [];
+
+        // Add hashrate dataset (left y-axis)
+        datasets.push({
+            label: 'Total Hashrate',
+            data: hashrateData,
+            borderColor: '#4CAF50',
+            backgroundColor: '#4CAF5020',
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            yAxisID: 'y-hashrate',
+            order: 1
+        });
+
+        // Add temperature datasets for each miner (right y-axis)
+        const tempColors = ['#2196F3', '#ff9800', '#f44336', '#9c27b0', '#00bcd4', '#ffeb3b'];
+        Object.keys(minerTempData).forEach((ip, index) => {
+            datasets.push({
+                label: `${ip} Temp`,
+                data: minerTempData[ip],
+                borderColor: tempColors[index % tempColors.length],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+                yAxisID: 'y-temperature',
+                order: 2
+            });
         });
 
         // Destroy existing chart
-        if (temperatureChart) {
-            temperatureChart.destroy();
+        if (combinedChart) {
+            combinedChart.destroy();
         }
 
-        // Create new chart
-        temperatureChart = new Chart(ctx, {
+        // Create new dual-axis chart
+        combinedChart = new Chart(ctx, {
             type: 'line',
             data: { datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     legend: {
-                        labels: { color: '#fff' }
+                        labels: {
+                            color: '#fff',
+                            usePointStyle: true,
+                            padding: 15
+                        }
                     },
-                    title: {
-                        display: false
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    if (context.dataset.yAxisID === 'y-hashrate') {
+                                        label += context.parsed.y.toFixed(2) + ' TH/s';
+                                    } else {
+                                        label += context.parsed.y.toFixed(1) + '°C';
+                                    }
+                                }
+                                return label;
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -615,92 +667,50 @@ async function loadTemperatureChart(hours = 24) {
                         ticks: { color: '#888' },
                         grid: { color: '#333' }
                     },
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: 'Temperature (°C)',
-                            color: '#888'
-                        },
-                        ticks: { color: '#888' },
-                        grid: { color: '#333' }
-                    }
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Error loading temperature chart:', error);
-    }
-}
-
-// Load Hashrate Chart
-async function loadHashrateChart(hours = 24) {
-    try {
-        const response = await fetch(`${API_BASE}/api/history/hashrate?hours=${hours}`);
-        const result = await response.json();
-
-        if (!result.success) {
-            console.error('Error loading hashrate history:', result.error);
-            return;
-        }
-
-        const ctx = document.getElementById('hashrate-chart').getContext('2d');
-
-        // Prepare data
-        const labels = result.data.map(point => new Date(point.timestamp));
-        const data = result.data.map(point => point.hashrate_ths);
-
-        // Destroy existing chart
-        if (hashrateChart) {
-            hashrateChart.destroy();
-        }
-
-        // Create new chart
-        hashrateChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Total Hashrate (TH/s)',
-                    data,
-                    borderColor: '#4CAF50',
-                    backgroundColor: '#4CAF5020',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: { color: '#fff' }
-                    }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: hours <= 24 ? 'hour' : 'day'
-                        },
-                        ticks: { color: '#888' },
-                        grid: { color: '#333' }
-                    },
-                    y: {
+                    'y-hashrate': {
+                        type: 'linear',
+                        position: 'left',
                         beginAtZero: true,
                         title: {
                             display: true,
                             text: 'Hashrate (TH/s)',
-                            color: '#888'
+                            color: '#4CAF50'
                         },
-                        ticks: { color: '#888' },
-                        grid: { color: '#333' }
+                        ticks: {
+                            color: '#4CAF50',
+                            callback: function(value) {
+                                return value.toFixed(2);
+                            }
+                        },
+                        grid: {
+                            color: '#333',
+                            drawOnChartArea: true
+                        }
+                    },
+                    'y-temperature': {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)',
+                            color: '#2196F3'
+                        },
+                        ticks: {
+                            color: '#2196F3',
+                            callback: function(value) {
+                                return value.toFixed(0) + '°C';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 }
             }
         });
     } catch (error) {
-        console.error('Error loading hashrate chart:', error);
+        console.error('Error loading combined chart:', error);
     }
 }
 
@@ -1129,6 +1139,149 @@ startAutoRefresh = function() {
             loadAlertsTab();
         } else if (currentTab === 'weather') {
             loadWeatherTab();
+        } else if (currentTab === 'pools') {
+            loadPoolsTab();
         }
     }, UPDATE_INTERVAL);
 };
+
+// ============================================================================
+// POOLS TAB FUNCTIONS
+// ============================================================================
+
+// Load Pools Tab
+async function loadPoolsTab() {
+    await loadAllPools();
+}
+
+// Load All Pools
+async function loadAllPools() {
+    try {
+        const response = await fetch(`${API_BASE}/api/pools`);
+        const result = await response.json();
+
+        const container = document.getElementById('pools-container');
+
+        if (!result.success || result.miners.length === 0) {
+            container.innerHTML = '<p class="loading">No miners available or pool management not supported</p>';
+            return;
+        }
+
+        let html = '';
+        result.miners.forEach(miner => {
+            html += createPoolCard(miner);
+        });
+        container.innerHTML = html;
+
+        // Attach event listeners
+        result.miners.forEach(miner => {
+            const form = document.getElementById(`pool-form-${miner.ip.replace(/\./g, '-')}`);
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    savePoolConfig(miner.ip);
+                });
+            }
+        });
+    } catch (error) {
+        console.error('Error loading pools:', error);
+    }
+}
+
+// Create Pool Card HTML
+function createPoolCard(miner) {
+    const ipId = miner.ip.replace(/\./g, '-');
+    const pools = miner.pools || [];
+
+    // Ensure we have at least 3 pool slots
+    while (pools.length < 3) {
+        pools.push({ url: '', user: '', password: 'x' });
+    }
+
+    return `
+        <div class="pool-card">
+            <div class="pool-card-header">
+                <h3>${miner.model || miner.type}</h3>
+                <div class="pool-card-ip">${miner.ip}</div>
+            </div>
+            <form id="pool-form-${ipId}" class="pool-form">
+                <div class="pools-grid">
+                    ${pools.map((pool, index) => `
+                        <div class="pool-item">
+                            <h4>Pool ${index + 1} ${index === miner.active_pool ? '(Active)' : ''}</h4>
+                            <div class="form-group">
+                                <label>Pool URL:</label>
+                                <input type="text"
+                                       name="pool${index}_url"
+                                       value="${pool.url || ''}"
+                                       placeholder="stratum+tcp://pool.example.com:3333"
+                                       ${index === 0 ? 'required' : ''}>
+                            </div>
+                            <div class="form-group">
+                                <label>Worker Username:</label>
+                                <input type="text"
+                                       name="pool${index}_user"
+                                       value="${pool.user || ''}"
+                                       placeholder="your_bitcoin_address.worker"
+                                       ${index === 0 ? 'required' : ''}>
+                            </div>
+                            <div class="form-group">
+                                <label>Password:</label>
+                                <input type="text"
+                                       name="pool${index}_password"
+                                       value="${pool.password || 'x'}"
+                                       placeholder="x">
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="pool-actions">
+                    <button type="submit" class="btn btn-primary">💾 Save Pool Configuration</button>
+                </div>
+            </form>
+        </div>
+    `;
+}
+
+// Save Pool Configuration
+async function savePoolConfig(ip) {
+    const ipId = ip.replace(/\./g, '-');
+    const form = document.getElementById(`pool-form-${ipId}`);
+    const formData = new FormData(form);
+
+    // Build pools array
+    const pools = [];
+    for (let i = 0; i < 3; i++) {
+        const url = formData.get(`pool${i}_url`);
+        const user = formData.get(`pool${i}_user`);
+        const password = formData.get(`pool${i}_password`) || 'x';
+
+        if (url && user) {
+            pools.push({ url, user, password });
+        }
+    }
+
+    if (pools.length === 0) {
+        showAlert('At least one pool configuration is required', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/miner/${ip}/pools`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pools })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert(`✅ Pool configuration updated for ${ip}`, 'success');
+            setTimeout(() => loadAllPools(), 1000);
+        } else {
+            showAlert(`❌ Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`❌ Error saving pool config: ${error.message}`, 'error');
+    }
+}

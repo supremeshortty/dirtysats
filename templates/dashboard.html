@@ -23,6 +23,7 @@
             <button class="tab-btn" data-tab="charts">Charts</button>
             <button class="tab-btn" data-tab="alerts">Alerts</button>
             <button class="tab-btn" data-tab="weather">Weather</button>
+            <button class="tab-btn" data-tab="pools">Pools</button>
         </div>
 
         <!-- Fleet Tab -->
@@ -167,19 +168,11 @@
                 </div>
             </section>
 
-            <!-- Temperature Chart -->
+            <!-- Combined Hashrate & Temperature Chart -->
             <section class="chart-section">
-                <h3>Temperature History</h3>
+                <h3>Fleet Performance - Hashrate & Temperature</h3>
                 <div class="chart-container">
-                    <canvas id="temperature-chart"></canvas>
-                </div>
-            </section>
-
-            <!-- Hashrate Chart -->
-            <section class="chart-section">
-                <h3>Hashrate History</h3>
-                <div class="chart-container">
-                    <canvas id="hashrate-chart"></canvas>
+                    <canvas id="combined-chart"></canvas>
                 </div>
             </section>
 
@@ -287,6 +280,19 @@
                 <h2>Optimal Mining Hours</h2>
                 <div id="optimal-hours-container">
                     <p class="loading">No data available</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Pools Tab -->
+        <div id="pools-tab" class="tab-content">
+            <!-- Pool Management Section -->
+            <section class="pools-section">
+                <h2>Mining Pool Configuration</h2>
+                <p class="help-text">Manage mining pools for each miner in your fleet. Changes are applied immediately to the selected miner.</p>
+
+                <div id="pools-container">
+                    <p class="loading">Loading pool configurations...</p>
                 </div>
             </section>
         </div>

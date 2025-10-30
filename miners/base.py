@@ -67,3 +67,31 @@ class MinerAPIHandler(ABC):
             True if this miner type is detected
         """
         pass
+
+    def get_pools(self, ip: str) -> Optional[Dict]:
+        """
+        Get pool configuration from miner
+
+        Args:
+            ip: Miner IP address
+
+        Returns:
+            Dict with pool information:
+                - pools: list of pool dicts with url, user, password
+                - active_pool: currently active pool index
+            None if not supported or error
+        """
+        return None
+
+    def set_pools(self, ip: str, pools: list) -> bool:
+        """
+        Set pool configuration on miner
+
+        Args:
+            ip: Miner IP address
+            pools: List of pool dicts with url, user, password
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return False
