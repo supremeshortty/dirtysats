@@ -182,7 +182,17 @@ class AlertManager:
         if not self.should_send_alert(alert):
             return
 
-        # Record alert
+        # Record alert in database
+        import json
+        self.db.add_alert_to_history(
+            alert_type=alert.alert_type.value,
+            level=alert.level.value,
+            title=alert.title,
+            message=alert.message,
+            data_json=json.dumps(alert.data) if alert.data else None
+        )
+
+        # Also keep in memory for quick access
         self.alert_history.append(alert)
         key = f"{alert.alert_type.value}:{alert.miner_ip or 'global'}"
         self.last_alerts[key] = datetime.now()
@@ -398,13 +408,8 @@ class AlertManager:
             return False
 
     def get_alert_history(self, hours: int = 24) -> List[Dict]:
-        """Get alert history"""
-        cutoff = datetime.now() - timedelta(hours=hours)
-        return [
-            alert.to_dict()
-            for alert in self.alert_history
-            if alert.timestamp > cutoff
-        ]
+        """Get alert history from database"""
+        return self.db.get_alert_history(hours)
 
     # Convenience methods for creating common alerts
 

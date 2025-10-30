@@ -49,6 +49,19 @@ class WeatherManager:
         self.last_update = None
         self.cache_duration = timedelta(minutes=30)
 
+        # Load configuration from database
+        self._load_config_from_db()
+
+    def _load_config_from_db(self):
+        """Load weather configuration from database"""
+        config = self.db.get_weather_config()
+        if config:
+            self.api_key = config.get('api_key')
+            self.location = config.get('location')
+            self.latitude = config.get('latitude')
+            self.longitude = config.get('longitude')
+            logger.info("Loaded weather configuration from database")
+
     def configure(self, api_key: str, location: str = None,
                   latitude: float = None, longitude: float = None):
         """
@@ -63,6 +76,10 @@ class WeatherManager:
         self.location = location
         self.latitude = latitude
         self.longitude = longitude
+
+        # Save to database for persistence
+        self.db.save_weather_config(api_key, location, latitude, longitude)
+
         logger.info(f"Weather configured for {location or f'{latitude},{longitude}'}")
 
     def _should_update_cache(self) -> bool:

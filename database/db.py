@@ -148,6 +148,48 @@ class Database:
                 ON profitability_log(timestamp)
             """)
 
+            # Alert configuration table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS alert_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel TEXT NOT NULL,
+                    config_json TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Alert history table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS alert_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    alert_type TEXT,
+                    level TEXT,
+                    title TEXT,
+                    message TEXT,
+                    data_json TEXT
+                )
+            """)
+
+            # Weather configuration table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS weather_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    api_key TEXT,
+                    location TEXT,
+                    latitude REAL,
+                    longitude REAL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Create index for alert history
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_alert_history_timestamp
+                ON alert_history(timestamp)
+            """)
+
             logger.info("Database initialized successfully")
 
     def add_miner(self, ip: str, miner_type: str, model: str = None) -> int:
@@ -372,3 +414,72 @@ class Database:
             """, (f'-{days}',))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    # Alert Management Methods
+
+    def add_alert_to_history(self, alert_type: str, level: str, title: str,
+                             message: str, data_json: str = None):
+        """Log alert to history"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO alert_history (alert_type, level, title, message, data_json)
+                VALUES (?, ?, ?, ?, ?)
+            """, (alert_type, level, title, message, data_json))
+
+    def get_alert_history(self, hours: int = 24) -> List[Dict]:
+        """Get alert history"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM alert_history
+                WHERE timestamp > datetime('now', ? || ' hours')
+                ORDER BY timestamp DESC
+            """, (f'-{hours}',))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def save_alert_config(self, channel: str, config_json: str):
+        """Save alert channel configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO alert_config (channel, config_json, enabled)
+                VALUES (?, ?, 1)
+            """, (channel, config_json))
+
+    def get_alert_config(self, channel: str = None) -> Optional[Dict]:
+        """Get alert configuration for a channel"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if channel:
+                cursor.execute("SELECT * FROM alert_config WHERE channel = ?", (channel,))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+            else:
+                cursor.execute("SELECT * FROM alert_config")
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    # Weather Configuration Methods
+
+    def save_weather_config(self, api_key: str, location: str = None,
+                           latitude: float = None, longitude: float = None):
+        """Save weather configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Delete old config
+            cursor.execute("DELETE FROM weather_config")
+            # Insert new config
+            cursor.execute("""
+                INSERT INTO weather_config (api_key, location, latitude, longitude, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (api_key, location, latitude, longitude, datetime.now()))
+
+    def get_weather_config(self) -> Optional[Dict]:
+        """Get weather configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM weather_config ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            return dict(row) if row else None

@@ -53,6 +53,14 @@ function switchTab(tabName) {
     // Load tab-specific data
     if (tabName === 'energy') {
         loadEnergyTab();
+    } else if (tabName === 'charts') {
+        loadChartsTab();
+    } else if (tabName === 'alerts') {
+        loadAlertsTab();
+    } else if (tabName === 'weather') {
+        loadWeatherTab();
+    } else if (tabName === 'fleet') {
+        loadDashboard();
     }
 }
 
