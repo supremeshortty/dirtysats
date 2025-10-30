@@ -260,6 +260,27 @@
                         <button type="button" id="test-slack-btn" class="btn btn-secondary">Test Slack</button>
                     </form>
                 </div>
+
+                <div class="config-card">
+                    <h3>Telegram Bot</h3>
+                    <p class="help-text">
+                        Get bot token from <a href="https://t.me/BotFather" target="_blank">@BotFather</a>.
+                        Get chat ID: send a message to your bot, then visit
+                        <code>https://api.telegram.org/bot&lt;YOUR_BOT_TOKEN&gt;/getUpdates</code>
+                    </p>
+                    <form id="telegram-alert-form">
+                        <div class="form-group">
+                            <label for="telegram-bot-token">Bot Token:</label>
+                            <input type="text" id="telegram-bot-token" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                        </div>
+                        <div class="form-group">
+                            <label for="telegram-chat-id">Chat ID:</label>
+                            <input type="text" id="telegram-chat-id" placeholder="123456789 or -123456789 for groups">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Telegram Config</button>
+                        <button type="button" id="test-telegram-btn" class="btn btn-secondary">Test Telegram</button>
+                    </form>
+                </div>
             </section>
 
             <!-- Alert History -->

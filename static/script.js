@@ -1087,6 +1087,38 @@ document.getElementById('chart-time-range')?.addEventListener('change', loadChar
 document.getElementById('test-email-btn')?.addEventListener('click', testAlert);
 document.getElementById('test-discord-btn')?.addEventListener('click', testAlert);
 document.getElementById('test-slack-btn')?.addEventListener('click', testAlert);
+document.getElementById('test-telegram-btn')?.addEventListener('click', testAlert);
+
+// Telegram configuration form
+document.getElementById('telegram-alert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const botToken = document.getElementById('telegram-bot-token').value;
+    const chatId = document.getElementById('telegram-chat-id').value;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/alerts/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                telegram: {
+                    enabled: true,
+                    bot_token: botToken,
+                    chat_id: chatId
+                }
+            })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showAlert('Telegram configuration saved!', 'success');
+        } else {
+            showAlert(`Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Error saving Telegram config: ${error.message}`, 'error');
+    }
+});
 
 // Update auto-refresh to include new tabs
 const originalStartAutoRefresh = startAutoRefresh;

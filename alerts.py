@@ -70,6 +70,11 @@ class AlertConfig:
         self.slack_enabled = False
         self.slack_webhook_url = ""
 
+        # Telegram
+        self.telegram_enabled = False
+        self.telegram_bot_token = ""
+        self.telegram_chat_id = ""
+
         # Alert rules
         self.alert_cooldown = timedelta(minutes=15)  # Min time between same alert
         self.alert_on_offline = True
@@ -160,6 +165,13 @@ class AlertManager:
             self.config.slack_enabled = slack.get('enabled', False)
             self.config.slack_webhook_url = slack.get('webhook_url', '')
 
+        # Telegram
+        if 'telegram' in config_dict:
+            telegram = config_dict['telegram']
+            self.config.telegram_enabled = telegram.get('enabled', False)
+            self.config.telegram_bot_token = telegram.get('bot_token', '')
+            self.config.telegram_chat_id = telegram.get('chat_id', '')
+
         logger.info("Alert configuration updated")
 
     def should_send_alert(self, alert: Alert) -> bool:
@@ -218,6 +230,10 @@ class AlertManager:
 
         if self.config.slack_enabled:
             if self._send_slack(alert):
+                success_count += 1
+
+        if self.config.telegram_enabled:
+            if self._send_telegram(alert):
                 success_count += 1
 
         logger.info(f"Alert sent via {success_count} channel(s): {alert.title}")
@@ -405,6 +421,56 @@ class AlertManager:
 
         except Exception as e:
             logger.error(f"Failed to send Slack alert: {e}")
+            return False
+
+    def _send_telegram(self, alert: Alert) -> bool:
+        """Send Telegram bot alert"""
+        try:
+            # Emoji mapping for alert levels
+            emoji_map = {
+                AlertLevel.INFO: "ℹ️",
+                AlertLevel.WARNING: "⚠️",
+                AlertLevel.CRITICAL: "🚨",
+                AlertLevel.EMERGENCY: "🔴"
+            }
+
+            # Build formatted message
+            emoji = emoji_map.get(alert.level, "📢")
+            message = f"{emoji} *{alert.title}*\n\n"
+            message += f"{alert.message}\n\n"
+
+            # Add miner info if present
+            if alert.miner_ip:
+                message += f"🖥️ *Miner:* `{alert.miner_ip}`\n"
+
+            # Add alert data
+            if alert.data:
+                message += "\n📊 *Details:*\n"
+                for key, value in alert.data.items():
+                    # Format key nicely (capitalize, replace underscores)
+                    formatted_key = key.replace('_', ' ').title()
+                    message += f"• {formatted_key}: `{value}`\n"
+
+            # Add timestamp
+            timestamp = alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            message += f"\n🕐 {timestamp}"
+
+            # Send via Telegram Bot API
+            url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
+            payload = {
+                "chat_id": self.config.telegram_chat_id,
+                "text": message,
+                "parse_mode": "Markdown"
+            }
+
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            logger.info(f"Telegram alert sent: {alert.title}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send Telegram alert: {e}")
             return False
 
     def get_alert_history(self, hours: int = 24) -> List[Dict]:
