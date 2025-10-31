@@ -638,6 +638,19 @@ h3 {
     flex: 1;
 }
 
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.location-fields {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
 .help-text {
     color: var(--text-muted);
     font-size: 0.875rem;

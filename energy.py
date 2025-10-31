@@ -577,6 +577,188 @@ ENERGY_COMPANY_PRESETS = {
         ]
     },
 
+    # ========== CANADA ==========
+    "Hydro-Québec (Canada)": {
+        "location": "Quebec, Canada",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.07, "rate_type": "standard"},
+        ]
+    },
+    "BC Hydro (Canada)": {
+        "location": "British Columbia, Canada",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.09, "rate_type": "standard"},
+        ]
+    },
+    "Ontario Hydro (Canada)": {
+        "location": "Ontario, Canada",
+        "rates": [
+            {"start_time": "00:00", "end_time": "07:00", "rate_per_kwh": 0.08, "rate_type": "off-peak"},
+            {"start_time": "07:00", "end_time": "19:00", "rate_per_kwh": 0.13, "rate_type": "peak"},
+            {"start_time": "19:00", "end_time": "23:59", "rate_per_kwh": 0.08, "rate_type": "off-peak"},
+        ]
+    },
+    "Alberta Electric (Canada)": {
+        "location": "Alberta, Canada",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.10, "rate_type": "standard"},
+        ]
+    },
+
+    # ========== EUROPE ==========
+    "EDF (France)": {
+        "location": "France",
+        "rates": [
+            {"start_time": "00:00", "end_time": "06:00", "rate_per_kwh": 0.15, "rate_type": "off-peak"},
+            {"start_time": "06:00", "end_time": "22:00", "rate_per_kwh": 0.20, "rate_type": "peak"},
+            {"start_time": "22:00", "end_time": "23:59", "rate_per_kwh": 0.15, "rate_type": "off-peak"},
+        ]
+    },
+    "E.ON (Germany)": {
+        "location": "Germany",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.32, "rate_type": "standard"},
+        ]
+    },
+    "Enel (Italy)": {
+        "location": "Italy",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.28, "rate_type": "standard"},
+        ]
+    },
+    "Iberdrola (Spain)": {
+        "location": "Spain",
+        "rates": [
+            {"start_time": "00:00", "end_time": "08:00", "rate_per_kwh": 0.12, "rate_type": "off-peak"},
+            {"start_time": "08:00", "end_time": "22:00", "rate_per_kwh": 0.18, "rate_type": "peak"},
+            {"start_time": "22:00", "end_time": "23:59", "rate_per_kwh": 0.12, "rate_type": "off-peak"},
+        ]
+    },
+    "British Gas (UK)": {
+        "location": "United Kingdom",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.24, "rate_type": "standard"},
+        ]
+    },
+    "EDF Energy (UK)": {
+        "location": "United Kingdom",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.25, "rate_type": "standard"},
+        ]
+    },
+    "Vattenfall (Sweden)": {
+        "location": "Sweden",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.14, "rate_type": "standard"},
+        ]
+    },
+    "Fortum (Norway/Finland)": {
+        "location": "Norway, Finland",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.11, "rate_type": "standard"},
+        ]
+    },
+
+    # ========== ASIA-PACIFIC ==========
+    "China State Grid": {
+        "location": "China",
+        "rates": [
+            {"start_time": "00:00", "end_time": "08:00", "rate_per_kwh": 0.06, "rate_type": "off-peak"},
+            {"start_time": "08:00", "end_time": "22:00", "rate_per_kwh": 0.09, "rate_type": "peak"},
+            {"start_time": "22:00", "end_time": "23:59", "rate_per_kwh": 0.06, "rate_type": "off-peak"},
+        ]
+    },
+    "TEPCO (Japan)": {
+        "location": "Tokyo, Japan",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.21, "rate_type": "standard"},
+        ]
+    },
+    "KEPCO (South Korea)": {
+        "location": "South Korea",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.10, "rate_type": "standard"},
+        ]
+    },
+    "AGL Energy (Australia)": {
+        "location": "Australia",
+        "rates": [
+            {"start_time": "00:00", "end_time": "07:00", "rate_per_kwh": 0.18, "rate_type": "off-peak"},
+            {"start_time": "07:00", "end_time": "21:00", "rate_per_kwh": 0.28, "rate_type": "peak"},
+            {"start_time": "21:00", "end_time": "23:59", "rate_per_kwh": 0.18, "rate_type": "off-peak"},
+        ]
+    },
+    "Origin Energy (Australia)": {
+        "location": "Australia",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.25, "rate_type": "standard"},
+        ]
+    },
+    "Contact Energy (New Zealand)": {
+        "location": "New Zealand",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.17, "rate_type": "standard"},
+        ]
+    },
+    "Singapore Power": {
+        "location": "Singapore",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.18, "rate_type": "standard"},
+        ]
+    },
+
+    # ========== MIDDLE EAST ==========
+    "DEWA (Dubai)": {
+        "location": "Dubai, UAE",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.10, "rate_type": "standard"},
+        ]
+    },
+    "Saudi Electricity Company": {
+        "location": "Saudi Arabia",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.05, "rate_type": "standard"},
+        ]
+    },
+
+    # ========== LATIN AMERICA ==========
+    "CFE (Mexico)": {
+        "location": "Mexico",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.08, "rate_type": "standard"},
+        ]
+    },
+    "Enel Chile": {
+        "location": "Chile",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.14, "rate_type": "standard"},
+        ]
+    },
+    "Eletrobras (Brazil)": {
+        "location": "Brazil",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.11, "rate_type": "standard"},
+        ]
+    },
+
+    # ========== AFRICA ==========
+    "Eskom (South Africa)": {
+        "location": "South Africa",
+        "rates": [
+            {"start_time": "00:00", "end_time": "06:00", "rate_per_kwh": 0.06, "rate_type": "off-peak"},
+            {"start_time": "06:00", "end_time": "22:00", "rate_per_kwh": 0.11, "rate_type": "peak"},
+            {"start_time": "22:00", "end_time": "23:59", "rate_per_kwh": 0.06, "rate_type": "off-peak"},
+        ]
+    },
+
+    # ========== ICELAND (Popular for Mining) ==========
+    "Landsvirkjun (Iceland)": {
+        "location": "Iceland",
+        "rates": [
+            {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.04, "rate_type": "standard"},
+        ]
+    },
+
     # Custom Entry
     "Custom (Manual Entry)": {
         "location": "Custom Location",

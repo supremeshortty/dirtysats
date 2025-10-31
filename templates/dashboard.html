@@ -80,24 +80,129 @@
             <section class="energy-config-section">
                 <h2>Energy Configuration</h2>
                 <div class="config-card">
-                    <h3>Location & Company</h3>
+                    <h3>🌍 Worldwide Energy Company Selection</h3>
                     <form id="energy-config-form">
                         <div class="form-group">
-                            <label for="energy-company">Energy Company:</label>
+                            <label for="energy-company">Energy Company or Provider:</label>
                             <select id="energy-company" name="energy_company">
-                                <option value="">Select preset...</option>
-                                <option value="PG&E (California)">PG&E (California)</option>
-                                <option value="ConEd (New York)">ConEd (New York)</option>
-                                <option value="Texas Electric (Texas)">Texas Electric (Texas)</option>
-                                <option value="Custom (Manual Entry)">Custom (Manual Entry)</option>
+                                <option value="">Select a company or enter custom...</option>
+
+                                <optgroup label="🇺🇸 United States - Major Providers">
+                                    <option value="Xcel Energy (Colorado)">Xcel Energy (Colorado)</option>
+                                    <option value="Xcel Energy (Minnesota)">Xcel Energy (Minnesota)</option>
+                                    <option value="Xcel Energy (Texas)">Xcel Energy (Texas)</option>
+                                </optgroup>
+
+                                <optgroup label="🇺🇸 United States - California">
+                                    <option value="PG&E (California)">PG&E (Northern CA)</option>
+                                    <option value="SCE (Southern California Edison)">SCE (Southern CA)</option>
+                                    <option value="SDG&E (San Diego Gas & Electric)">SDG&E (San Diego)</option>
+                                </optgroup>
+
+                                <optgroup label="🇺🇸 United States - Texas">
+                                    <option value="Oncor (Texas)">Oncor (Dallas/Fort Worth)</option>
+                                    <option value="CenterPoint Energy (Texas)">CenterPoint (Houston)</option>
+                                    <option value="AEP Texas">AEP Texas</option>
+                                </optgroup>
+
+                                <optgroup label="🇺🇸 United States - Other States">
+                                    <option value="ConEd (Consolidated Edison)">ConEd (New York)</option>
+                                    <option value="NYSEG (New York State Electric & Gas)">NYSEG (Upstate NY)</option>
+                                    <option value="FPL (Florida Power & Light)">FPL (Florida)</option>
+                                    <option value="Duke Energy Florida">Duke Energy (Florida)</option>
+                                    <option value="Georgia Power">Georgia Power</option>
+                                    <option value="Duke Energy Carolinas">Duke Energy (Carolinas)</option>
+                                    <option value="ComEd (Commonwealth Edison)">ComEd (Illinois)</option>
+                                    <option value="AEP Ohio">AEP Ohio</option>
+                                    <option value="Duke Energy Ohio">Duke Energy (Ohio)</option>
+                                    <option value="DTE Energy">DTE Energy (Michigan)</option>
+                                    <option value="PECO Energy">PECO (Pennsylvania)</option>
+                                    <option value="Seattle City Light">Seattle City Light</option>
+                                    <option value="Puget Sound Energy">Puget Sound Energy (WA)</option>
+                                    <option value="Portland General Electric">Portland General (Oregon)</option>
+                                    <option value="NV Energy">NV Energy (Nevada)</option>
+                                    <option value="APS (Arizona Public Service)">APS (Arizona)</option>
+                                    <option value="Rocky Mountain Power (Utah)">Rocky Mountain (Utah)</option>
+                                    <option value="Idaho Power">Idaho Power</option>
+                                    <option value="NorthWestern Energy (Montana)">NorthWestern (Montana)</option>
+                                    <option value="Rocky Mountain Power (Wyoming)">Rocky Mountain (Wyoming)</option>
+                                </optgroup>
+
+                                <optgroup label="🇨🇦 Canada">
+                                    <option value="Hydro-Québec (Canada)">Hydro-Québec</option>
+                                    <option value="BC Hydro (Canada)">BC Hydro</option>
+                                    <option value="Ontario Hydro (Canada)">Ontario Hydro</option>
+                                    <option value="Alberta Electric (Canada)">Alberta Electric</option>
+                                </optgroup>
+
+                                <optgroup label="🇪🇺 Europe">
+                                    <option value="EDF (France)">EDF (France)</option>
+                                    <option value="E.ON (Germany)">E.ON (Germany)</option>
+                                    <option value="Enel (Italy)">Enel (Italy)</option>
+                                    <option value="Iberdrola (Spain)">Iberdrola (Spain)</option>
+                                    <option value="British Gas (UK)">British Gas (UK)</option>
+                                    <option value="EDF Energy (UK)">EDF Energy (UK)</option>
+                                    <option value="Vattenfall (Sweden)">Vattenfall (Sweden)</option>
+                                    <option value="Fortum (Norway/Finland)">Fortum (Norway/Finland)</option>
+                                </optgroup>
+
+                                <optgroup label="🌏 Asia-Pacific">
+                                    <option value="China State Grid">China State Grid</option>
+                                    <option value="TEPCO (Japan)">TEPCO (Japan)</option>
+                                    <option value="KEPCO (South Korea)">KEPCO (South Korea)</option>
+                                    <option value="AGL Energy (Australia)">AGL Energy (Australia)</option>
+                                    <option value="Origin Energy (Australia)">Origin Energy (Australia)</option>
+                                    <option value="Contact Energy (New Zealand)">Contact Energy (NZ)</option>
+                                    <option value="Singapore Power">Singapore Power</option>
+                                </optgroup>
+
+                                <optgroup label="🌍 Middle East & Africa">
+                                    <option value="DEWA (Dubai)">DEWA (Dubai, UAE)</option>
+                                    <option value="Saudi Electricity Company">Saudi Electricity</option>
+                                    <option value="Eskom (South Africa)">Eskom (South Africa)</option>
+                                </optgroup>
+
+                                <optgroup label="🌎 Latin America">
+                                    <option value="CFE (Mexico)">CFE (Mexico)</option>
+                                    <option value="Enel Chile">Enel (Chile)</option>
+                                    <option value="Eletrobras (Brazil)">Eletrobras (Brazil)</option>
+                                </optgroup>
+
+                                <optgroup label="❄️ Low-Cost Mining Regions">
+                                    <option value="Landsvirkjun (Iceland)">Landsvirkjun (Iceland) - Cheapest!</option>
+                                </optgroup>
+
+                                <optgroup label="⚙️ Custom">
+                                    <option value="Custom (Manual Entry)">Custom / Enter Manually</option>
+                                </optgroup>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="location">Location:</label>
-                            <input type="text" id="location" name="location" placeholder="e.g., California">
+
+                        <div class="location-fields">
+                            <h4 style="color: var(--text-primary); margin: 20px 0 15px 0; font-size: 1rem;">📍 Your Location (Optional)</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="city">City:</label>
+                                    <input type="text" id="city" name="city" placeholder="e.g., Denver">
+                                </div>
+                                <div class="form-group">
+                                    <label for="state">State/Province:</label>
+                                    <input type="text" id="state" name="state" placeholder="e.g., Colorado">
+                                </div>
+                                <div class="form-group">
+                                    <label for="country">Country:</label>
+                                    <input type="text" id="country" name="country" placeholder="e.g., USA">
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Apply Preset</button>
+
+                        <button type="submit" class="btn btn-primary">💾 Apply Energy Settings</button>
                     </form>
+
+                    <p class="help-text" style="margin-top: 20px;">
+                        <strong>Tip:</strong> Select your energy provider from the list above. If your provider isn't listed, choose "Custom / Enter Manually"
+                        and enter your location details. The system will use average rates for your region.
+                    </p>
                 </div>
             </section>
 
