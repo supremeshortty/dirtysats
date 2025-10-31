@@ -690,7 +690,8 @@ async function loadCombinedChart(hours = 24) {
                     'y-temperature': {
                         type: 'linear',
                         position: 'right',
-                        beginAtZero: false,
+                        min: 0,
+                        max: 200,  // Fixed range to make temp lines appear low
                         title: {
                             display: true,
                             text: 'Temperature (°C)',
@@ -698,6 +699,7 @@ async function loadCombinedChart(hours = 24) {
                         },
                         ticks: {
                             color: '#2196F3',
+                            stepSize: 50,
                             callback: function(value) {
                                 return value.toFixed(0) + '°C';
                             }
