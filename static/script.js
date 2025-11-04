@@ -149,6 +149,9 @@ function createMinerCard(miner) {
     const isOnline = status.status === 'online';
     const offlineClass = isOnline ? '' : 'offline';
 
+    // Extract chip type from raw data
+    const chipType = status.raw?.ASICModel || 'Unknown';
+
     return `
         <div class="miner-card ${offlineClass}">
             <div class="miner-header">
@@ -156,6 +159,7 @@ function createMinerCard(miner) {
                 <div class="miner-type">${miner.type}</div>
             </div>
             <div class="miner-ip">${miner.ip}</div>
+            <div class="chip-type">Chip Type: ${chipType}</div>
 
             ${isOnline ? `
                 <div class="miner-stats">
@@ -174,6 +178,14 @@ function createMinerCard(miner) {
                     <div class="miner-stat">
                         <span class="miner-stat-label">Fan Speed</span>
                         <span class="miner-stat-value">${status.fan_speed || 'N/A'}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Shares Found</span>
+                        <span class="miner-stat-value">${formatNumber(status.shares_accepted || 0)}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Best Difficulty</span>
+                        <span class="miner-stat-value">${formatDifficulty(status.best_difficulty || 0)}</span>
                     </div>
                 </div>
             ` : `

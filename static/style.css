@@ -508,8 +508,19 @@ h3 {
 .miner-ip {
     color: var(--success-color);
     font-family: 'Courier New', monospace;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     font-size: 1rem;
+    font-weight: 600;
+}
+
+.chip-type {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    padding: 8px 12px;
+    background: rgba(247, 147, 26, 0.1);
+    border-left: 3px solid var(--primary-color);
+    border-radius: 6px;
     font-weight: 600;
 }
 
@@ -518,6 +529,12 @@ h3 {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     margin-bottom: 20px;
+}
+
+@media (min-width: 1200px) {
+    .miner-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 .miner-stat {
