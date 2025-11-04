@@ -106,6 +106,11 @@ class CGMinerAPIHandler(MinerAPIHandler):
                     'fan_speed': int(fan_speed),
                     'model': model,
                     'status': 'online',
+                    # Mining statistics
+                    'shares_accepted': int(data.get('Accepted', 0)),
+                    'shares_rejected': int(data.get('Rejected', 0)),
+                    'best_difficulty': float(data.get('Best Share', 0)),
+                    'uptime_seconds': int(data.get('Elapsed', 0)),
                     'raw': {
                         'summary': summary,
                         'devs': devs

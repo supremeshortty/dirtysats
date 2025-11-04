@@ -65,6 +65,12 @@ class BitaxeAPIHandler(MinerAPIHandler):
                 'model': model,
                 'frequency': data.get('frequency', 0),
                 'status': 'online',
+                # Mining statistics
+                'shares_accepted': int(data.get('sharesAccepted', data.get('shares', 0))),
+                'shares_rejected': int(data.get('sharesRejected', 0)),
+                'best_difficulty': data.get('bestDiff', data.get('bestDifficulty', 0)),
+                'session_difficulty': data.get('sessionDiff', 0),
+                'uptime_seconds': int(data.get('uptimeSeconds', data.get('runningTime', 0))),
                 'raw': data
             }
 

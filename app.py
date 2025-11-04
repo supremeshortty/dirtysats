@@ -494,6 +494,9 @@ class FleetManager:
             total_power = 0
             avg_temp = 0
             temp_count = 0
+            total_shares = 0
+            total_rejected = 0
+            best_diff_ever = 0
 
             for miner in self.miners.values():
                 if miner.last_status and miner.last_status.get('status') == 'online':
@@ -504,6 +507,13 @@ class FleetManager:
                         avg_temp += miner.last_status['temperature']
                         temp_count += 1
 
+                    # Aggregate shares and difficulty
+                    total_shares += miner.last_status.get('shares_accepted', 0)
+                    total_rejected += miner.last_status.get('shares_rejected', 0)
+                    best_diff = miner.last_status.get('best_difficulty', 0)
+                    if best_diff and best_diff > best_diff_ever:
+                        best_diff_ever = best_diff
+
             return {
                 'total_miners': len(self.miners),
                 'online_miners': online_count,
@@ -511,6 +521,9 @@ class FleetManager:
                 'total_hashrate': total_hashrate,
                 'total_power': total_power,
                 'avg_temperature': avg_temp / temp_count if temp_count > 0 else 0,
+                'total_shares': total_shares,
+                'total_rejected': total_rejected,
+                'best_difficulty_ever': best_diff_ever,
                 'last_update': datetime.now().isoformat()
             }
 

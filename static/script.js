@@ -93,6 +93,8 @@ async function loadStats() {
             document.getElementById('online-miners').textContent = stats.online_miners;
             document.getElementById('offline-miners').textContent = stats.offline_miners;
             document.getElementById('total-hashrate').textContent = formatHashrate(stats.total_hashrate);
+            document.getElementById('total-shares').textContent = formatNumber(stats.total_shares || 0);
+            document.getElementById('best-difficulty').textContent = formatDifficulty(stats.best_difficulty_ever || 0);
             document.getElementById('total-power').textContent = `${stats.total_power.toFixed(1)} W`;
             document.getElementById('avg-temp').textContent = `${stats.avg_temperature.toFixed(1)}°C`;
         }
@@ -206,6 +208,27 @@ function formatHashrate(hashrate) {
     }
 
     return `${value.toFixed(2)} ${units[unitIndex]}`;
+}
+
+// Format number with commas
+function formatNumber(num) {
+    if (!num) return '0';
+    return num.toLocaleString();
+}
+
+// Format difficulty to human-readable
+function formatDifficulty(diff) {
+    if (!diff) return '0';
+
+    if (diff >= 1_000_000_000) {
+        return `${(diff / 1_000_000_000).toFixed(2)}B`;
+    } else if (diff >= 1_000_000) {
+        return `${(diff / 1_000_000).toFixed(2)}M`;
+    } else if (diff >= 1_000) {
+        return `${(diff / 1_000).toFixed(2)}K`;
+    } else {
+        return diff.toFixed(0);
+    }
 }
 
 // Discover miners
