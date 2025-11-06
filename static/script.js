@@ -99,14 +99,14 @@ async function loadStats() {
 
         if (data.success) {
             const stats = data.stats;
-            document.getElementById('total-miners').textContent = stats.total_miners;
-            document.getElementById('online-miners').textContent = stats.online_miners;
-            document.getElementById('offline-miners').textContent = stats.offline_miners;
-            document.getElementById('total-hashrate').textContent = formatHashrate(stats.total_hashrate);
+            document.getElementById('total-miners').textContent = stats.total_miners ?? 0;
+            document.getElementById('online-miners').textContent = stats.online_miners ?? 0;
+            document.getElementById('offline-miners').textContent = stats.offline_miners ?? 0;
+            document.getElementById('total-hashrate').textContent = formatHashrate(stats.total_hashrate ?? 0);
             document.getElementById('total-shares').textContent = formatNumber(stats.total_shares || 0);
             document.getElementById('best-difficulty').textContent = formatDifficulty(stats.best_difficulty_ever || 0);
-            document.getElementById('total-power').textContent = `${stats.total_power.toFixed(1)} W`;
-            document.getElementById('avg-temp').textContent = `${stats.avg_temperature.toFixed(1)}°C`;
+            document.getElementById('total-power').textContent = `${(stats.total_power ?? 0).toFixed(1)} W`;
+            document.getElementById('avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
         }
     } catch (error) {
         console.error('Error loading stats:', error);
@@ -455,7 +455,7 @@ async function loadEnergyRates() {
 
         if (data.success) {
             document.getElementById('current-rate').textContent =
-                `$${data.current_rate.toFixed(3)}/kWh`;
+                `$${(data.current_rate ?? 0).toFixed(3)}/kWh`;
 
             // Display rate schedule
             displayRateSchedule(data.rates);
@@ -487,9 +487,9 @@ function displayRateSchedule(rates) {
                 <tbody>
                     ${rates.map(rate => `
                         <tr>
-                            <td>${rate.start_time} - ${rate.end_time}</td>
-                            <td>$${rate.rate_per_kwh.toFixed(3)}/kWh</td>
-                            <td><span class="rate-type ${rate.rate_type}">${rate.rate_type}</span></td>
+                            <td>${rate.start_time ?? 'N/A'} - ${rate.end_time ?? 'N/A'}</td>
+                            <td>$${(rate.rate_per_kwh ?? 0).toFixed(3)}/kWh</td>
+                            <td><span class="rate-type ${rate.rate_type ?? 'standard'}">${rate.rate_type ?? 'standard'}</span></td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -531,31 +531,31 @@ function displayProfitability(prof) {
             <div class="profitability-grid">
                 <div class="profit-item">
                     <span class="profit-label">BTC Price</span>
-                    <span class="profit-value">$${prof.btc_price.toLocaleString()}</span>
+                    <span class="profit-value">$${(prof.btc_price ?? 0).toLocaleString()}</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">BTC Per Day</span>
-                    <span class="profit-value">${prof.btc_per_day.toFixed(8)} BTC</span>
+                    <span class="profit-value">${(prof.btc_per_day ?? 0).toFixed(8)} BTC</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Revenue Per Day</span>
-                    <span class="profit-value">$${prof.revenue_per_day.toFixed(2)}</span>
+                    <span class="profit-value">$${(prof.revenue_per_day ?? 0).toFixed(2)}</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Energy Cost Per Day</span>
-                    <span class="profit-value">$${prof.energy_cost_per_day.toFixed(2)}</span>
+                    <span class="profit-value">$${(prof.energy_cost_per_day ?? 0).toFixed(2)}</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Profit Per Day</span>
-                    <span class="profit-value ${profitClass}">$${prof.profit_per_day.toFixed(2)}</span>
+                    <span class="profit-value ${profitClass}">$${(prof.profit_per_day ?? 0).toFixed(2)}</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Profit Margin</span>
-                    <span class="profit-value ${profitClass}">${prof.profit_margin.toFixed(1)}%</span>
+                    <span class="profit-value ${profitClass}">${(prof.profit_margin ?? 0).toFixed(1)}%</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Break-Even BTC Price</span>
-                    <span class="profit-value">$${prof.break_even_btc_price.toLocaleString()}</span>
+                    <span class="profit-value">$${(prof.break_even_btc_price ?? 0).toLocaleString()}</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Status</span>
@@ -578,9 +578,9 @@ async function loadEnergyConsumption() {
 
         if (data.success) {
             document.getElementById('energy-today').textContent =
-                `${data.total_kwh.toFixed(2)} kWh`;
+                `${(data.total_kwh ?? 0).toFixed(2)} kWh`;
             document.getElementById('cost-today').textContent =
-                `$${data.total_cost.toFixed(2)}`;
+                `$${(data.total_cost ?? 0).toFixed(2)}`;
         }
     } catch (error) {
         console.error('Error loading energy consumption:', error);
@@ -1283,7 +1283,7 @@ async function loadSharesMetrics() {
         document.getElementById('fleet-efficiency').textContent = `${efficiency} GH/W`;
         document.getElementById('accept-rate').textContent = `${acceptRate}%`;
         document.getElementById('reject-rate').textContent = `${rejectRate}%`;
-        document.getElementById('charts-avg-temp').textContent = `${stats.avg_temperature.toFixed(1)}°C`;
+        document.getElementById('charts-avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
 
         // Create shares pie chart
         const ctx = document.getElementById('shares-chart').getContext('2d');
@@ -1422,20 +1422,20 @@ async function loadCurrentWeather() {
             <div class="weather-card">
                 <div class="weather-stat">
                     <div class="weather-stat-label">Temperature</div>
-                    <div class="weather-stat-value">${weather.temp_f.toFixed(1)}°F</div>
-                    <div class="weather-stat-description">${weather.temp_c.toFixed(1)}°C</div>
+                    <div class="weather-stat-value">${(weather.temp_f ?? 0).toFixed(1)}°F</div>
+                    <div class="weather-stat-description">${(weather.temp_c ?? 0).toFixed(1)}°C</div>
                 </div>
                 <div class="weather-stat">
                     <div class="weather-stat-label">Feels Like</div>
-                    <div class="weather-stat-value">${weather.feels_like_f.toFixed(1)}°F</div>
+                    <div class="weather-stat-value">${(weather.feels_like_f ?? 0).toFixed(1)}°F</div>
                 </div>
                 <div class="weather-stat">
                     <div class="weather-stat-label">Humidity</div>
-                    <div class="weather-stat-value">${weather.humidity}%</div>
+                    <div class="weather-stat-value">${weather.humidity ?? 0}%</div>
                 </div>
                 <div class="weather-stat">
                     <div class="weather-stat-label">Conditions</div>
-                    <div class="weather-stat-description">${weather.description}</div>
+                    <div class="weather-stat-description">${weather.description ?? 'N/A'}</div>
                 </div>
             </div>
         `;
@@ -1463,8 +1463,8 @@ async function loadWeatherForecast() {
             html += `
                 <div class="forecast-item">
                     <div class="forecast-time">${time}</div>
-                    <div class="forecast-temp">${forecast.temp_f.toFixed(0)}°F</div>
-                    <div class="forecast-desc">${forecast.description}</div>
+                    <div class="forecast-temp">${(forecast.temp_f ?? 0).toFixed(0)}°F</div>
+                    <div class="forecast-desc">${forecast.description ?? 'N/A'}</div>
                 </div>
             `;
         });
@@ -1493,19 +1493,19 @@ async function loadThermalPrediction() {
 
         let html = `
             <div class="prediction-card ${levelClass}">
-                <div class="prediction-message">${pred.message}</div>
+                <div class="prediction-message">${pred.message ?? 'N/A'}</div>
                 <div class="prediction-details">
                     <div class="prediction-detail">
                         <div class="prediction-detail-label">Current Ambient</div>
-                        <div class="prediction-detail-value">${pred.current_ambient_f.toFixed(1)}°F</div>
+                        <div class="prediction-detail-value">${(pred.current_ambient_f ?? 0).toFixed(1)}°F</div>
                     </div>
                     <div class="prediction-detail">
                         <div class="prediction-detail-label">Forecast Max</div>
-                        <div class="prediction-detail-value">${pred.forecast_max_f.toFixed(1)}°F</div>
+                        <div class="prediction-detail-value">${(pred.forecast_max_f ?? 0).toFixed(1)}°F</div>
                     </div>
                     <div class="prediction-detail">
                         <div class="prediction-detail-label">Estimated Miner Temp</div>
-                        <div class="prediction-detail-value">${pred.estimated_miner_temp_c.toFixed(1)}°C</div>
+                        <div class="prediction-detail-value">${(pred.estimated_miner_temp_c ?? 0).toFixed(1)}°C</div>
                     </div>
                 </div>
         `;
@@ -1545,9 +1545,9 @@ async function loadOptimalHours() {
         result.optimal_periods.forEach(period => {
             html += `
                 <div class="optimal-period">
-                    <div class="optimal-period-time">${period.start} - ${period.end}</div>
-                    <div class="optimal-period-duration">${period.duration_hours} hours</div>
-                    <div class="optimal-period-temp">Avg: ${period.avg_temp_f.toFixed(1)}°F</div>
+                    <div class="optimal-period-time">${period.start ?? 'N/A'} - ${period.end ?? 'N/A'}</div>
+                    <div class="optimal-period-duration">${period.duration_hours ?? 0} hours</div>
+                    <div class="optimal-period-temp">Avg: ${(period.avg_temp_f ?? 0).toFixed(1)}°F</div>
                 </div>
             `;
         });
