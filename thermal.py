@@ -212,6 +212,10 @@ class ThermalManager:
         self.thermal_states: Dict[str, ThermalState] = {}
         self.global_auto_tune_enabled = True
 
+    def _get_profile(self, miner_type: str) -> FrequencyProfile:
+        """Get the frequency profile for a miner type"""
+        return MINER_PROFILES.get(miner_type, MINER_PROFILES['Unknown'])
+
     def register_miner(self, miner_ip: str, miner_type: str):
         """Register a miner for thermal management"""
         if miner_ip not in self.thermal_states:

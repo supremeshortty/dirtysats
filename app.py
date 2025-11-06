@@ -513,8 +513,13 @@ class FleetManager:
                     total_shares += miner.last_status.get('shares_accepted', 0)
                     total_rejected += miner.last_status.get('shares_rejected', 0)
                     best_diff = miner.last_status.get('best_difficulty', 0)
-                    if best_diff and best_diff > best_diff_ever:
-                        best_diff_ever = best_diff
+                    # Convert to float to handle string values from miner API
+                    try:
+                        best_diff_float = float(best_diff) if best_diff else 0
+                        if best_diff_float > best_diff_ever:
+                            best_diff_ever = best_diff_float
+                    except (ValueError, TypeError):
+                        pass  # Skip invalid difficulty values
 
             return {
                 'total_miners': len(self.miners),
