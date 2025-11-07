@@ -607,6 +607,7 @@ function displayProfitability(prof) {
                 <div class="profit-item">
                     <span class="profit-label">BTC Per Day</span>
                     <span class="profit-value">${(prof.btc_per_day ?? 0).toFixed(8)} BTC</span>
+                    <span class="profit-sublabel">${((prof.btc_per_day ?? 0) * 100000000).toFixed(0)} sats</span>
                 </div>
                 <div class="profit-item">
                     <span class="profit-label">Revenue Per Day</span>
@@ -639,6 +640,180 @@ function displayProfitability(prof) {
     `;
 
     container.innerHTML = html;
+
+    // Load schedule simulations after profitability is loaded
+    loadScheduleSimulations(prof);
+}
+
+// Load and display schedule simulations
+async function loadScheduleSimulations(profitability) {
+    try {
+        // Get rate schedule data
+        const ratesResponse = await fetch(`${API_BASE}/api/energy/rates`);
+        const ratesData = await ratesResponse.json();
+
+        if (!ratesData.success || !ratesData.schedule) {
+            document.getElementById('simulation-strategies').innerHTML =
+                '<p class="loading">Unable to load rate schedule for simulations</p>';
+            return;
+        }
+
+        const rates = ratesData.schedule;
+        const avgRate = rates.reduce((sum, r) => sum + r.rate_per_kwh, 0) / rates.length;
+        const minRate = Math.min(...rates.map(r => r.rate_per_kwh));
+        const maxRate = Math.max(...rates.map(r => r.rate_per_kwh));
+
+        // Calculate hours for each rate type
+        const offPeakHours = rates.filter(r => r.rate_per_kwh < avgRate).length;
+        const peakHours = 24 - offPeakHours;
+
+        // Define strategies
+        const strategies = [
+            {
+                name: "24/7 Maximum Mining",
+                description: "Mine at maximum frequency 24 hours a day, regardless of energy rates",
+                miningHours: 24,
+                avgFrequency: 1.0,
+                schedule: "All day: MAX frequency",
+                settings: { maxRate: 999, highRateFreq: 0, lowRateFreq: 0 }
+            },
+            {
+                name: "Off-Peak Only",
+                description: "Mine only during off-peak hours when electricity is cheapest",
+                miningHours: offPeakHours,
+                avgFrequency: 1.0,
+                schedule: `${offPeakHours} hours/day at MAX frequency during lowest rates`,
+                settings: { maxRate: avgRate, highRateFreq: 0, lowRateFreq: 0 },
+                recommended: true
+            },
+            {
+                name: "Smart Scheduling",
+                description: "Reduce frequency during peak rates, maximize during off-peak",
+                miningHours: 24,
+                avgFrequency: 0.7,
+                schedule: "Peak: 400 MHz underclock, Off-peak: MAX frequency",
+                settings: { maxRate: 999, highRateFreq: 400, lowRateFreq: 0 }
+            },
+            {
+                name: "Conservative",
+                description: "Turn off during highest rates, mine at reduced frequency otherwise",
+                miningHours: offPeakHours,
+                avgFrequency: 0.8,
+                schedule: `Turn OFF when rate > $${avgRate.toFixed(3)}/kWh, otherwise 450 MHz`,
+                settings: { maxRate: avgRate, highRateFreq: 0, lowRateFreq: 450 }
+            }
+        ];
+
+        // Calculate profitability for each strategy
+        const strategiesWithProfit = strategies.map(strategy => {
+            // Estimate revenue based on mining hours and frequency
+            const revenueMultiplier = (strategy.miningHours / 24) * strategy.avgFrequency;
+            const estimatedRevenue = profitability.revenue_per_day * revenueMultiplier;
+
+            // Estimate energy cost based on mining hours and frequency
+            const energyMultiplier = (strategy.miningHours / 24) * strategy.avgFrequency;
+            const avgRateForStrategy = strategy.miningHours === 24 ? avgRate : minRate;
+            const estimatedEnergyCost = (profitability.energy_cost_per_day / avgRate) * avgRateForStrategy * energyMultiplier;
+
+            const estimatedProfit = estimatedRevenue - estimatedEnergyCost;
+            const estimatedBtc = profitability.btc_per_day * revenueMultiplier;
+
+            return {
+                ...strategy,
+                estimatedRevenue,
+                estimatedEnergyCost,
+                estimatedProfit,
+                estimatedBtc
+            };
+        });
+
+        // Sort by profitability
+        strategiesWithProfit.sort((a, b) => b.estimatedProfit - a.estimatedProfit);
+
+        // Display strategy cards
+        displayStrategyCards(strategiesWithProfit);
+
+    } catch (error) {
+        console.error('Error loading schedule simulations:', error);
+        document.getElementById('simulation-strategies').innerHTML =
+            '<p class="loading">Error loading simulations</p>';
+    }
+}
+
+// Display strategy cards
+function displayStrategyCards(strategies) {
+    const container = document.getElementById('simulation-strategies');
+
+    const html = strategies.map(strategy => {
+        const profitClass = strategy.estimatedProfit > 0 ? 'profit' : 'loss';
+        const recommendedClass = strategy.recommended ? 'recommended' : '';
+
+        return `
+            <div class="strategy-card ${recommendedClass}">
+                <div class="strategy-header">
+                    <div class="strategy-name">${strategy.name}</div>
+                    <div class="strategy-description">${strategy.description}</div>
+                </div>
+
+                <div class="strategy-metrics">
+                    <div class="strategy-metric">
+                        <span class="metric-label">Est. Daily Profit</span>
+                        <span class="metric-value ${profitClass}">$${strategy.estimatedProfit.toFixed(2)}</span>
+                    </div>
+                    <div class="strategy-metric">
+                        <span class="metric-label">Est. Daily Revenue</span>
+                        <span class="metric-value">$${strategy.estimatedRevenue.toFixed(2)}</span>
+                    </div>
+                    <div class="strategy-metric">
+                        <span class="metric-label">Est. Energy Cost</span>
+                        <span class="metric-value">$${strategy.estimatedEnergyCost.toFixed(2)}</span>
+                    </div>
+                    <div class="strategy-metric">
+                        <span class="metric-label">Est. BTC/Day</span>
+                        <span class="metric-value">${strategy.estimatedBtc.toFixed(8)}</span>
+                    </div>
+                </div>
+
+                <div class="strategy-schedule-info">
+                    <strong>Schedule:</strong> ${strategy.schedule}
+                </div>
+
+                <button class="apply-strategy-btn" onclick="applyStrategy(${JSON.stringify(strategy.settings).replace(/"/g, '&quot;')})">
+                    Apply This Schedule
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = html;
+}
+
+// Apply a strategy
+async function applyStrategy(settings) {
+    try {
+        const response = await fetch(`${API_BASE}/api/energy/schedule`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                auto_from_rates: true,
+                max_rate_threshold: settings.maxRate,
+                low_frequency: settings.highRateFreq,
+                high_frequency: settings.lowRateFreq
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('Mining schedule applied successfully! Your miners will now follow this strategy.', 'success');
+        } else {
+            showAlert(`Error: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Error applying schedule: ${error.message}`, 'error');
+    }
 }
 
 // Load energy consumption
