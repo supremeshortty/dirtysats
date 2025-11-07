@@ -106,6 +106,7 @@ async function loadDashboard() {
 // Load fleet statistics
 async function loadStats() {
     try {
+        // Get current stats (live)
         const response = await fetch(`${API_BASE}/api/stats`);
         const data = await response.json();
 
@@ -115,11 +116,32 @@ async function loadStats() {
             document.getElementById('online-miners').textContent = stats.online_miners ?? 0;
             document.getElementById('offline-miners').textContent = stats.offline_miners ?? 0;
             document.getElementById('total-hashrate').textContent = formatHashrate(stats.total_hashrate ?? 0);
-            document.getElementById('total-shares').textContent = formatNumber(stats.total_shares || 0);
             document.getElementById('best-difficulty').textContent = formatDifficulty(stats.best_difficulty_ever || 0);
-            document.getElementById('total-power').textContent = `${(stats.total_power ?? 0).toFixed(1)} W`;
             document.getElementById('avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
         }
+
+        // Get time-based stats for shares and power
+        const sharesHours = parseInt(document.getElementById('shares-timerange').value);
+        const powerHours = parseInt(document.getElementById('power-timerange').value);
+
+        const [sharesResponse, powerResponse] = await Promise.all([
+            fetch(`${API_BASE}/api/stats/aggregate?hours=${sharesHours}`),
+            fetch(`${API_BASE}/api/stats/aggregate?hours=${powerHours}`)
+        ]);
+
+        const sharesData = await sharesResponse.json();
+        const powerData = await powerResponse.json();
+
+        if (sharesData.success) {
+            const totalShares = sharesData.stats.total_shares_accepted ?? 0;
+            document.getElementById('total-shares').textContent = formatNumber(totalShares);
+        }
+
+        if (powerData.success) {
+            const avgPower = powerData.stats.avg_power ?? 0;
+            document.getElementById('total-power').textContent = `${avgPower.toFixed(1)} W`;
+        }
+
     } catch (error) {
         console.error('Error loading stats:', error);
     }

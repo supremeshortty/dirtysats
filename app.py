@@ -184,7 +184,10 @@ class FleetManager:
                             temperature=status.get('temperature'),
                             power=status.get('power'),
                             fan_speed=status.get('fan_speed'),
-                            status='online'
+                            status='online',
+                            shares_accepted=status.get('shares_accepted'),
+                            shares_rejected=status.get('shares_rejected'),
+                            best_difficulty=status.get('best_difficulty')
                         )
 
                     # Update thermal stats and apply auto-tuning
@@ -572,6 +575,26 @@ def get_stats():
         'success': True,
         'stats': stats
     })
+
+
+@app.route('/api/stats/aggregate', methods=['GET'])
+def get_aggregate_stats_route():
+    """Get aggregated statistics over a time period"""
+    hours = request.args.get('hours', default=24, type=int)
+
+    try:
+        agg_stats = fleet.db.get_aggregate_stats(hours)
+        return jsonify({
+            'success': True,
+            'hours': hours,
+            'stats': agg_stats
+        })
+    except Exception as e:
+        logger.error(f"Error getting aggregate stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/discover', methods=['POST'])

@@ -61,6 +61,9 @@ class Database:
                     power REAL,
                     fan_speed INTEGER,
                     status TEXT,
+                    shares_accepted INTEGER DEFAULT 0,
+                    shares_rejected INTEGER DEFAULT 0,
+                    best_difficulty REAL DEFAULT 0,
                     FOREIGN KEY (miner_id) REFERENCES miners(id)
                 )
             """)
@@ -241,14 +244,18 @@ class Database:
 
     def add_stats(self, miner_id: int, hashrate: float = None,
                   temperature: float = None, power: float = None,
-                  fan_speed: int = None, status: str = "online"):
+                  fan_speed: int = None, status: str = "online",
+                  shares_accepted: int = None, shares_rejected: int = None,
+                  best_difficulty: float = None):
         """Add stats entry for a miner"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO stats (miner_id, hashrate, temperature, power, fan_speed, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (miner_id, hashrate, temperature, power, fan_speed, status))
+                INSERT INTO stats (miner_id, hashrate, temperature, power, fan_speed, status,
+                                   shares_accepted, shares_rejected, best_difficulty)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (miner_id, hashrate, temperature, power, fan_speed, status,
+                  shares_accepted, shares_rejected, best_difficulty))
 
     def get_latest_stats(self, miner_id: int) -> Optional[Dict]:
         """Get latest stats for a miner"""
@@ -433,6 +440,36 @@ class Database:
             """, (f'-{days}',))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def get_aggregate_stats(self, hours: int = 24) -> Dict:
+        """Get aggregated stats over a time period"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    SUM(shares_accepted) as total_shares_accepted,
+                    SUM(shares_rejected) as total_shares_rejected,
+                    AVG(power) as avg_power,
+                    MAX(power) as max_power,
+                    MIN(power) as min_power,
+                    AVG(temperature) as avg_temperature,
+                    AVG(hashrate) as avg_hashrate,
+                    MAX(best_difficulty) as best_difficulty
+                FROM stats
+                WHERE timestamp > datetime('now', ? || ' hours')
+                AND status = 'online'
+            """, (f'-{hours}',))
+            row = cursor.fetchone()
+            return dict(row) if row else {
+                'total_shares_accepted': 0,
+                'total_shares_rejected': 0,
+                'avg_power': 0,
+                'max_power': 0,
+                'min_power': 0,
+                'avg_temperature': 0,
+                'avg_hashrate': 0,
+                'best_difficulty': 0
+            }
 
     # Alert Management Methods
 
