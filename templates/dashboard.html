@@ -353,15 +353,21 @@
             <!-- Time Range Selector -->
             <section class="chart-controls-section">
                 <h2>Historical Data</h2>
-                <div class="form-group-inline">
+                <div class="form-group-inline chart-time-controls">
                     <label for="chart-time-range">Time Range:</label>
                     <select id="chart-time-range">
-                        <option value="6">Last 6 hours</option>
-                        <option value="24" selected>Last 24 hours</option>
-                        <option value="72">Last 3 days</option>
-                        <option value="168">Last 7 days</option>
+                        <option value="1">Last Hour</option>
+                        <option value="3">Last 3 Hours</option>
+                        <option value="6">Last 6 Hours</option>
+                        <option value="12">Last 12 Hours</option>
+                        <option value="24" selected>Last 24 Hours</option>
+                        <option value="48">Last 2 Days</option>
+                        <option value="72">Last 3 Days</option>
+                        <option value="168">Last Week</option>
+                        <option value="336">Last 2 Weeks</option>
+                        <option value="720">Last 30 Days</option>
                     </select>
-                    <button id="refresh-charts-btn" class="btn btn-secondary">Refresh</button>
+                    <button id="refresh-charts-btn" class="btn btn-secondary">↻ Refresh</button>
                 </div>
             </section>
 

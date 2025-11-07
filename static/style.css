@@ -686,6 +686,22 @@ h3 {
     flex: 1;
 }
 
+.chart-time-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.chart-time-controls select {
+    min-width: 150px;
+    flex: 1 1 auto;
+}
+
+.chart-time-controls button {
+    flex-shrink: 0;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1540,6 +1556,28 @@ h3 {
         left: 12px;
         right: 12px;
         top: 12px;
+    }
+
+    .chart-time-controls {
+        gap: 8px;
+    }
+
+    .chart-time-controls label {
+        width: 100%;
+        margin-bottom: 4px;
+    }
+
+    .chart-time-controls select {
+        min-width: 120px;
+    }
+
+    .chart-header {
+        gap: 12px;
+    }
+
+    .chart-controls {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 
