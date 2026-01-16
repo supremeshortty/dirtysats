@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mining Fleet Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><rect x='4' y='4' width='16' height='16' rx='2'/><rect x='9' y='9' width='6' height='6'/><path d='M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2'/></svg>">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    <rect x="9" y="9" width="6" height="6"/>
+                    <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
+                </svg>
+            </div>
+            <span class="sidebar-title">Fleet Manager</span>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-tab="fleet">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Fleet</span>
+            </div>
+            <div class="nav-item" data-tab="energy">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Energy</span>
+            </div>
+            <div class="nav-item" data-tab="charts">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Charts</span>
+            </div>
+            <div class="nav-item" data-tab="alerts">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Alerts</span>
+            </div>
+            <div class="nav-item" data-tab="weather">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Weather</span>
+            </div>
+            <div class="nav-item" data-tab="pools">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                    </svg>
+                </span>
+                <span class="nav-label">Pools</span>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                <span class="icon-sun">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                </span>
+                <span class="icon-moon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </span>
+                <span class="theme-label">Theme</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>
+                    <svg class="header-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        <rect x="9" y="9" width="6" height="6"/>
+                        <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
+                    </svg>
+                    Home Mining Fleet
+                </h1>
+                <div class="header-subtitle">Bitcoin Mining Dashboard</div>
+            </div>
+            <div class="header-center">
+                <button id="discover-btn" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    Discover Miners
+                </button>
+                <div class="live-indicator">
+                    <span class="live-dot"></span>
+                    <span>Live</span>
+                </div>
+                <span id="last-update" class="status-text">Last update: Never</span>
+            </div>
+            <div class="header-right">
+                <div class="author-badge">
+                    <div class="author-label">Created by</div>
+                    <div class="author-handle">@satman</div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Legacy Tab Navigation (hidden on desktop, visible on mobile) -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="fleet">Fleet</button>
+                <button class="tab-btn" data-tab="energy">Energy</button>
+                <button class="tab-btn" data-tab="charts">Charts</button>
+                <button class="tab-btn" data-tab="alerts">Alerts</button>
+                <button class="tab-btn" data-tab="weather">Weather</button>
+                <button class="tab-btn" data-tab="pools">Pools</button>
+            </div>
+
+            <!-- Fleet Tab -->
+            <div id="fleet-tab" class="tab-content active">
+                <!-- Fleet Statistics -->
+                <section class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Miners</div>
+                        <div class="stat-value" id="total-miners">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Online</div>
+                        <div class="stat-value success" id="online-miners">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Offline</div>
+                        <div class="stat-value danger" id="offline-miners">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Hashrate</div>
+                        <div class="stat-value" id="total-hashrate">0 GH/s</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            Total Shares
+                            <select id="shares-timerange" class="stat-timerange">
+                                <option value="1">Last Hour</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="12">Last 12 Hours</option>
+                                <option value="24" selected>Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                        </div>
+                        <div class="stat-value success" id="total-shares">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Best Difficulty</div>
+                        <div class="stat-value" id="best-difficulty">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">
+                            Total Power
+                            <select id="power-timerange" class="stat-timerange">
+                                <option value="1">Last Hour</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="12">Last 12 Hours</option>
+                                <option value="24" selected>Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                        </div>
+                        <div class="stat-value" id="total-power">0 W</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Average Chip Temperature</div>
+                        <div class="stat-value" id="avg-temp">0°C</div>
+                    </div>
+                </section>
+
+                <!-- Fleet Performance Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Fleet Performance - Hashrate & Temperature</h3>
+                        <div class="chart-controls">
+                            <select id="fleet-chart-timerange" class="chart-timerange-select">
+                                <option value="1">Last Hour</option>
+                                <option value="3">Last 3 Hours</option>
+                                <option value="6" selected>Last 6 Hours</option>
+                                <option value="12">Last 12 Hours</option>
+                                <option value="24">Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                            <button id="fleet-chart-refresh" class="btn btn-secondary btn-sm">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fleet-combined-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Miners List -->
+                <section class="miners-section">
+                    <h2>Miners</h2>
+                    <div id="miners-container">
+                        <p class="loading">Loading miners...</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Energy Tab -->
+            <div id="energy-tab" class="tab-content">
+                <!-- Energy Configuration -->
+                <section class="energy-config-section">
+                    <h2>Energy Configuration</h2>
+                    <div class="config-card">
+                        <h3>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" y1="12" x2="22" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                            Worldwide Energy Company Selection
+                        </h3>
+                        <form id="energy-config-form">
+                            <div class="form-group">
+                                <label for="energy-company">Energy Company or Provider:</label>
+                                <select id="energy-company" name="energy_company">
+                                    <option value="">Select a company or enter custom...</option>
+                                    <optgroup label="United States - Major Providers">
+                                        <option value="Xcel Energy (Colorado)">Xcel Energy (Colorado)</option>
+                                        <option value="Xcel Energy (Minnesota)">Xcel Energy (Minnesota)</option>
+                                        <option value="Xcel Energy (Texas)">Xcel Energy (Texas)</option>
+                                    </optgroup>
+                                    <optgroup label="United States - California">
+                                        <option value="PG&E (California)">PG&E (Northern CA)</option>
+                                        <option value="SCE (Southern California Edison)">SCE (Southern CA)</option>
+                                        <option value="SDG&E (San Diego Gas & Electric)">SDG&E (San Diego)</option>
+                                    </optgroup>
+                                    <optgroup label="United States - Texas">
+                                        <option value="Oncor (Texas)">Oncor (Dallas/Fort Worth)</option>
+                                        <option value="CenterPoint Energy (Texas)">CenterPoint (Houston)</option>
+                                        <option value="AEP Texas">AEP Texas</option>
+                                    </optgroup>
+                                    <optgroup label="United States - Other States">
+                                        <option value="ConEd (Consolidated Edison)">ConEd (New York)</option>
+                                        <option value="FPL (Florida Power & Light)">FPL (Florida)</option>
+                                        <option value="Duke Energy Florida">Duke Energy (Florida)</option>
+                                        <option value="Georgia Power">Georgia Power</option>
+                                        <option value="ComEd (Commonwealth Edison)">ComEd (Illinois)</option>
+                                        <option value="DTE Energy">DTE Energy (Michigan)</option>
+                                        <option value="Seattle City Light">Seattle City Light</option>
+                                        <option value="APS (Arizona Public Service)">APS (Arizona)</option>
+                                    </optgroup>
+                                    <optgroup label="Canada">
+                                        <option value="Hydro-Québec (Canada)">Hydro-Québec</option>
+                                        <option value="BC Hydro (Canada)">BC Hydro</option>
+                                        <option value="Ontario Hydro (Canada)">Ontario Hydro</option>
+                                    </optgroup>
+                                    <optgroup label="Europe">
+                                        <option value="EDF (France)">EDF (France)</option>
+                                        <option value="E.ON (Germany)">E.ON (Germany)</option>
+                                        <option value="Enel (Italy)">Enel (Italy)</option>
+                                        <option value="British Gas (UK)">British Gas (UK)</option>
+                                    </optgroup>
+                                    <optgroup label="Asia-Pacific">
+                                        <option value="TEPCO (Japan)">TEPCO (Japan)</option>
+                                        <option value="AGL Energy (Australia)">AGL Energy (Australia)</option>
+                                    </optgroup>
+                                    <optgroup label="Low-Cost Mining Regions">
+                                        <option value="Landsvirkjun (Iceland)">Landsvirkjun (Iceland)</option>
+                                    </optgroup>
+                                    <optgroup label="Custom">
+                                        <option value="Custom (Manual Entry)">Custom / Enter Manually</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            <!-- Custom Rate Entry -->
+                            <div id="custom-rate-entry" class="custom-rate-panel" style="display: none;">
+                                <h4>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon-sm">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                    </svg>
+                                    Custom Energy Rates
+                                </h4>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="custom-rate">Standard Rate ($/kWh):</label>
+                                        <input type="number" id="custom-rate" name="custom_rate" step="0.001" min="0" placeholder="e.g., 0.12">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="custom-peak-rate">Peak Rate ($/kWh):</label>
+                                        <input type="number" id="custom-peak-rate" name="custom_peak_rate" step="0.001" min="0" placeholder="e.g., 0.25">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="custom-offpeak-rate">Off-Peak Rate ($/kWh):</label>
+                                        <input type="number" id="custom-offpeak-rate" name="custom_offpeak_rate" step="0.001" min="0" placeholder="e.g., 0.08">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="location-fields">
+                                <h4>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon-sm">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    Your Location (Optional)
+                                </h4>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="city">City:</label>
+                                        <input type="text" id="city" name="city" placeholder="e.g., Denver">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="state">State/Province:</label>
+                                        <input type="text" id="state" name="state" placeholder="e.g., Colorado">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="country">Country:</label>
+                                        <input type="text" id="country" name="country" placeholder="e.g., USA">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                Apply Energy Settings
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Current Rate & Schedule -->
+                <section class="rate-info-section">
+                    <h2>Current Status</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Current Rate</div>
+                            <div class="stat-value" id="current-rate">$0.12/kWh</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Energy Today</div>
+                            <div class="stat-value" id="energy-today">0 kWh</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Cost Today</div>
+                            <div class="stat-value" id="cost-today">$0.00</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Profitability Calculator -->
+                <section class="profitability-section">
+                    <h2>Profitability</h2>
+                    <div id="profitability-container">
+                        <p class="loading">Calculating profitability...</p>
+                    </div>
+                </section>
+
+                <!-- Rate Schedule -->
+                <section class="rate-schedule-section">
+                    <h2>Rate Schedule</h2>
+                    <div id="rate-schedule-container">
+                        <p class="loading">Loading rate schedule...</p>
+                    </div>
+                </section>
+
+                <!-- Mining Schedule Configuration -->
+                <section class="mining-schedule-section">
+                    <h2>Mining Schedule</h2>
+                    <div class="config-card">
+                        <p>Automatically adjust miner frequency based on energy rates:</p>
+                        <form id="mining-schedule-form">
+                            <div class="form-group">
+                                <label for="max-rate-threshold">Turn Off When Rate Exceeds ($/kWh):</label>
+                                <input type="number" id="max-rate-threshold" step="0.01" value="0.25" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="high-rate-frequency">Frequency During Peak Rates (MHz):</label>
+                                <input type="number" id="high-rate-frequency" value="0" min="0" max="600" placeholder="0 = OFF">
+                                <small class="form-hint">Set to 0 to turn miners OFF during expensive electricity.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="low-rate-frequency">Frequency During Off-Peak (MHz):</label>
+                                <input type="number" id="low-rate-frequency" value="0" min="0" max="600" placeholder="0 = MAX">
+                                <small class="form-hint">Set to 0 to run at MAX frequency during cheap electricity.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Auto-Create Schedule</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- AI Schedule Simulation -->
+                <section class="schedule-simulation-section">
+                    <h2>AI Schedule Simulation</h2>
+                    <p class="section-description">Compare different mining strategies and apply the best one for your energy rates:</p>
+                    <div id="simulation-strategies" class="simulation-grid">
+                        <div class="loading-simulation">
+                            <p>Loading simulations...</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Charts Tab -->
+            <div id="charts-tab" class="tab-content">
+                <section class="chart-controls-section">
+                    <h2>Historical Data</h2>
+                    <div class="form-group-inline chart-time-controls">
+                        <label for="chart-time-range">Time Range:</label>
+                        <select id="chart-time-range">
+                            <option value="1">Last Hour</option>
+                            <option value="6">Last 6 Hours</option>
+                            <option value="24" selected>Last 24 Hours</option>
+                            <option value="168">Last Week</option>
+                            <option value="720">Last 30 Days</option>
+                        </select>
+                        <button id="refresh-charts-btn" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <polyline points="1 20 1 14 7 14"/>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Combined Hashrate & Temperature Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Fleet Performance - Hashrate & Temperature</h3>
+                        <div class="chart-controls">
+                            <select id="combined-chart-timerange" class="chart-timerange-select">
+                                <option value="1">Last Hour</option>
+                                <option value="6" selected>Last 6 Hours</option>
+                                <option value="24">Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                            <button id="combined-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="combined-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Power Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Power Consumption History</h3>
+                        <div class="chart-controls">
+                            <select id="power-chart-timerange" class="chart-timerange-select">
+                                <option value="1">Last Hour</option>
+                                <option value="6" selected>Last 6 Hours</option>
+                                <option value="24">Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                            <button id="power-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="power-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Profitability Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Profitability Trend</h3>
+                        <div class="chart-controls">
+                            <select id="profitability-chart-timerange" class="chart-timerange-select">
+                                <option value="7" selected>Last Week</option>
+                                <option value="14">Last 2 Weeks</option>
+                                <option value="30">Last 30 Days</option>
+                            </select>
+                            <button id="profitability-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="profitability-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Efficiency Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Mining Efficiency - Hashrate per Watt</h3>
+                        <div class="chart-controls">
+                            <select id="efficiency-chart-timerange" class="chart-timerange-select">
+                                <option value="1">Last Hour</option>
+                                <option value="6" selected>Last 6 Hours</option>
+                                <option value="24">Last 24 Hours</option>
+                            </select>
+                            <button id="efficiency-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="efficiency-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Shares Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Shares Accepted vs Rejected</h3>
+                        <div class="chart-controls">
+                            <select id="shares-chart-timerange" class="chart-timerange-select">
+                                <option value="24" selected>Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                            </select>
+                            <button id="shares-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="shares-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Performance Metrics -->
+                <section class="chart-section">
+                    <h3>Current Performance Metrics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Fleet Efficiency</div>
+                            <div class="stat-value" id="fleet-efficiency">0 TH/W</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Accepted Shares</div>
+                            <div class="stat-value success" id="total-accepted-shares">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Rejected Shares</div>
+                            <div class="stat-value danger" id="total-rejected-shares">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Accept Rate</div>
+                            <div class="stat-value success" id="accept-rate">0%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Reject Rate</div>
+                            <div class="stat-value" id="reject-rate">0%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Avg Temp</div>
+                            <div class="stat-value" id="charts-avg-temp">0°C</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Alerts Tab -->
+            <div id="alerts-tab" class="tab-content">
+                <section class="alert-config-section">
+                    <h2>Telegram Alert Configuration</h2>
+                    <div class="config-card">
+                        <h3>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                            </svg>
+                            Telegram Bot Setup
+                        </h3>
+                        <p class="help-text">
+                            <strong>Step 1:</strong> Create bot with <a href="https://t.me/BotFather" target="_blank">@BotFather</a><br>
+                            <strong>Step 2:</strong> Get Chat ID from getUpdates API<br>
+                            <strong>Step 3:</strong> Enter your details below
+                        </p>
+                        <form id="telegram-alert-form">
+                            <div class="form-group">
+                                <label for="telegram-bot-token">Bot Token:</label>
+                                <input type="text" id="telegram-bot-token" placeholder="1234567890:ABCdef..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="telegram-chat-id">Chat ID:</label>
+                                <input type="text" id="telegram-chat-id" placeholder="123456789" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                Save Configuration
+                            </button>
+                            <button type="button" id="test-telegram-btn" class="btn btn-secondary">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                                Send Test Alert
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="alert-history-section">
+                    <h2>Recent Alerts</h2>
+                    <div id="alert-history-container">
+                        <p class="loading">Loading alert history...</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Weather Tab -->
+            <div id="weather-tab" class="tab-content">
+                <section class="weather-config-section">
+                    <h2>Weather Configuration</h2>
+                    <div class="config-card">
+                        <p>Get a free API key from <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></p>
+                        <form id="weather-config-form">
+                            <div class="form-group">
+                                <label for="weather-api-key">API Key:</label>
+                                <input type="text" id="weather-api-key" placeholder="Your OpenWeatherMap API key">
+                            </div>
+                            <div class="form-group">
+                                <label for="weather-location">Location:</label>
+                                <input type="text" id="weather-location" placeholder="San Francisco,US">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Configuration</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="current-weather-section">
+                    <h2>Current Conditions</h2>
+                    <div id="current-weather-container">
+                        <p class="loading">Weather not configured or unavailable</p>
+                    </div>
+                </section>
+
+                <section class="weather-forecast-section">
+                    <h2>24-Hour Forecast</h2>
+                    <div id="weather-forecast-container">
+                        <p class="loading">No forecast available</p>
+                    </div>
+                </section>
+
+                <section class="thermal-prediction-section">
+                    <h2>Thermal Impact Prediction</h2>
+                    <div id="thermal-prediction-container">
+                        <p class="loading">No prediction available</p>
+                    </div>
+                </section>
+
+                <section class="optimal-hours-section">
+                    <h2>Optimal Mining Hours</h2>
+                    <div id="optimal-hours-container">
+                        <p class="loading">No data available</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Pools Tab -->
+            <div id="pools-tab" class="tab-content">
+                <section class="pools-section">
+                    <h2>Mining Pool Configuration</h2>
+                    <p class="help-text">Manage mining pools for each miner in your fleet.</p>
+                    <div id="pools-container">
+                        <p class="loading">Loading pool configurations...</p>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <div id="alert-box" class="alert" style="display: none;"></div>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="/static/script.js"></script>
+
+    <script>
+        // Sidebar navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const tab = this.getAttribute('data-tab');
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(tab + '-tab').classList.add('active');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector(`.tab-btn[data-tab="${tab}"]`)?.classList.add('active');
+                if (typeof switchTab === 'function') switchTab(tab);
+            });
+        });
+    </script>
+</body>
+</html>
