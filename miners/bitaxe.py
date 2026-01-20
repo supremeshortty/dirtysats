@@ -150,17 +150,46 @@ class BitaxeAPIHandler(MinerAPIHandler):
             # Classify the device
             type_key, display_name = self._classify_device(data)
 
+            # Check for overheat mode
+            overheat_mode = data.get('overheat_mode', data.get('overheatMode', 0))
+            overheat_temp = data.get('overheat_temp', data.get('overheatTemp', 75))
+            current_temp = float(data.get('temp', 0))
+
+            # Get power draw
+            power = float(data.get('power', 0))
+
+            # Determine status - check for overheat condition
+            # Some firmware versions don't expose overheat_mode, but we can detect it:
+            # - If power is very low (< 1W) but the device is responding, ASICs are shut down
+            # - This typically happens during overheat cooldown
+            if overheat_mode == 1 or overheat_mode == True:
+                status = 'overheated'
+            elif power < 1.0 and hashrate_ghs > 0:
+                # Device reports hashrate but uses no power = ASICs shut down (overheat protection)
+                status = 'overheated'
+            elif current_temp >= overheat_temp:
+                status = 'overheating'
+            else:
+                status = 'online'
+
+            # If miner is overheated or power is extremely low (< 1W), it's not actually hashing
+            # Report 0 hashrate to reflect actual mining output
+            effective_hashrate = 0 if status == 'overheated' or power < 1.0 else hashrate_hs
+
             # Parse response format
             return {
-                'hashrate': hashrate_hs,
-                'temperature': float(data.get('temp', 0)),
+                'hashrate': effective_hashrate,
+                'temperature': current_temp,
                 'power': float(data.get('power', 0)),
                 'fan_speed': int(data.get('fanspeed', data.get('fanSpeed', 0))),
                 'model': display_name,
                 'miner_type': type_key,
                 'frequency': data.get('frequency', 0),
                 'voltage': data.get('coreVoltage', data.get('voltage', 0)),
-                'status': 'online',
+                'status': status,
+                # Overheat info
+                'overheat_mode': overheat_mode,
+                'overheat_temp': overheat_temp,
                 # ASIC info
                 'asic_model': data.get('ASICModel', data.get('asicModel', '')),
                 'asic_count': data.get('ASICCount', data.get('asicCount', 1)),
@@ -174,6 +203,7 @@ class BitaxeAPIHandler(MinerAPIHandler):
                 'hostname': data.get('hostname', ''),
                 'firmware': data.get('version', ''),
                 'board_version': data.get('boardVersion', ''),
+                'vr_temp': float(data.get('vrTemp', 0)),
                 'raw': data
             }
 

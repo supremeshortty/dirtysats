@@ -1,10 +1,10 @@
 #!/bin/bash
-# Installation script for Home Mining Fleet Manager
+# Installation script for DirtySats - Bitcoin Mining Fleet Manager
 
 set -e
 
 echo "========================================="
-echo "Home Mining Fleet Manager - Installation"
+echo "DirtySats - Installation"
 echo "========================================="
 echo ""
 
@@ -42,7 +42,7 @@ echo "========================================="
 echo "Installation complete!"
 echo "========================================="
 echo ""
-echo "To start the fleet manager:"
+echo "To start DirtySats:"
 echo "  1. Activate virtual environment: source venv/bin/activate"
 echo "  2. Run the application: python3 app.py"
 echo "  3. Open browser to: http://localhost:5000"

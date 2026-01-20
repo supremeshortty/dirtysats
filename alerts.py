@@ -30,6 +30,7 @@ class AlertType(Enum):
     EMERGENCY_SHUTDOWN = "emergency_shutdown"
     MINER_ONLINE = "miner_online"
     WEATHER_WARNING = "weather_warning"
+    OVERHEAT_RECOVERY = "overheat_recovery"
 
 
 class AlertConfig:
@@ -302,6 +303,22 @@ class AlertManager:
                 'temperature': f"{temperature:.1f}°C",
                 'reason': reason,
                 'action': 'Frequency set to minimum, 10-minute cooldown'
+            }
+        )
+        self.send_alert(alert)
+
+    def alert_overheat_recovery(self, miner_ip: str, temperature: float, recovery_temp: float):
+        """Send overheat recovery alert when miner is rebooted after cooling down"""
+        alert = Alert(
+            alert_type=AlertType.OVERHEAT_RECOVERY,
+            level=AlertLevel.INFO,
+            title=f"Overheat Recovery: {miner_ip}",
+            message=f"Miner {miner_ip} cooled to {temperature:.1f}°C and has been rebooted.",
+            miner_ip=miner_ip,
+            data={
+                'temperature': f"{temperature:.1f}°C",
+                'recovery_threshold': f"{recovery_temp:.1f}°C",
+                'action': 'Automatic reboot triggered'
             }
         )
         self.send_alert(alert)

@@ -1,5 +1,5 @@
 """
-Configuration for Home Mining Fleet Manager
+DirtySats - Bitcoin Mining Fleet Manager Configuration
 """
 import os
 
@@ -9,11 +9,23 @@ DISCOVERY_TIMEOUT = 2  # seconds per IP
 DISCOVERY_THREADS = 20  # parallel scan threads
 
 # Monitoring settings
-UPDATE_INTERVAL = 300  # seconds between status updates (data points stored every 5 min)
+UPDATE_INTERVAL = 30  # seconds between status updates
 STATUS_TIMEOUT = 3  # seconds per miner status check
+
+# Alert settings
+ALERT_COOLDOWN = 900  # seconds between repeated alerts for same issue (default: 15 min)
+
+# Overheat recovery settings
+OVERHEAT_AUTO_REBOOT = True  # Automatically reboot miners when they cool down after overheating
+OVERHEAT_RECOVERY_TEMP = 38  # Temperature (°C) at which to reboot overheated miners
 
 # Database
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "fleet.db")
+
+# OpenEI API Key (for utility rate search)
+# Get a free key at: https://openei.org/services/api/signup
+# Can also be set via OPENEI_API_KEY environment variable
+OPENEI_API_KEY = os.environ.get('OPENEI_API_KEY', None)
 
 # Flask settings
 FLASK_HOST = "0.0.0.0"
@@ -82,21 +94,33 @@ def get_thermal_profile_key(miner_type: str) -> str:
     """Get the thermal profile key for a miner type"""
     miner_upper = miner_type.upper()
 
-    # NerdQAxe family (multi-chip, higher power)
-    if 'NERDOCTAXE' in miner_upper:
+    # NerdQAxe family (multi-chip) - check most specific first
+    if 'NERDOCTAXE' in miner_upper or 'OCTAXE' in miner_upper:
         return 'NerdOctaxe'
-    if 'NERDQAXE' in miner_upper:
+    if 'NERDQAXE++' in miner_upper or 'QAXE++' in miner_upper:
+        return 'NerdQAxePP'
+    if 'NERDQAXE' in miner_upper or 'QAXE' in miner_upper:
         return 'NerdQAxe'
     if 'NERDAXE' in miner_upper:
         return 'NerdAxe'
 
-    # BitAxe family (single-chip)
+    # BitAxe family - check most specific first
+    if 'HEX' in miner_upper:
+        return 'BitAxeHex'
+    if 'GAMMA' in miner_upper or 'BM1370' in miner_upper:
+        return 'BitAxeGamma'
+    if 'SUPRA' in miner_upper or 'BM1368' in miner_upper:
+        return 'BitAxeSupra'
+    if 'ULTRA' in miner_upper or 'BM1366' in miner_upper:
+        return 'BitAxeUltra'
+    if 'MAX' in miner_upper or 'BM1397' in miner_upper:
+        return 'BitAxeMax'
     if 'BITAXE' in miner_upper:
         return 'BitAxe'
 
-    # LuckyMiner (similar to BitAxe)
-    if 'LUCKYMINER' in miner_upper:
-        return 'BitAxe'
+    # LuckyMiner
+    if 'LUCKYMINER' in miner_upper or 'LUCKY' in miner_upper:
+        return 'LuckyMiner'
 
     # Traditional ASIC miners
     if 'ANTMINER' in miner_upper:

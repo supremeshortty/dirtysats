@@ -86,9 +86,16 @@ class Database:
                     energy_company TEXT,
                     rate_structure TEXT,
                     currency TEXT DEFAULT 'USD',
+                    default_rate REAL DEFAULT 0.12,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Add default_rate column if it doesn't exist (migration for existing databases)
+            try:
+                cursor.execute("ALTER TABLE energy_config ADD COLUMN default_rate REAL DEFAULT 0.12")
+            except Exception:
+                pass  # Column already exists
 
             # Energy rates table (time-of-use pricing)
             cursor.execute("""
@@ -192,6 +199,15 @@ class Database:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_alert_history_timestamp
                 ON alert_history(timestamp)
+            """)
+
+            # Settings table (key-value store for app settings)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
             """)
 
             # Migrations: Add custom_name column if it doesn't exist
@@ -300,6 +316,22 @@ class Database:
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
+    def get_best_difficulty_ever(self) -> float:
+        """Get the highest best_difficulty ever recorded across all miners"""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT MAX(best_difficulty) as max_diff FROM stats
+                    WHERE best_difficulty > 0
+                """)
+                row = cursor.fetchone()
+                if row and row['max_diff'] is not None:
+                    return float(row['max_diff'])
+                return 0.0
+        except Exception:
+            return 0.0
+
     def update_miner_custom_name(self, ip: str, custom_name: str):
         """Update custom name for a miner"""
         with self._get_connection() as conn:
@@ -310,6 +342,33 @@ class Database:
                 WHERE ip = ?
             """, (custom_name if custom_name else None, ip))
             return cursor.rowcount > 0
+
+    def update_miner_auto_optimize(self, ip: str, enabled: bool):
+        """Update auto-optimize setting for a miner"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE miners
+                SET auto_optimize = ?
+                WHERE ip = ?
+            """, (1 if enabled else 0, ip))
+            return cursor.rowcount > 0
+
+    def get_miner_auto_optimize(self, ip: str) -> bool:
+        """Get auto-optimize setting for a miner"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT auto_optimize FROM miners WHERE ip = ?", (ip,))
+            row = cursor.fetchone()
+            return bool(row['auto_optimize']) if row and row['auto_optimize'] else False
+
+    def get_all_auto_optimize_settings(self) -> dict:
+        """Get auto-optimize settings for all miners"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT ip, auto_optimize FROM miners")
+            rows = cursor.fetchall()
+            return {row['ip']: bool(row['auto_optimize']) for row in rows}
 
     def delete_miner(self, ip: str):
         """Delete a miner and its stats"""
@@ -329,7 +388,8 @@ class Database:
     # Energy Management Methods
 
     def set_energy_config(self, location: str, energy_company: str,
-                          rate_structure: str = "tou", currency: str = "USD"):
+                          rate_structure: str = "tou", currency: str = "USD",
+                          default_rate: float = None):
         """Set or update energy configuration"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -337,9 +397,9 @@ class Database:
             cursor.execute("DELETE FROM energy_config")
             # Insert new config
             cursor.execute("""
-                INSERT INTO energy_config (location, energy_company, rate_structure, currency, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (location, energy_company, rate_structure, currency, datetime.now()))
+                INSERT INTO energy_config (location, energy_company, rate_structure, currency, default_rate, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (location, energy_company, rate_structure, currency, default_rate, datetime.now()))
 
     def get_energy_config(self) -> Optional[Dict]:
         """Get energy configuration"""
@@ -409,15 +469,100 @@ class Database:
 
     def get_energy_consumption_history(self, hours: int = 24) -> List[Dict]:
         """Get energy consumption history"""
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM energy_consumption
-                WHERE timestamp > datetime('now', ? || ' hours')
+                WHERE timestamp > ?
                 ORDER BY timestamp DESC
-            """, (f'-{hours}',))
+            """, (cutoff,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def calculate_actual_energy_consumption(self, hours: int = 24) -> Dict:
+        """
+        Calculate actual energy consumption from power readings in stats table.
+
+        This integrates power over time: Energy (kWh) = Σ(Power_i × Duration_i) / 1000
+
+        Returns:
+            Dict with total_kwh, readings_count, time_coverage_percent, and hourly breakdown
+        """
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get all power readings ordered by timestamp
+            cursor.execute("""
+                SELECT timestamp, SUM(power) as total_power
+                FROM stats
+                WHERE timestamp > ?
+                AND status IN ('online', 'overheating')
+                AND power > 0
+                GROUP BY timestamp
+                ORDER BY timestamp ASC
+            """, (cutoff,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                return {
+                    'total_kwh': 0,
+                    'readings_count': 0,
+                    'time_coverage_percent': 0,
+                    'hourly_breakdown': []
+                }
+
+            # Integrate power over time
+            total_energy_wh = 0
+            hourly_energy = {}  # hour -> wh
+            readings_count = len(rows)
+
+            for i in range(len(rows) - 1):
+                current_ts = datetime.fromisoformat(rows[i]['timestamp'])
+                next_ts = datetime.fromisoformat(rows[i + 1]['timestamp'])
+                power_watts = rows[i]['total_power'] or 0
+
+                # Calculate time interval in hours
+                interval_seconds = (next_ts - current_ts).total_seconds()
+
+                # Skip if interval is too large (gap in data > 5 minutes)
+                if interval_seconds > 300:
+                    continue
+
+                interval_hours = interval_seconds / 3600
+                energy_wh = power_watts * interval_hours
+                total_energy_wh += energy_wh
+
+                # Track by hour for TOU calculation
+                hour_key = current_ts.strftime('%Y-%m-%d %H:00')
+                if hour_key not in hourly_energy:
+                    hourly_energy[hour_key] = {'wh': 0, 'readings': 0}
+                hourly_energy[hour_key]['wh'] += energy_wh
+                hourly_energy[hour_key]['readings'] += 1
+
+            # Calculate time coverage (what % of the requested period has data)
+            if rows:
+                first_ts = datetime.fromisoformat(rows[0]['timestamp'])
+                last_ts = datetime.fromisoformat(rows[-1]['timestamp'])
+                actual_span = (last_ts - first_ts).total_seconds() / 3600
+                time_coverage = (actual_span / hours) * 100 if hours > 0 else 0
+            else:
+                time_coverage = 0
+
+            # Convert hourly breakdown to list
+            hourly_breakdown = [
+                {'hour': k, 'kwh': v['wh'] / 1000, 'readings': v['readings']}
+                for k, v in sorted(hourly_energy.items())
+            ]
+
+            return {
+                'total_kwh': total_energy_wh / 1000,
+                'readings_count': readings_count,
+                'time_coverage_percent': min(100, time_coverage),
+                'hourly_breakdown': hourly_breakdown
+            }
 
     def add_profitability_log(self, btc_price: float, network_difficulty: float,
                              total_hashrate: float, estimated_btc_per_day: float,
@@ -435,44 +580,86 @@ class Database:
 
     def get_profitability_history(self, days: int = 7) -> List[Dict]:
         """Get profitability history"""
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM profitability_log
-                WHERE timestamp > datetime('now', ? || ' days')
+                WHERE timestamp > ?
                 ORDER BY timestamp DESC
-            """, (f'-{days}',))
+            """, (cutoff,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
     def get_aggregate_stats(self, hours: int = 24) -> Dict:
         """Get aggregated stats over a time period"""
+        # Use Python datetime to avoid UTC/localtime issues with SQLite
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
+            # Calculate shares earned in period (difference between latest and earliest)
+            # For each miner, get max - min shares in the period
             cursor.execute("""
                 SELECT
-                    SUM(shares_accepted) as total_shares_accepted,
-                    SUM(shares_rejected) as total_shares_rejected,
-                    AVG(power) as avg_power,
-                    MAX(power) as max_power,
-                    MIN(power) as min_power,
-                    AVG(temperature) as avg_temperature,
-                    AVG(hashrate) as avg_hashrate,
-                    MAX(best_difficulty) as best_difficulty
+                    COALESCE(SUM(shares_gained), 0) as total_shares_accepted,
+                    COALESCE(SUM(rejected_gained), 0) as total_shares_rejected
+                FROM (
+                    SELECT
+                        miner_id,
+                        MAX(shares_accepted) - MIN(shares_accepted) as shares_gained,
+                        MAX(shares_rejected) - MIN(shares_rejected) as rejected_gained
+                    FROM stats
+                    WHERE timestamp > ?
+                    AND status = 'online'
+                    GROUP BY miner_id
+                )
+            """, (cutoff,))
+            shares_row = cursor.fetchone()
+
+            # Calculate average fleet power by grouping readings into time buckets
+            # Group by 30-second intervals to match the update frequency
+            cursor.execute("""
+                SELECT
+                    AVG(fleet_power) as avg_fleet_power,
+                    MAX(fleet_power) as max_power,
+                    MIN(fleet_power) as min_power,
+                    AVG(avg_temp) as avg_temperature,
+                    AVG(total_hashrate) as avg_hashrate
+                FROM (
+                    SELECT
+                        (strftime('%s', timestamp) / 30) as time_bucket,
+                        SUM(power) as fleet_power,
+                        AVG(temperature) as avg_temp,
+                        SUM(hashrate) as total_hashrate
+                    FROM stats
+                    WHERE timestamp > ?
+                    AND status = 'online'
+                    GROUP BY time_bucket
+                    HAVING COUNT(DISTINCT miner_id) > 0
+                )
+            """, (cutoff,))
+            power_row = cursor.fetchone()
+
+            # Get best difficulty
+            cursor.execute("""
+                SELECT MAX(best_difficulty) as best_difficulty
                 FROM stats
-                WHERE timestamp > datetime('now', ? || ' hours')
+                WHERE timestamp > ?
                 AND status = 'online'
-            """, (f'-{hours}',))
-            row = cursor.fetchone()
-            return dict(row) if row else {
-                'total_shares_accepted': 0,
-                'total_shares_rejected': 0,
-                'avg_power': 0,
-                'max_power': 0,
-                'min_power': 0,
-                'avg_temperature': 0,
-                'avg_hashrate': 0,
-                'best_difficulty': 0
+            """, (cutoff,))
+            diff_row = cursor.fetchone()
+
+            return {
+                'total_shares_accepted': shares_row['total_shares_accepted'] if shares_row else 0,
+                'total_shares_rejected': shares_row['total_shares_rejected'] if shares_row else 0,
+                'avg_power': power_row['avg_fleet_power'] if power_row else 0,
+                'max_power': power_row['max_power'] if power_row else 0,
+                'min_power': power_row['min_power'] if power_row else 0,
+                'avg_temperature': power_row['avg_temperature'] if power_row else 0,
+                'avg_hashrate': power_row['avg_hashrate'] if power_row else 0,
+                'best_difficulty': diff_row['best_difficulty'] if diff_row else 0
             }
 
     # Alert Management Methods
@@ -489,13 +676,14 @@ class Database:
 
     def get_alert_history(self, hours: int = 24) -> List[Dict]:
         """Get alert history"""
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM alert_history
-                WHERE timestamp > datetime('now', ? || ' hours')
+                WHERE timestamp > ?
                 ORDER BY timestamp DESC
-            """, (f'-{hours}',))
+            """, (cutoff,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -543,3 +731,31 @@ class Database:
             cursor.execute("SELECT * FROM weather_config ORDER BY id DESC LIMIT 1")
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    # Settings methods (key-value store)
+
+    def set_setting(self, key: str, value: str):
+        """Set a setting value"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+            """, (key, value, datetime.now()))
+
+    def get_setting(self, key: str, default: str = None) -> Optional[str]:
+        """Get a setting value"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row['value'] if row else default
+
+    def delete_setting(self, key: str):
+        """Delete a setting"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM settings WHERE key = ?", (key,))

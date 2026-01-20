@@ -1,4 +1,4 @@
-// Mining Fleet Manager Dashboard
+// DirtySats - Bitcoin Mining Fleet Manager
 const API_BASE = '';
 const UPDATE_INTERVAL = 5000; // 5 seconds
 const CHART_REFRESH_INTERVAL = 30000; // 30 seconds for chart updates
@@ -21,6 +21,99 @@ let optimizationState = {
     // Intervals for optimization loops
     intervals: {}
 };
+
+// Load persisted auto-optimize settings from backend
+async function loadAutoOptimizeSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/auto-optimize/all`);
+        const data = await response.json();
+
+        if (data.success && data.settings) {
+            // Start optimization for miners that have it enabled
+            for (const [ip, enabled] of Object.entries(data.settings)) {
+                if (enabled && minersCache[ip]) {
+                    // Initialize state and start optimization silently
+                    if (!optimizationState.miners[ip]?.active) {
+                        startMinerOptimizationSilent(ip);
+                    }
+                }
+            }
+
+            // Update fleet button state
+            const anyActive = Object.values(data.settings).some(v => v);
+            optimizationState.fleetOptimizing = anyActive;
+            updateFleetOptimizeButton();
+        }
+    } catch (error) {
+        console.error('Error loading auto-optimize settings:', error);
+    }
+}
+
+// Start optimization without confirmation dialog (for restoring state)
+async function startMinerOptimizationSilent(ip) {
+    const miner = minersCache[ip];
+    if (!miner) return;
+
+    const status = miner.last_status || {};
+    const profile = getMinerOCProfileByIP(ip);
+
+    // Initialize optimization state for this miner
+    optimizationState.miners[ip] = {
+        active: true,
+        startTime: Date.now(),
+        startFreq: status.raw?.frequency || status.frequency || profile.frequency.stock,
+        startHashrate: status.hashrate || 0,
+        startShares: status.shares_accepted || 0,
+        startEfficiency: calculateEfficiency(status.hashrate, status.power),
+        lastAdjustment: Date.now(),
+        adjustmentCount: 0,
+        status: 'starting'
+    };
+
+    // Add optimizing class to miner card
+    const cardId = `miner-card-${ip.replace(/\./g, '-')}`;
+    const card = document.getElementById(cardId);
+    if (card) {
+        card.classList.add('optimizing');
+        card.classList.remove('optimized');
+    }
+
+    // Run first optimization check immediately
+    await runOptimizationCycle(ip);
+
+    // Set up interval for ongoing optimization
+    optimizationState.intervals[ip] = setInterval(() => {
+        runOptimizationCycle(ip);
+    }, 30000);
+}
+
+// Save auto-optimize setting to backend
+async function saveAutoOptimizeSetting(ip, enabled) {
+    try {
+        await fetch(`${API_BASE}/api/miner/${ip}/auto-optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+    } catch (error) {
+        console.error('Error saving auto-optimize setting:', error);
+    }
+}
+
+// Update fleet optimize button state
+function updateFleetOptimizeButton() {
+    const btn = document.getElementById('auto-optimize-fleet-btn');
+    const btnText = document.getElementById('auto-optimize-fleet-text');
+    if (btn && btnText) {
+        if (optimizationState.fleetOptimizing) {
+            btn.classList.add('optimizing');
+            btnText.textContent = 'Stop Optimization';
+        } else {
+            btn.classList.remove('optimizing');
+            btnText.textContent = 'Auto Optimize Fleet';
+        }
+    }
+}
 
 // ============================================================================
 // CHART COLOR SYSTEM - "Mission Control" Palette
@@ -367,21 +460,92 @@ document.addEventListener('DOMContentLoaded', () => {
         loadFleetCombinedChart(hours);
     });
 
-    // Energy config form
-    document.getElementById('energy-config-form').addEventListener('submit', applyEnergyPreset);
+    // Utility Rate Configuration - Tab switching
+    document.querySelectorAll('.rate-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const targetTab = this.dataset.tab;
+            // Update tab buttons
+            document.querySelectorAll('.rate-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            // Update panels
+            document.querySelectorAll('.rate-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${targetTab}-panel`).classList.add('active');
+        });
+    });
 
-    // Show/hide custom rate entry based on dropdown selection
-    document.getElementById('energy-company').addEventListener('change', function() {
-        const customRateEntry = document.getElementById('custom-rate-entry');
-        if (this.value === 'Custom (Manual Entry)') {
-            customRateEntry.style.display = 'block';
-        } else {
-            customRateEntry.style.display = 'none';
+    // OpenEI API Key management
+    document.getElementById('save-api-key').addEventListener('click', saveOpenEIKey);
+    document.getElementById('toggle-api-key-visibility').addEventListener('click', toggleApiKeyVisibility);
+    document.getElementById('openei-api-key').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveOpenEIKey();
         }
+    });
+    // Allow clicking on status to toggle form
+    document.getElementById('api-key-status').addEventListener('click', toggleApiKeyForm);
+    // Check API key status on load
+    checkOpenEIKeyStatus();
+
+    // Utility search
+    document.getElementById('utility-search-btn').addEventListener('click', searchUtilities);
+    document.getElementById('utility-search').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchUtilities();
+        }
+    });
+
+    // Apply OpenEI rate button
+    document.getElementById('apply-openei-rate').addEventListener('click', applySelectedOpenEIRate);
+
+    // Manual rate form
+    document.getElementById('manual-rate-form').addEventListener('submit', applyManualRates);
+
+    // Manual rate type toggle (TOU vs Flat)
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const rateType = this.dataset.type;
+            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            if (rateType === 'tou') {
+                document.getElementById('tou-rate-entry').style.display = 'block';
+                document.getElementById('flat-rate-entry').style.display = 'none';
+            } else {
+                document.getElementById('tou-rate-entry').style.display = 'none';
+                document.getElementById('flat-rate-entry').style.display = 'block';
+            }
+        });
     });
 
     // Mining schedule form
     document.getElementById('mining-schedule-form').addEventListener('submit', createMiningSchedule);
+
+    // Collapsible sections toggle
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.closest('.collapsible-section');
+            section.classList.toggle('collapsed');
+            // Save state to localStorage
+            const sectionId = section.id;
+            if (sectionId) {
+                const collapsed = section.classList.contains('collapsed');
+                localStorage.setItem(`section-${sectionId}`, collapsed ? 'collapsed' : 'expanded');
+            }
+        });
+    });
+
+    // Restore collapsible section states from localStorage
+    document.querySelectorAll('.collapsible-section').forEach(section => {
+        const sectionId = section.id;
+        if (sectionId) {
+            const savedState = localStorage.getItem(`section-${sectionId}`);
+            if (savedState === 'collapsed') {
+                section.classList.add('collapsed');
+            }
+        }
+    });
 });
 
 // Tab Management
@@ -430,12 +594,17 @@ function switchTab(tabName) {
 // Load all dashboard data
 async function loadDashboard() {
     try {
+        // Read fleet chart time range from dropdown
+        const fleetChartHours = parseInt(document.getElementById('fleet-chart-timerange')?.value) || 6;
         await Promise.all([
             loadStats(),
             loadMiners(),
-            loadFleetCombinedChart()
+            loadFleetCombinedChart(fleetChartHours)
         ]);
         updateLastUpdateTime();
+
+        // Load and restore auto-optimize settings after miners are loaded
+        await loadAutoOptimizeSettings();
     } catch (error) {
         console.error('Error loading dashboard:', error);
         showAlert('Error loading dashboard data', 'error');
@@ -454,31 +623,23 @@ async function loadStats() {
             document.getElementById('total-miners').textContent = stats.total_miners ?? 0;
             document.getElementById('online-miners').textContent = stats.online_miners ?? 0;
             document.getElementById('offline-miners').textContent = stats.offline_miners ?? 0;
+            document.getElementById('overheated-miners').textContent = stats.overheated_miners ?? 0;
             document.getElementById('total-hashrate').textContent = formatHashrate(stats.total_hashrate ?? 0);
             document.getElementById('best-difficulty').textContent = formatDifficulty(stats.best_difficulty_ever || 0);
             document.getElementById('avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
+            // Show current total power from live stats
+            document.getElementById('total-power').textContent = `${(stats.total_power ?? 0).toFixed(1)} W`;
         }
 
-        // Get time-based stats for shares and power
+        // Get time-based stats for shares
         const sharesHours = parseInt(document.getElementById('shares-timerange').value);
-        const powerHours = parseInt(document.getElementById('power-timerange').value);
 
-        const [sharesResponse, powerResponse] = await Promise.all([
-            fetch(`${API_BASE}/api/stats/aggregate?hours=${sharesHours}`),
-            fetch(`${API_BASE}/api/stats/aggregate?hours=${powerHours}`)
-        ]);
-
+        const sharesResponse = await fetch(`${API_BASE}/api/stats/aggregate?hours=${sharesHours}`);
         const sharesData = await sharesResponse.json();
-        const powerData = await powerResponse.json();
 
         if (sharesData.success) {
             const totalShares = sharesData.stats.total_shares_accepted ?? 0;
             document.getElementById('total-shares').textContent = formatNumber(totalShares);
-        }
-
-        if (powerData.success) {
-            const avgPower = powerData.stats.avg_power ?? 0;
-            document.getElementById('total-power').textContent = `${avgPower.toFixed(1)} W`;
         }
 
     } catch (error) {
@@ -512,9 +673,6 @@ async function loadMiners() {
 function displayMiners(miners) {
     const container = document.getElementById('miners-container');
 
-    console.log('displayMiners called with:', miners);
-    console.log('Number of miners:', miners ? miners.length : 'undefined');
-
     if (!miners || miners.length === 0) {
         container.innerHTML = '<p class="no-miners">No miners found. Click "Discover Miners" to scan your network.</p>';
         return;
@@ -522,7 +680,6 @@ function displayMiners(miners) {
 
     try {
         // Update miners cache for charts and modal data
-        minersCache = {};
         miners.forEach(miner => {
             minersCache[miner.ip] = {
                 custom_name: miner.custom_name,
@@ -532,40 +689,52 @@ function displayMiners(miners) {
             };
         });
 
-        const minersHTML = miners.map(miner => createMinerCard(miner)).join('');
-        container.innerHTML = `<div class="miners-grid">${minersHTML}</div>`;
+        // Check if we need to rebuild the grid or can update in-place
+        const existingGrid = container.querySelector('.miners-grid');
+        const currentMinerIPs = miners.map(m => m.ip).sort().join(',');
+        const existingMinerIPs = existingGrid ?
+            Array.from(existingGrid.querySelectorAll('.miner-card')).map(c => c.dataset.ip).sort().join(',') : '';
 
-        // Attach event listeners for actions
-        miners.forEach(miner => {
-            const card = document.getElementById(`miner-card-${miner.ip.replace(/\./g, '-')}`);
-            if (card) {
-                card.addEventListener('click', (e) => {
-                    // Don't open modal if clicking on action buttons or edit name
-                    if (e.target.closest('.miner-actions') || e.target.closest('.edit-name-btn')) {
-                        return;
-                    }
-                    openMinerDetail(miner.ip);
-                });
-            }
+        // If miner list changed (added/removed), rebuild the grid
+        if (!existingGrid || currentMinerIPs !== existingMinerIPs) {
+            const minersHTML = miners.map(miner => createMinerCard(miner)).join('');
+            container.innerHTML = `<div class="miners-grid">${minersHTML}</div>`;
 
-            const deleteBtn = document.getElementById(`delete-${miner.ip}`);
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteMiner(miner.ip);
-                });
-            }
+            // Attach event listeners for actions
+            miners.forEach(miner => {
+                const card = document.getElementById(`miner-card-${miner.ip.replace(/\./g, '-')}`);
+                if (card) {
+                    card.addEventListener('click', (e) => {
+                        // Don't open modal if clicking on action buttons or edit name
+                        if (e.target.closest('.miner-actions') || e.target.closest('.edit-name-btn')) {
+                            return;
+                        }
+                        openMinerDetail(miner.ip);
+                    });
+                }
 
-            const restartBtn = document.getElementById(`restart-${miner.ip}`);
-            if (restartBtn) {
-                restartBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    restartMiner(miner.ip);
-                });
-            }
-        });
+                const deleteBtn = document.getElementById(`delete-${miner.ip}`);
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteMiner(miner.ip);
+                    });
+                }
 
-        console.log('Successfully displayed', miners.length, 'miners');
+                const restartBtn = document.getElementById(`restart-${miner.ip}`);
+                if (restartBtn) {
+                    restartBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        restartMiner(miner.ip);
+                    });
+                }
+            });
+        } else {
+            // Update existing cards in-place (live update without flickering)
+            miners.forEach(miner => {
+                updateMinerCardData(miner.ip);
+            });
+        }
     } catch (error) {
         console.error('Error in displayMiners:', error);
         container.innerHTML = '<p class="no-miners">Error displaying miners. Check console for details.</p>';
@@ -593,8 +762,20 @@ function getMinerDisplayName(ip) {
 // Create HTML for single miner card
 function createMinerCard(miner) {
     const status = miner.last_status || {};
-    const isOnline = status.status === 'online';
-    const offlineClass = isOnline ? '' : 'offline';
+    const minerStatus = status.status || 'offline';
+    const isOnline = minerStatus === 'online' || minerStatus === 'overheating';
+    const isOverheated = minerStatus === 'overheated';
+    const isOverheating = minerStatus === 'overheating';
+
+    // Determine card class based on status
+    let statusClass = '';
+    if (isOverheated) {
+        statusClass = 'overheated';
+    } else if (isOverheating) {
+        statusClass = 'overheating';
+    } else if (!isOnline) {
+        statusClass = 'offline';
+    }
 
     // Extract chip type from raw data
     const chipType = status.raw?.ASICModel || 'Unknown';
@@ -608,30 +789,40 @@ function createMinerCard(miner) {
     const isOptimized = optimizationState.miners[miner.ip]?.status === 'optimal';
     const optimizingClass = isOptimizing ? 'optimizing' : (isOptimized ? 'optimized' : '');
 
-    // Build optimization badge HTML
-    let optimizationBadge = '';
-    if (isOptimizing) {
-        optimizationBadge = '<span class="optimization-badge tuning">AUTO-TUNING</span>';
+    // Build status badge HTML
+    let statusBadge = '';
+    if (isOverheated) {
+        statusBadge = '<span class="status-badge overheated">OVERHEATED</span>';
+    } else if (isOverheating) {
+        statusBadge = '<span class="status-badge overheating">OVERHEATING</span>';
+    } else if (isOptimizing) {
+        statusBadge = '<span class="optimization-badge tuning">AUTO-TUNING</span>';
     } else if (isOptimized) {
-        optimizationBadge = '<span class="optimization-badge optimized">OPTIMIZED</span>';
+        statusBadge = '<span class="optimization-badge optimized">OPTIMIZED</span>';
     }
 
     return `
-        <div class="miner-card ${offlineClass} ${optimizingClass}" id="miner-card-${miner.ip.replace(/\./g, '-')}" data-ip="${miner.ip}">
+        <div class="miner-card ${statusClass} ${optimizingClass}" id="miner-card-${miner.ip.replace(/\./g, '-')}" data-ip="${miner.ip}">
             <div class="miner-header">
                 <div class="miner-title" id="miner-title-${miner.ip.replace(/\./g, '-')}" data-ip="${miner.ip}">
                     <span class="miner-name">${displayName}</span>
                     <span class="edit-name-btn" onclick="editMinerName('${miner.ip}', '${(miner.custom_name || '').replace(/'/g, "\\'")}')">✏️</span>
                 </div>
                 <div class="miner-badges">
-                    ${optimizationBadge}
+                    ${statusBadge}
                     <div class="miner-type">${miner.type}</div>
                 </div>
             </div>
             <div class="miner-ip">${miner.ip}</div>
             <div class="chip-type">Chip Type: ${chipType}</div>
 
-            ${isOnline ? `
+            ${isOverheated ? `
+                <div class="status-overheated" style="text-align: center; padding: 20px;">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🔥</div>
+                    <div style="color: #ff4444; font-weight: bold;">DEVICE OVERHEATED</div>
+                    <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Cooling down...</div>
+                </div>
+            ` : isOnline ? `
                 <div class="miner-stats">
                     <div class="miner-stat">
                         <span class="miner-stat-label">Hashrate</span>
@@ -639,7 +830,7 @@ function createMinerCard(miner) {
                     </div>
                     <div class="miner-stat">
                         <span class="miner-stat-label">Temperature</span>
-                        <span class="miner-stat-value">${status.temperature?.toFixed(1) || 'N/A'}°C</span>
+                        <span class="miner-stat-value ${isOverheating ? 'temp-warning' : ''}">${status.temperature?.toFixed(1) || 'N/A'}°C</span>
                     </div>
                     <div class="miner-stat">
                         <span class="miner-stat-label">Power</span>
@@ -665,7 +856,7 @@ function createMinerCard(miner) {
             `}
 
             <div class="miner-actions">
-                <button id="restart-${miner.ip}" class="btn btn-primary" ${!isOnline ? 'disabled' : ''}>
+                <button id="restart-${miner.ip}" class="btn btn-secondary" ${!isOnline ? 'disabled' : ''}>
                     Restart
                 </button>
                 <button id="delete-${miner.ip}" class="btn btn-danger">
@@ -702,8 +893,15 @@ function formatNumber(num) {
 function formatDifficulty(diff) {
     if (!diff) return '0';
 
-    if (diff >= 1_000_000_000) {
-        return `${(diff / 1_000_000_000).toFixed(2)}B`;
+    // If already a formatted string (e.g., '2.73 G'), return as-is
+    if (typeof diff === 'string') {
+        return diff;
+    }
+
+    if (diff >= 1_000_000_000_000) {
+        return `${(diff / 1_000_000_000_000).toFixed(2)}T`;
+    } else if (diff >= 1_000_000_000) {
+        return `${(diff / 1_000_000_000).toFixed(2)}G`;
     } else if (diff >= 1_000_000) {
         return `${(diff / 1_000_000).toFixed(2)}M`;
     } else if (diff >= 1_000) {
@@ -713,11 +911,25 @@ function formatDifficulty(diff) {
     }
 }
 
+// Button loading state helpers
+function setButtonLoading(btn, isLoading, loadingText = 'Loading...') {
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.originalText = btn.textContent;
+        btn.classList.add('loading');
+        btn.disabled = true;
+        btn.innerHTML = `<span class="btn-spinner"></span> ${loadingText}`;
+    } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || btn.textContent;
+    }
+}
+
 // Discover miners
 async function discoverMiners() {
     const btn = document.getElementById('discover-btn');
-    btn.disabled = true;
-    btn.textContent = 'Discovering...';
+    setButtonLoading(btn, true, 'Discovering...');
 
     showAlert('Scanning network for miners... This may take up to 60 seconds.', 'success');
 
@@ -741,8 +953,11 @@ async function discoverMiners() {
     } catch (error) {
         showAlert(`Discovery error: ${error.message}`, 'error');
     } finally {
-        btn.disabled = false;
-        btn.textContent = 'Discover Miners';
+        setButtonLoading(btn, false);
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg> Discover Miners`;
     }
 }
 
@@ -817,8 +1032,30 @@ async function editMinerName(ip, currentName) {
         const data = await response.json();
 
         if (data.success) {
+            // Immediately update the UI
+            const displayName = newName || minersCache[ip]?.model || minersCache[ip]?.type || 'Unknown';
+
+            // Update miners cache
+            if (minersCache[ip]) {
+                minersCache[ip].custom_name = newName || null;
+            }
+
+            // Update miner card name
+            const cardId = `miner-card-${ip.replace(/\./g, '-')}`;
+            const card = document.getElementById(cardId);
+            if (card) {
+                const nameEl = card.querySelector('.miner-name');
+                if (nameEl) nameEl.textContent = displayName;
+
+                // Update edit button with new name
+                const editBtn = card.querySelector('.edit-name-btn');
+                if (editBtn) {
+                    const escapedName = (newName || '').replace(/'/g, "\\'");
+                    editBtn.setAttribute('onclick', `editMinerName('${ip}', '${escapedName}')`);
+                }
+            }
+
             showAlert(`Miner name updated`, 'success');
-            loadDashboard();
         } else {
             showAlert(`Failed to update name: ${data.error}`, 'error');
         }
@@ -962,6 +1199,496 @@ function displayRateSchedule(rates) {
     container.innerHTML = tableHTML;
 }
 
+// ============================================
+// OpenEI Utility Rate Search Functions
+// ============================================
+
+// Global state for selected utility rate
+let selectedOpenEIRate = null;
+
+// Check OpenEI API key status on page load
+async function checkOpenEIKeyStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/api/openei/key`);
+        const data = await response.json();
+
+        const statusEl = document.getElementById('api-key-status');
+        const formEl = document.getElementById('api-key-form');
+        const inputEl = document.getElementById('openei-api-key');
+        const apiKeySection = document.getElementById('api-key-section');
+        const searchSection = document.getElementById('utility-search-section');
+        const sectionDivider = document.querySelector('#openei-panel .section-divider');
+
+        if (data.success && data.configured) {
+            statusEl.textContent = 'Configured ✓';
+            statusEl.className = 'api-key-status configured';
+            if (inputEl) inputEl.placeholder = data.masked_key || 'API key configured';
+            // Collapse the entire API key section since key is already set
+            if (formEl) formEl.style.display = 'none';
+            // Hide the description paragraph too
+            const descParagraph = apiKeySection?.querySelector('.panel-description');
+            if (descParagraph) descParagraph.style.display = 'none';
+            // Hide the hint paragraph
+            const hintParagraph = apiKeySection?.querySelector('.panel-hint');
+            if (hintParagraph) hintParagraph.style.display = 'none';
+            // Show search section prominently
+            if (searchSection) searchSection.style.display = 'block';
+            if (sectionDivider) sectionDivider.style.display = 'block';
+        } else {
+            statusEl.textContent = 'Not Configured';
+            statusEl.className = 'api-key-status not-configured';
+            if (formEl) formEl.style.display = 'block';
+            // Show the description and hint
+            const descParagraph = apiKeySection?.querySelector('.panel-description');
+            if (descParagraph) descParagraph.style.display = 'block';
+            const hintParagraph = apiKeySection?.querySelector('.panel-hint');
+            if (hintParagraph) hintParagraph.style.display = 'block';
+            // Still show search section but it won't work without key
+            if (searchSection) searchSection.style.display = 'block';
+            if (sectionDivider) sectionDivider.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking API key status:', error);
+    }
+}
+
+// Save OpenEI API key
+async function saveOpenEIKey() {
+    const inputEl = document.getElementById('openei-api-key');
+    const apiKey = inputEl.value.trim();
+
+    if (!apiKey) {
+        showAlert('Please enter an API key', 'warning');
+        return;
+    }
+
+    const saveBtn = document.getElementById('save-api-key');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Validating...';
+    saveBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/openei/key`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('API key saved successfully!', 'success');
+            inputEl.value = '';
+            inputEl.placeholder = data.masked_key || 'API key configured';
+            await checkOpenEIKeyStatus();
+        } else {
+            showAlert(data.error || 'Failed to save API key', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving API key:', error);
+        showAlert('Error saving API key. Please try again.', 'error');
+    } finally {
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+// Toggle API key visibility
+function toggleApiKeyVisibility() {
+    const inputEl = document.getElementById('openei-api-key');
+    if (inputEl.type === 'password') {
+        inputEl.type = 'text';
+    } else {
+        inputEl.type = 'password';
+    }
+}
+
+// Toggle API key form visibility (for reconfiguring)
+function toggleApiKeyForm() {
+    const formEl = document.getElementById('api-key-form');
+    if (formEl.style.display === 'none') {
+        formEl.style.display = 'block';
+    } else {
+        formEl.style.display = 'none';
+    }
+}
+
+// Search utilities via OpenEI API
+async function searchUtilities() {
+    const searchInput = document.getElementById('utility-search');
+    const query = searchInput.value.trim();
+
+    if (query.length < 2) {
+        showAlert('Please enter at least 2 characters to search', 'warning');
+        return;
+    }
+
+    const utilityList = document.getElementById('utility-list');
+    const searchResultsWrapper = document.getElementById('utility-search-results');
+    const ratePlansContainer = document.getElementById('rate-plans-container');
+    const ratePlansList = document.getElementById('rate-plans-list');
+    const ratePreview = document.getElementById('rate-preview');
+
+    // Show loading state
+    utilityList.innerHTML = '<div class="loading">Searching utilities...</div>';
+    searchResultsWrapper.style.display = 'block';
+    ratePlansContainer.style.display = 'none';
+    ratePlansList.innerHTML = '';
+    ratePreview.style.display = 'none';
+    selectedOpenEIRate = null;
+    document.getElementById('apply-openei-rate').disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/utilities/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.success && data.utilities && data.utilities.length > 0) {
+            displayUtilityResults(data.utilities);
+        } else if (data.error) {
+            // Show API error (likely missing API key)
+            const isApiKeyError = data.error.includes('API key') || data.error.includes('API_KEY');
+            utilityList.innerHTML = `
+                <div class="error-message">
+                    <p>${data.error}</p>
+                    ${isApiKeyError ? `
+                        <p class="hint">
+                            <a href="https://openei.org/services/api/signup" target="_blank">Get a free API key</a>
+                            and add it to your config.py or set the OPENEI_API_KEY environment variable.
+                        </p>
+                        <p class="hint">Or use the <strong>Manual Entry</strong> tab to enter your rates directly.</p>
+                    ` : `
+                        <p class="hint">Please try again or use manual entry</p>
+                    `}
+                </div>
+            `;
+        } else {
+            utilityList.innerHTML = `
+                <div class="no-results">
+                    <p>No utilities found for "${query}"</p>
+                    <p class="hint">Try searching by utility name, state, or city (e.g., "Xcel Energy", "Colorado", "Denver")</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error searching utilities:', error);
+        utilityList.innerHTML = `
+            <div class="error-message">
+                <p>Error searching utilities: ${error.message}</p>
+                <p class="hint">Please try again or use the Manual Entry tab</p>
+            </div>
+        `;
+    }
+}
+
+// Display utility search results
+function displayUtilityResults(utilities) {
+    const container = document.getElementById('utility-list');
+    const wrapper = document.getElementById('utility-search-results');
+
+    const html = utilities.map(utility => `
+        <div class="utility-item" data-utility-name="${utility.utility_name}" data-eia-id="${utility.eia_id || ''}">
+            <div class="utility-name">${utility.utility_name}</div>
+            <div class="utility-info">${utility.state || ''} ${utility.eia_id ? `(EIA: ${utility.eia_id})` : ''}</div>
+        </div>
+    `).join('');
+
+    container.innerHTML = html;
+    wrapper.style.display = 'block';
+
+    // Add click handlers to utility items
+    container.querySelectorAll('.utility-item').forEach(item => {
+        item.addEventListener('click', () => {
+            // Remove selection from other items
+            container.querySelectorAll('.utility-item').forEach(i => i.classList.remove('selected'));
+            // Select this item
+            item.classList.add('selected');
+            // Load rate plans for this utility
+            loadUtilityRatePlans(item.dataset.utilityName, item.dataset.eiaId);
+        });
+    });
+}
+
+// Load rate plans for a selected utility
+async function loadUtilityRatePlans(utilityName, eiaId) {
+    const container = document.getElementById('rate-plans-container');
+    const plansList = document.getElementById('rate-plans-list');
+    const ratePreview = document.getElementById('rate-preview');
+
+    // Show loading state
+    container.style.display = 'block';
+    plansList.innerHTML = '<div class="loading">Loading rate plans...</div>';
+    ratePreview.style.display = 'none';
+    selectedOpenEIRate = null;
+    document.getElementById('apply-openei-rate').disabled = true;
+
+    try {
+        let url = `${API_BASE}/api/utilities/${encodeURIComponent(utilityName)}/rates`;
+        if (eiaId) {
+            url += `?eia_id=${encodeURIComponent(eiaId)}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success && data.rate_plans && data.rate_plans.length > 0) {
+            displayRatePlans(data.rate_plans);
+        } else {
+            plansList.innerHTML = `
+                <div class="no-results">
+                    <p>No residential rate plans found for this utility</p>
+                    <p class="hint">Try a different utility or use manual entry</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading rate plans:', error);
+        plansList.innerHTML = `
+            <div class="error-message">
+                <p>Error loading rate plans: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+// Display available rate plans
+function displayRatePlans(plans) {
+    const plansList = document.getElementById('rate-plans-list');
+
+    const html = plans.map(plan => `
+        <div class="rate-plan-item" data-rate-label="${plan.label}">
+            <div class="rate-plan-name">${plan.name || plan.label}</div>
+            <div class="rate-plan-details">
+                ${plan.startdate ? `Effective: ${plan.startdate}` : ''}
+                ${plan.is_tou ? '<span class="tou-badge">TOU</span>' : ''}
+            </div>
+        </div>
+    `).join('');
+
+    plansList.innerHTML = html;
+
+    // Add click handlers to rate plan items
+    plansList.querySelectorAll('.rate-plan-item').forEach(item => {
+        item.addEventListener('click', () => {
+            // Remove selection from other items
+            plansList.querySelectorAll('.rate-plan-item').forEach(i => i.classList.remove('selected'));
+            // Select this item
+            item.classList.add('selected');
+            // Preview this rate plan
+            previewRatePlan(item.dataset.rateLabel);
+        });
+    });
+}
+
+// Preview a rate plan's details
+async function previewRatePlan(rateLabel) {
+    const preview = document.getElementById('rate-preview');
+    const previewContent = document.getElementById('rate-preview-content');
+
+    // Show loading state
+    preview.style.display = 'block';
+    previewContent.innerHTML = '<div class="loading">Loading rate details...</div>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/utilities/rates/${encodeURIComponent(rateLabel)}`);
+        const data = await response.json();
+
+        if (data.success && data.rates) {
+            // Reshape data for display
+            const rateData = {
+                name: data.plan_name || rateLabel,
+                utility: data.utility,
+                schedules: data.rates // Backend returns 'rates', frontend uses 'schedules'
+            };
+            displayRatePreview(rateData, rateLabel);
+            selectedOpenEIRate = rateLabel;
+            document.getElementById('apply-openei-rate').disabled = false;
+        } else {
+            previewContent.innerHTML = `
+                <div class="error-message">
+                    <p>Could not load rate details: ${data.error || 'Unknown error'}</p>
+                </div>
+            `;
+            selectedOpenEIRate = null;
+            document.getElementById('apply-openei-rate').disabled = true;
+        }
+    } catch (error) {
+        console.error('Error loading rate preview:', error);
+        previewContent.innerHTML = `
+            <div class="error-message">
+                <p>Error: ${error.message}</p>
+            </div>
+        `;
+        selectedOpenEIRate = null;
+        document.getElementById('apply-openei-rate').disabled = true;
+    }
+}
+
+// Display rate preview
+function displayRatePreview(rateData, rateLabel) {
+    const content = document.getElementById('rate-preview-content');
+    const schedules = rateData.schedules || [];
+
+    let html = `
+        <div class="rate-preview-header">
+            <strong>${rateData.name || rateLabel}</strong>
+            ${rateData.utility ? `<span class="utility-name">${rateData.utility}</span>` : ''}
+        </div>
+    `;
+
+    if (schedules.length > 0) {
+        html += `
+            <div class="rate-schedule-preview">
+                <table class="rate-preview-table">
+                    <thead>
+                        <tr>
+                            <th>Time Period</th>
+                            <th>Rate</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${schedules.map(s => `
+                            <tr>
+                                <td>${s.start_time} - ${s.end_time}</td>
+                                <td>$${s.rate_per_kwh.toFixed(4)}/kWh</td>
+                                <td><span class="rate-type ${s.rate_type}">${s.rate_type}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        html += '<p class="no-schedule">No detailed schedule available for this rate</p>';
+    }
+
+    content.innerHTML = html;
+}
+
+// Apply selected OpenEI rate
+async function applySelectedOpenEIRate() {
+    if (!selectedOpenEIRate) {
+        showAlert('Please select a rate plan first', 'warning');
+        return;
+    }
+
+    const applyBtn = document.getElementById('apply-openei-rate');
+    const originalText = applyBtn.textContent;
+    applyBtn.textContent = 'Applying...';
+    applyBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/utilities/rates/${encodeURIComponent(selectedOpenEIRate)}/apply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('Rate plan applied successfully!', 'success');
+            // Reload energy rates to show the new schedule
+            await loadEnergyRates();
+            // Reload profitability to reflect new rates
+            await loadProfitability();
+        } else {
+            showAlert(`Failed to apply rate: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error applying rate:', error);
+        showAlert(`Error applying rate: ${error.message}`, 'error');
+    } finally {
+        applyBtn.textContent = originalText;
+        applyBtn.disabled = !selectedOpenEIRate;
+    }
+}
+
+// Apply manually entered rates
+async function applyManualRates(e) {
+    e.preventDefault();
+
+    const activeToggle = document.querySelector('.toggle-btn.active');
+    const rateType = activeToggle ? activeToggle.dataset.type : 'flat';
+
+    let ratesPayload;
+
+    if (rateType === 'flat') {
+        // Flat rate - single rate for all hours
+        const flatRate = parseFloat(document.getElementById('manual-flat-rate').value);
+
+        if (isNaN(flatRate) || flatRate <= 0) {
+            showAlert('Please enter a valid rate', 'warning');
+            return;
+        }
+
+        ratesPayload = {
+            standard_rate: flatRate
+        };
+    } else {
+        // TOU rates - peak hours and off-peak for all other hours
+        const peakRate = parseFloat(document.getElementById('manual-peak-rate').value);
+        const peakStart = document.getElementById('manual-peak-start').value;
+        const peakEnd = document.getElementById('manual-peak-end').value;
+        const offPeakRate = parseFloat(document.getElementById('manual-offpeak-rate').value);
+
+        // Validate inputs
+        if (isNaN(peakRate) || peakRate <= 0) {
+            showAlert('Please enter a valid peak rate', 'warning');
+            return;
+        }
+        if (isNaN(offPeakRate) || offPeakRate <= 0) {
+            showAlert('Please enter a valid off-peak rate', 'warning');
+            return;
+        }
+        if (!peakStart || !peakEnd) {
+            showAlert('Please enter peak hours', 'warning');
+            return;
+        }
+
+        ratesPayload = {
+            peak_rate: peakRate,
+            peak_start: peakStart,
+            peak_end: peakEnd,
+            off_peak_rate: offPeakRate
+        };
+    }
+
+    const submitBtn = document.querySelector('#manual-rate-form button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Applying...';
+    submitBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/energy/rates/manual`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(ratesPayload)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('Rates applied successfully!', 'success');
+            // Reload energy rates to show the new schedule
+            await loadEnergyRates();
+            // Reload profitability to reflect new rates
+            await loadProfitability();
+        } else {
+            showAlert(`Failed to apply rates: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error applying manual rates:', error);
+        showAlert(`Error applying rates: ${error.message}`, 'error');
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
 // Load profitability
 async function loadProfitability() {
     try {
@@ -969,7 +1696,11 @@ async function loadProfitability() {
         const data = await response.json();
 
         if (data.success) {
+            console.log('Profitability data:', data.profitability);
+            console.log('Energy cost details:', data.profitability.energy_cost_details);
             displayProfitability(data.profitability);
+        } else {
+            console.error('Profitability API error:', data.error);
         }
     } catch (error) {
         console.error('Error loading profitability:', error);
@@ -988,28 +1719,78 @@ function displayProfitability(prof) {
     const isProfitable = prof.profit_per_day > 0;
     const profitClass = isProfitable ? 'positive' : 'negative';
 
+    // Calculate sats for display
+    const satsPerDay = Math.round((prof.btc_per_day ?? 0) * 100000000);
+    const poolFeePercent = prof.pool_fee_percent ?? 2;
+    const includesTxFees = prof.includes_tx_fees ?? true;
+    const blockSubsidy = prof.block_subsidy ?? 3.125;
+    const blocksUntilHalving = prof.blocks_until_halving ?? 0;
+    const daysUntilHalving = prof.days_until_halving ?? 0;
+    const blockHeight = prof.block_height ?? 0;
+
+    // Format halving countdown
+    let halvingText = '';
+    if (daysUntilHalving > 365) {
+        const years = (daysUntilHalving / 365).toFixed(1);
+        halvingText = `~${years} years`;
+    } else if (daysUntilHalving > 30) {
+        const months = Math.round(daysUntilHalving / 30);
+        halvingText = `~${months} months`;
+    } else {
+        halvingText = `~${Math.round(daysUntilHalving)} days`;
+    }
+
+    // Energy cost breakdown
+    const energyDetails = prof.energy_cost_details ?? {};
+    const usesSchedule = energyDetails.uses_schedule ?? false;
+    const costByType = energyDetails.cost_by_rate_type ?? {};
+    const ratesByType = energyDetails.rates_by_type ?? {};  // Actual $/kWh rates
+    const hoursInfo = usesSchedule ?
+        `${energyDetails.hours_full_power ?? 24}h full, ${energyDetails.hours_reduced ?? 0}h reduced, ${energyDetails.hours_off ?? 0}h off` :
+        '24h constant';
+
+    // Build energy cost sublabel - show the actual $/kWh rates being used
+    let energyCostSublabel = '';
+    const hasTOURates = ratesByType.peak || ratesByType['off-peak'];
+    if (hasTOURates) {
+        const parts = [];
+        if (ratesByType.peak) parts.push(`Peak: $${ratesByType.peak.toFixed(3)}/kWh`);
+        if (ratesByType['off-peak']) parts.push(`Off-peak: $${ratesByType['off-peak'].toFixed(3)}/kWh`);
+        if (ratesByType.standard) parts.push(`Std: $${ratesByType.standard.toFixed(3)}/kWh`);
+        energyCostSublabel = parts.join(' | ');
+    } else if (ratesByType.standard) {
+        energyCostSublabel = `$${ratesByType.standard.toFixed(3)}/kWh`;
+    } else {
+        energyCostSublabel = `${(prof.energy_kwh_per_day ?? 0).toFixed(2)} kWh`;
+    }
+
     const html = `
         <div class="profitability-card">
+            <div class="profitability-notice">
+                Estimates include ${poolFeePercent}% pool fee${includesTxFees ? ' + tx fees (FPPS)' : ''}. Actual pool earnings may vary.
+            </div>
             <div class="profitability-grid">
                 <div class="profit-item">
                     <span class="profit-label">BTC Price</span>
                     <span class="profit-value">$${(prof.btc_price ?? 0).toLocaleString()}</span>
                 </div>
                 <div class="profit-item">
-                    <span class="profit-label">BTC Per Day</span>
+                    <span class="profit-label">Est. BTC Per Day</span>
                     <span class="profit-value">${(prof.btc_per_day ?? 0).toFixed(8)} BTC</span>
-                    <span class="profit-sublabel">${((prof.btc_per_day ?? 0) * 100000000).toFixed(0)} sats</span>
+                    <span class="profit-sublabel">${satsPerDay.toLocaleString()} sats</span>
                 </div>
                 <div class="profit-item">
-                    <span class="profit-label">Revenue Per Day</span>
+                    <span class="profit-label">Est. Revenue Per Day</span>
                     <span class="profit-value">$${(prof.revenue_per_day ?? 0).toFixed(2)}</span>
+                    <span class="profit-sublabel">After ${poolFeePercent}% pool fee</span>
                 </div>
-                <div class="profit-item">
+                <div class="profit-item" title="${hoursInfo}">
                     <span class="profit-label">Energy Cost Per Day</span>
                     <span class="profit-value">$${(prof.energy_cost_per_day ?? 0).toFixed(2)}</span>
+                    <span class="profit-sublabel">${energyCostSublabel}</span>
                 </div>
                 <div class="profit-item">
-                    <span class="profit-label">Profit Per Day</span>
+                    <span class="profit-label">Est. Profit Per Day</span>
                     <span class="profit-value ${profitClass}">$${(prof.profit_per_day ?? 0).toFixed(2)}</span>
                 </div>
                 <div class="profit-item">
@@ -1025,6 +1806,21 @@ function displayProfitability(prof) {
                     <span class="profit-value ${profitClass}">
                         ${isProfitable ? '✓ Profitable' : '✗ Not Profitable'}
                     </span>
+                </div>
+            </div>
+            <div class="halving-info">
+                <div class="halving-item">
+                    <span class="halving-label">Block Height</span>
+                    <span class="halving-value">${blockHeight.toLocaleString()}</span>
+                </div>
+                <div class="halving-item">
+                    <span class="halving-label">Block Subsidy</span>
+                    <span class="halving-value">${blockSubsidy} BTC</span>
+                </div>
+                <div class="halving-item">
+                    <span class="halving-label">Next Halving</span>
+                    <span class="halving-value">${halvingText}</span>
+                    <span class="halving-sublabel">${blocksUntilHalving.toLocaleString()} blocks</span>
                 </div>
             </div>
         </div>
@@ -1207,17 +2003,36 @@ async function applyStrategy(settings) {
     }
 }
 
-// Load energy consumption
+// Load energy consumption using actual power data with TOU rates
 async function loadEnergyConsumption() {
     try {
-        const response = await fetch(`${API_BASE}/api/energy/consumption?hours=24`);
+        // Use the new actual consumption endpoint that calculates from miner power readings
+        const response = await fetch(`${API_BASE}/api/energy/consumption/actual?hours=24`);
         const data = await response.json();
 
         if (data.success) {
-            document.getElementById('energy-today').textContent =
-                `${(data.total_kwh ?? 0).toFixed(2)} kWh`;
-            document.getElementById('cost-today').textContent =
-                `$${(data.total_cost ?? 0).toFixed(2)}`;
+            const energyEl = document.getElementById('energy-today');
+            const costEl = document.getElementById('cost-today');
+
+            energyEl.textContent = `${(data.total_kwh ?? 0).toFixed(2)} kWh`;
+            costEl.textContent = `$${(data.total_cost ?? 0).toFixed(2)}`;
+
+            // Add tooltip with TOU breakdown if we have data
+            if (data.time_coverage_percent > 0) {
+                const peakCost = data.cost_by_rate_type?.peak ?? 0;
+                const offPeakCost = data.cost_by_rate_type?.['off-peak'] ?? 0;
+                const standardCost = data.cost_by_rate_type?.standard ?? 0;
+
+                let breakdown = `Coverage: ${data.time_coverage_percent.toFixed(0)}%`;
+                if (peakCost > 0 || offPeakCost > 0) {
+                    breakdown += `\nPeak: $${peakCost.toFixed(2)}`;
+                    breakdown += `\nOff-Peak: $${offPeakCost.toFixed(2)}`;
+                }
+                if (standardCost > 0) {
+                    breakdown += `\nStandard: $${standardCost.toFixed(2)}`;
+                }
+                costEl.title = breakdown;
+            }
         }
     } catch (error) {
         console.error('Error loading energy consumption:', error);
@@ -1595,15 +2410,21 @@ let profitabilityChart = null;
 let efficiencyChart = null;
 let sharesChart = null;
 
-// Load Charts Tab
+// Load Charts Tab - reads each chart's individual time range
 async function loadChartsTab() {
-    const hours = parseInt(document.getElementById('chart-time-range').value);
+    // Each chart has its own time range dropdown
+    const combinedHours = parseInt(document.getElementById('combined-chart-timerange')?.value) || 6;
+    const powerHours = parseInt(document.getElementById('power-chart-timerange')?.value) || 6;
+    const profitDays = parseInt(document.getElementById('profitability-chart-timerange')?.value) || 7;
+    const efficiencyHours = parseInt(document.getElementById('efficiency-chart-timerange')?.value) || 6;
+    const sharesHours = parseInt(document.getElementById('shares-chart-timerange')?.value) || 24;
+
     await Promise.all([
-        loadCombinedChart(hours),
-        loadPowerChart(hours),
-        loadProfitabilityChart(),
-        loadEfficiencyChart(hours),
-        loadSharesMetrics()
+        loadCombinedChart(combinedHours),
+        loadPowerChart(powerHours),
+        loadProfitabilityChart(profitDays),
+        loadEfficiencyChart(efficiencyHours),
+        loadSharesMetrics(sharesHours)
     ]);
 }
 
@@ -2086,11 +2907,11 @@ async function loadEfficiencyChart(hours = 24) {
         // Use totals data for efficiency calculation (contains total_power)
         const totalsData = result.totals || result.data;
 
-        // Calculate efficiency (GH/s per Watt) for each data point
+        // Calculate efficiency in W/TH (industry standard, lower is better)
         const efficiencyData = totalsData
             .filter(point => point.hashrate_ths > 0 && point.total_power > 0)
             .map(point => {
-                const efficiency = point.hashrate_ths / (point.total_power || 1) * 1000; // Convert to GH/W
+                const efficiency = point.total_power / point.hashrate_ths; // W/TH
                 return {
                     x: new Date(point.timestamp),
                     y: efficiency
@@ -2134,7 +2955,7 @@ async function loadEfficiencyChart(hours = 24) {
                         ...CHART_DEFAULTS.plugins.tooltip,
                         callbacks: {
                             label: function(context) {
-                                return `Efficiency: ${context.parsed.y.toFixed(2)} GH/W`;
+                                return `Efficiency: ${context.parsed.y.toFixed(1)} W/TH`;
                             }
                         }
                     }
@@ -2153,7 +2974,7 @@ async function loadEfficiencyChart(hours = 24) {
                         max: efficiencyAxisMax,
                         title: {
                             display: true,
-                            text: 'Efficiency (GH/W)',
+                            text: 'Efficiency (W/TH)',
                             color: CHART_COLORS.efficiency.line,
                             font: { size: 12, weight: '600' }
                         },
@@ -2199,13 +3020,13 @@ async function loadSharesMetrics(hours = 24) {
         const rejectRate = totalAttempts > 0 ? ((totalRejected / totalAttempts) * 100).toFixed(2) : 0;
 
         // Update metrics
-        // Calculate efficiency in TH/W: (hashrate in H/s / 1e12) / power in W * 1000 = TH/W
-        const efficiency = stats.total_power > 0 ? ((stats.total_hashrate / 1e12) / stats.total_power * 1000).toFixed(3) : 0;
-        document.getElementById('fleet-efficiency').textContent = `${efficiency} TH/W`;
+        // Calculate efficiency in W/TH: power in W / (hashrate in H/s / 1e12) = W/TH (industry standard, lower is better)
+        const hashrateThs = stats.total_hashrate / 1e12;
+        const efficiency = hashrateThs > 0 ? (stats.total_power / hashrateThs).toFixed(1) : 0;
+        document.getElementById('fleet-efficiency').textContent = `${efficiency} W/TH`;
         document.getElementById('total-accepted-shares').textContent = formatNumber(totalShares);
         document.getElementById('total-rejected-shares').textContent = formatNumber(totalRejected);
         document.getElementById('accept-rate').textContent = `${acceptRate}%`;
-        document.getElementById('reject-rate').textContent = `${rejectRate}%`;
         document.getElementById('charts-avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
 
         // Create shares pie chart
@@ -2289,6 +3110,42 @@ async function loadAlertsTab() {
     await loadAlertHistory();
 }
 
+// Format relative time (e.g., "5 minutes ago")
+function formatRelativeTime(timestamp) {
+    const now = new Date();
+    const alertTime = new Date(timestamp);
+    const diffMs = now - alertTime;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+}
+
+// Get icon for alert type
+function getAlertIcon(alertType) {
+    const icons = {
+        'high_temperature': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`,
+        'critical_temperature': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`,
+        'miner_offline': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+        'miner_online': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+        'low_hashrate': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>`,
+        'frequency_adjusted': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+        'emergency_shutdown': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+    };
+    return icons[alertType] || `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+}
+
+// Extract miner IP from alert title/message
+function extractMinerIP(alert) {
+    const ipRegex = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+    const match = (alert.title || alert.message || '').match(ipRegex);
+    return match ? match[1] : null;
+}
+
 // Load Alert History
 async function loadAlertHistory() {
     try {
@@ -2303,20 +3160,55 @@ async function loadAlertHistory() {
         }
 
         if (result.alerts.length === 0) {
-            container.innerHTML = '<p class="loading">No recent alerts</p>';
+            container.innerHTML = `
+                <div class="no-alerts">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    <p>No alerts in the last 24 hours</p>
+                </div>
+            `;
             return;
         }
 
         let html = '';
         result.alerts.forEach(alert => {
-            const time = new Date(alert.timestamp).toLocaleString();
+            const relativeTime = formatRelativeTime(alert.timestamp);
+            const fullTime = new Date(alert.timestamp).toLocaleString();
+            const icon = getAlertIcon(alert.alert_type);
+            const minerIP = extractMinerIP(alert);
+            const minerName = minerIP && minersCache[minerIP] ?
+                (minersCache[minerIP].custom_name || minersCache[minerIP].model || minerIP) :
+                minerIP;
+
+            // Parse extra data if available
+            let extraDetails = '';
+            if (alert.data_json) {
+                try {
+                    const data = typeof alert.data_json === 'string' ? JSON.parse(alert.data_json) : alert.data_json;
+                    const details = [];
+                    if (data.temperature) details.push(`Temp: ${data.temperature}`);
+                    if (data.hashrate) details.push(`Hashrate: ${data.hashrate}`);
+                    if (data.frequency) details.push(`Freq: ${data.frequency}`);
+                    if (details.length > 0) {
+                        extraDetails = `<div class="alert-item-details">${details.join(' • ')}</div>`;
+                    }
+                } catch (e) { /* ignore parse errors */ }
+            }
+
             html += `
                 <div class="alert-item ${alert.level}">
-                    <div class="alert-item-header">
-                        <div class="alert-item-title">${alert.title || 'Alert'}</div>
-                        <div class="alert-item-time">${time}</div>
+                    <div class="alert-item-icon">${icon}</div>
+                    <div class="alert-item-content">
+                        <div class="alert-item-header">
+                            <div class="alert-item-title">${alert.title || 'Alert'}</div>
+                            <div class="alert-item-time" title="${fullTime}">${relativeTime}</div>
+                        </div>
+                        ${minerName ? `<div class="alert-item-miner">${minerName}</div>` : ''}
+                        <div class="alert-item-message">${alert.message}</div>
+                        ${extraDetails}
                     </div>
-                    <div class="alert-item-message">${alert.message}</div>
                     <span class="alert-item-level ${alert.level}">${alert.level.toUpperCase()}</span>
                 </div>
             `;
@@ -2349,8 +3241,6 @@ async function testAlert() {
 }
 
 // Event Listeners for Phase 4 features
-document.getElementById('refresh-charts-btn')?.addEventListener('click', loadChartsTab);
-document.getElementById('chart-time-range')?.addEventListener('change', loadChartsTab);
 document.getElementById('test-telegram-btn')?.addEventListener('click', testAlert);
 
 // Individual chart controls event listeners
@@ -2446,9 +3336,10 @@ startAutoRefresh = function() {
 
     // Chart refresh interval (30 seconds) - runs independently
     chartRefreshTimer = setInterval(() => {
-        // Always refresh fleet chart on dashboard
+        // Always refresh fleet chart on dashboard - read time range from dropdown
         if (currentTab === 'fleet') {
-            loadFleetCombinedChart();
+            const fleetChartHours = parseInt(document.getElementById('fleet-chart-timerange')?.value) || 6;
+            loadFleetCombinedChart(fleetChartHours);
         }
         // Refresh charts tab if active
         if (currentTab === 'charts') {
@@ -2683,18 +3574,24 @@ function populateMinerDetail(ip) {
     }
 
     const status = miner.last_status || miner;
-    const isOnline = status.status === 'online';
+    const minerStatus = status.status || 'offline';
+    const isOnline = minerStatus === 'online' || minerStatus === 'overheating';
+    const isOverheated = minerStatus === 'overheated';
+    const isOverheating = minerStatus === 'overheating';
 
     // Header info
     document.getElementById('modal-miner-name').textContent = miner.custom_name || miner.model || 'Unknown Miner';
     document.getElementById('modal-miner-type').textContent = miner.model || miner.type || 'Bitcoin Miner';
     document.getElementById('modal-miner-ip').textContent = ip;
 
-    // Status avatar
+    // Status avatar - handle overheated state
     const avatarEl = document.getElementById('modal-miner-status');
-    if (isOnline) {
-        avatarEl.classList.remove('offline');
-    } else {
+    avatarEl.classList.remove('offline', 'overheated', 'overheating');
+    if (isOverheated) {
+        avatarEl.classList.add('overheated');
+    } else if (isOverheating) {
+        avatarEl.classList.add('overheating');
+    } else if (!isOnline) {
         avatarEl.classList.add('offline');
     }
 
@@ -2702,6 +3599,7 @@ function populateMinerDetail(ip) {
     const hashrate = status.hashrate || 0;
     const hashrateFormatted = formatHashrateForModal(hashrate);
     document.getElementById('modal-hashrate').textContent = hashrateFormatted.value;
+    document.getElementById('modal-hashrate-unit').textContent = hashrateFormatted.unit;
 
     // Temperature
     const temp = status.temperature || 0;
@@ -2727,12 +3625,15 @@ function populateMinerDetail(ip) {
     const uptime = status.uptime || status.raw?.uptimeSeconds || 0;
     document.getElementById('modal-uptime').textContent = formatUptime(uptime);
 
-    // Pool status bar
-    const poolStatus = status.pool_status || (isOnline ? 'Alive' : 'Dead');
+    // Pool status bar - handle overheated state
+    const poolStatus = status.pool_status || (isOnline && !isOverheated ? 'Alive' : 'Dead');
     const poolBar = document.querySelector('.pool-bar');
     const poolText = document.querySelector('.pool-text');
-    if (poolStatus.toLowerCase() === 'alive' && isOnline) {
-        poolBar?.classList.remove('offline');
+    poolBar?.classList.remove('offline', 'overheated');
+    if (isOverheated) {
+        poolBar?.classList.add('overheated');
+        if (poolText) poolText.textContent = 'Miner Overheated - Cooling Down';
+    } else if (poolStatus.toLowerCase() === 'alive' && isOnline) {
         if (poolText) poolText.textContent = 'Pool Connected';
     } else {
         poolBar?.classList.add('offline');
@@ -2758,8 +3659,12 @@ function populateMinerDetail(ip) {
 
     document.getElementById('modal-perf-power').textContent = `${power.toFixed(1)} W`;
 
-    const voltage = status.raw?.voltage || 5;
-    const amps = power / voltage;
+    // Determine input voltage based on miner type for current calculation
+    // BitAxe/NerdAxe family: 5V USB, Traditional ASICs: 12V or higher
+    const minerModel = status.raw?.boardVersion || status.raw?.ASICModel || '';
+    const isTraditionalASIC = /antminer|whatsminer|avalon/i.test(minerModel);
+    const inputVoltage = status.raw?.inputVoltage || (isTraditionalASIC ? 12 : 5);
+    const amps = power / inputVoltage;
     document.getElementById('modal-perf-current').textContent = `${amps.toFixed(2)} A`;
 
     const kwhDay = (power / 1000) * 24;
@@ -2775,9 +3680,23 @@ function populateMinerDetail(ip) {
     document.getElementById('modal-pool-shares').textContent = formatNumber(status.shares_accepted || 0);
     document.getElementById('modal-rejected-shares').textContent = formatNumber(status.shares_rejected || 0);
 
-    // Share bar width
+    // Calculate acceptance rate
     const totalShares = (status.shares_accepted || 0) + (status.shares_rejected || 0);
     const acceptRate = totalShares > 0 ? (status.shares_accepted / totalShares) * 100 : 100;
+
+    // Update acceptance rate gauge
+    const gaugeArc = document.getElementById('acceptance-gauge-arc');
+    const gaugePercent = document.getElementById('acceptance-rate-percent');
+    if (gaugeArc && gaugePercent) {
+        // Circumference = 2 * π * r = 2 * π * 42 ≈ 264
+        const circumference = 264;
+        const offset = circumference - (acceptRate / 100) * circumference;
+        gaugeArc.style.strokeDashoffset = offset;
+        gaugeArc.style.transition = 'stroke-dashoffset 0.5s ease';
+        gaugePercent.textContent = `${acceptRate.toFixed(1)}%`;
+    }
+
+    // Legacy share bar (if still present)
     const shareBarEl = document.getElementById('share-bar-accepted');
     if (shareBarEl) shareBarEl.style.width = `${acceptRate}%`;
 
@@ -2865,17 +3784,21 @@ function formatUptime(seconds) {
 async function refreshMinerDetailData(ip) {
     try {
         const response = await fetch(`${API_BASE}/api/miners`);
-        const miners = await response.json();
+        const data = await response.json();
 
-        const miner = miners.find(m => m.ip === ip);
-        if (miner) {
-            // Update cache
-            minersCache[ip] = {
-                ...minersCache[ip],
-                last_status: miner.last_status || miner
-            };
-            // Refresh display
-            populateMinerDetail(ip);
+        if (data.success && data.miners) {
+            const miner = data.miners.find(m => m.ip === ip);
+            if (miner) {
+                // Update cache
+                minersCache[ip] = {
+                    custom_name: miner.custom_name,
+                    model: miner.model,
+                    type: miner.type,
+                    last_status: miner.last_status || {}
+                };
+                // Refresh display
+                populateMinerDetail(ip);
+            }
         }
     } catch (error) {
         console.error('Error refreshing miner detail:', error);
@@ -3134,6 +4057,9 @@ async function startMinerOptimization(ip) {
         status: 'starting'
     };
 
+    // Save setting to backend for persistence
+    saveAutoOptimizeSetting(ip, true);
+
     // Add optimizing class to miner card
     const cardId = `miner-card-${ip.replace(/\./g, '-')}`;
     const card = document.getElementById(cardId);
@@ -3164,6 +4090,9 @@ function stopMinerOptimization(ip) {
         optimizationState.miners[ip].status = wasActive ? 'stopped' : 'idle';
     }
 
+    // Save setting to backend for persistence
+    saveAutoOptimizeSetting(ip, false);
+
     // Update miner card class
     const cardId = `miner-card-${ip.replace(/\./g, '-')}`;
     const card = document.getElementById(cardId);
@@ -3179,10 +4108,7 @@ function stopMinerOptimization(ip) {
     const anyActive = Object.values(optimizationState.miners).some(m => m.active);
     if (!anyActive) {
         optimizationState.fleetOptimizing = false;
-        const btn = document.getElementById('auto-optimize-fleet-btn');
-        const btnText = document.getElementById('auto-optimize-fleet-text');
-        if (btn) btn.classList.remove('optimizing');
-        if (btnText) btnText.textContent = 'Auto Optimize Fleet';
+        updateFleetOptimizeButton();
     }
 }
 
@@ -3863,22 +4789,36 @@ async function applyAutoFan() {
 
 // Thermal profiles for different miner types (based on thermal.py research)
 // target = middle-upper of optimal zone (70% between optimal and warning)
+// Thermal profiles based on comprehensive research
+// Sources: solosatoshi.com, d-central.tech, mineshop.eu, zeusbtc.com, bitmain.com
+// Smaller devices = less cooling capacity = lower optimal temp targets
+// Traditional ASIC miners measure board temp (higher thresholds)
 const THERMAL_PROFILES = {
-    'BitAxe': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'BitAxe Ultra': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'BitAxe Max': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'BitAxe Supra': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'BitAxe Gamma': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'NerdAxe': { optimal: 60, warning: 65, critical: 68, target: 63 },
-    'NerdQAxe+': { optimal: 58, warning: 63, critical: 66, target: 61 },
-    'NerdQAxe++': { optimal: 58, warning: 63, critical: 66, target: 61 },
-    'NerdOctaxe': { optimal: 55, warning: 60, critical: 64, target: 58 },
-    'Antminer': { optimal: 65, warning: 75, critical: 80, target: 72 },
-    'Antminer S9': { optimal: 65, warning: 75, critical: 80, target: 72 },
-    'Antminer S19': { optimal: 65, warning: 75, critical: 80, target: 72 },
-    'Whatsminer': { optimal: 65, warning: 75, critical: 80, target: 72 },
-    'Avalon': { optimal: 65, warning: 75, critical: 80, target: 72 },
-    'default': { optimal: 60, warning: 65, critical: 70, target: 63 }
+    // Single-chip BitAxe family (small 40mm heatsink + tiny fan)
+    'BitAxe': { optimal: 55, warning: 62, critical: 68, target: 58 },
+    'BitAxe Max': { optimal: 55, warning: 62, critical: 68, target: 58 },        // BM1397
+    'BitAxe Ultra': { optimal: 55, warning: 62, critical: 68, target: 58 },      // BM1366
+    'BitAxe Supra': { optimal: 55, warning: 63, critical: 69, target: 58 },      // BM1368, better heat dissipation
+    'BitAxe Gamma': { optimal: 55, warning: 63, critical: 70, target: 58 },      // BM1370, most efficient
+    'NerdAxe': { optimal: 55, warning: 62, critical: 68, target: 58 },           // Single BM1366
+
+    // Multi-chip devices (better cooling infrastructure)
+    'BitAxe Hex': { optimal: 52, warning: 60, critical: 68, target: 55 },        // 6x BM1366, 45-55°C optimal
+    'NerdQAxe+': { optimal: 55, warning: 63, critical: 70, target: 58 },         // 4x BM1366
+    'NerdQAxe++': { optimal: 55, warning: 63, critical: 70, target: 58 },        // 4x BM1370
+    'NerdOctaxe': { optimal: 55, warning: 62, critical: 68, target: 58 },        // 8x BM1370, dual 120mm fans
+
+    // LuckyMiner (ESP-Miner based)
+    'LuckyMiner': { optimal: 55, warning: 62, critical: 68, target: 58 },
+
+    // Traditional ASIC miners (measure board/PCB temp, not chip temp)
+    'Antminer': { optimal: 70, warning: 80, critical: 85, target: 75 },          // PCB temp
+    'Antminer S9': { optimal: 70, warning: 80, critical: 85, target: 75 },       // Max PCB 85-95°C
+    'Antminer S19': { optimal: 65, warning: 75, critical: 80, target: 70 },      // Max PCB 75-85°C
+    'Whatsminer': { optimal: 65, warning: 75, critical: 80, target: 70 },        // Warning at 80°C
+    'Avalon': { optimal: 65, warning: 75, critical: 80, target: 70 },
+
+    'default': { optimal: 55, warning: 62, critical: 68, target: 58 }
 };
 
 // Get thermal profile for a miner type
@@ -4071,39 +5011,200 @@ function updateMinerCardData(ip) {
     if (!card) return;
 
     const status = miner.last_status || miner;
-    const isOnline = status.status === 'online';
+    const minerStatus = status.status || 'offline';
+    const isOnline = minerStatus === 'online' || minerStatus === 'overheating';
+    const isOverheated = minerStatus === 'overheated';
+    const isOverheating = minerStatus === 'overheating';
 
-    // Update status class
-    if (isOnline) {
-        card.classList.remove('offline');
-    } else {
+    // Update miner name
+    const displayName = miner.custom_name || miner.model || miner.type || 'Unknown';
+    const nameEl = card.querySelector('.miner-name');
+    if (nameEl && nameEl.textContent !== displayName) {
+        nameEl.textContent = displayName;
+    }
+
+    // Update edit name button onclick with new name
+    const editBtn = card.querySelector('.edit-name-btn');
+    if (editBtn) {
+        const escapedName = (miner.custom_name || '').replace(/'/g, "\\'");
+        editBtn.setAttribute('onclick', `editMinerName('${ip}', '${escapedName}')`);
+    }
+
+    // Update status classes
+    card.classList.remove('offline', 'overheated', 'overheating');
+    if (isOverheated) {
+        card.classList.add('overheated');
+    } else if (isOverheating) {
+        card.classList.add('overheating');
+    } else if (!isOnline) {
         card.classList.add('offline');
     }
 
-    // Update individual stats within the card if they exist
+    // Update optimization badge
+    const isOptimizing = optimizationState.miners[ip]?.active === true;
+    const isOptimized = optimizationState.miners[ip]?.status === 'optimal';
+
+    card.classList.remove('optimizing', 'optimized');
+    if (isOptimizing && !isOverheated) {
+        card.classList.add('optimizing');
+    } else if (isOptimized && !isOverheated) {
+        card.classList.add('optimized');
+    }
+
+    // Update badge in header
+    const badgesContainer = card.querySelector('.miner-badges');
+    if (badgesContainer) {
+        // Remove existing badges
+        let statusBadge = badgesContainer.querySelector('.status-badge');
+        let optBadge = badgesContainer.querySelector('.optimization-badge');
+
+        // Handle status badges (overheated/overheating take priority)
+        if (isOverheated) {
+            if (optBadge) optBadge.remove();
+            if (!statusBadge) {
+                statusBadge = document.createElement('span');
+                statusBadge.className = 'status-badge overheated';
+                badgesContainer.insertBefore(statusBadge, badgesContainer.firstChild);
+            } else {
+                statusBadge.className = 'status-badge overheated';
+            }
+            statusBadge.textContent = 'OVERHEATED';
+        } else if (isOverheating) {
+            if (optBadge) optBadge.remove();
+            if (!statusBadge) {
+                statusBadge = document.createElement('span');
+                statusBadge.className = 'status-badge overheating';
+                badgesContainer.insertBefore(statusBadge, badgesContainer.firstChild);
+            } else {
+                statusBadge.className = 'status-badge overheating';
+            }
+            statusBadge.textContent = 'OVERHEATING';
+        } else {
+            // Remove status badge if not overheated/overheating
+            if (statusBadge) statusBadge.remove();
+
+            // Handle optimization badges
+            if (isOptimizing) {
+                if (!optBadge) {
+                    optBadge = document.createElement('span');
+                    optBadge.className = 'optimization-badge tuning';
+                    badgesContainer.insertBefore(optBadge, badgesContainer.firstChild);
+                } else {
+                    optBadge.className = 'optimization-badge tuning';
+                }
+                optBadge.textContent = 'AUTO-TUNING';
+            } else if (isOptimized) {
+                if (!optBadge) {
+                    optBadge = document.createElement('span');
+                    optBadge.className = 'optimization-badge optimized';
+                    badgesContainer.insertBefore(optBadge, badgesContainer.firstChild);
+                } else {
+                    optBadge.className = 'optimization-badge optimized';
+                }
+                optBadge.textContent = 'OPTIMIZED';
+            } else if (optBadge) {
+                optBadge.remove();
+            }
+        }
+    }
+
+    // Check for state transitions that require rebuilding the card content
     const statsContainer = card.querySelector('.miner-stats');
-    if (statsContainer && isOnline) {
-        // Update hashrate
+    const overheatedContainer = card.querySelector('.status-overheated');
+    const offlineContainer = card.querySelector('.status-offline');
+
+    // Determine what content type should be showing
+    const shouldShowStats = isOnline && !isOverheated;
+    const shouldShowOverheated = isOverheated;
+    const shouldShowOffline = !isOnline && !isOverheated;
+
+    // Check if current content matches expected state
+    const hasCorrectContent =
+        (shouldShowStats && statsContainer) ||
+        (shouldShowOverheated && overheatedContainer) ||
+        (shouldShowOffline && offlineContainer);
+
+    if (!hasCorrectContent) {
+        // State changed - rebuild the content section
+        // Find the content area (after chip-type, before miner-actions)
+        const chipType = card.querySelector('.chip-type');
+        const actions = card.querySelector('.miner-actions');
+
+        if (chipType && actions) {
+            // Remove old content
+            if (statsContainer) statsContainer.remove();
+            if (overheatedContainer) overheatedContainer.remove();
+            if (offlineContainer) offlineContainer.remove();
+
+            // Create new content based on status
+            let newContent;
+            if (shouldShowOverheated) {
+                newContent = document.createElement('div');
+                newContent.className = 'status-overheated';
+                newContent.style.textAlign = 'center';
+                newContent.style.padding = '20px';
+                newContent.innerHTML = `
+                    <div style="font-size: 2em; margin-bottom: 10px;">🔥</div>
+                    <div style="color: #ff4444; font-weight: bold;">DEVICE OVERHEATED</div>
+                    <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Cooling down...</div>
+                `;
+            } else if (shouldShowStats) {
+                newContent = document.createElement('div');
+                newContent.className = 'miner-stats';
+                newContent.innerHTML = `
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Hashrate</span>
+                        <span class="miner-stat-value">${formatHashrate(status.hashrate)}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Temperature</span>
+                        <span class="miner-stat-value ${isOverheating ? 'temp-warning' : ''}">${status.temperature?.toFixed(1) || 'N/A'}°C</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Power</span>
+                        <span class="miner-stat-value">${status.power?.toFixed(1) || 'N/A'} W</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Fan Speed</span>
+                        <span class="miner-stat-value">${status.fan_speed || 'N/A'}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Shares Found</span>
+                        <span class="miner-stat-value">${formatNumber(status.shares_accepted || 0)}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Best Difficulty</span>
+                        <span class="miner-stat-value">${formatDifficulty(status.best_difficulty || 0)}</span>
+                    </div>
+                `;
+            } else {
+                newContent = document.createElement('div');
+                newContent.className = 'status-offline';
+                newContent.style.textAlign = 'center';
+                newContent.style.padding = '20px';
+                newContent.textContent = '⚠️ Offline';
+            }
+
+            // Insert before actions
+            card.insertBefore(newContent, actions);
+        }
+    } else if (shouldShowStats && statsContainer) {
+        // Just update stats in place
         const hashrateEl = statsContainer.querySelector('.miner-stat:nth-child(1) .miner-stat-value');
         if (hashrateEl) hashrateEl.textContent = formatHashrate(status.hashrate || 0);
 
-        // Update temperature
         const tempEl = statsContainer.querySelector('.miner-stat:nth-child(2) .miner-stat-value');
         if (tempEl) tempEl.textContent = `${(status.temperature || 0).toFixed(1)}°C`;
 
-        // Update power
         const powerEl = statsContainer.querySelector('.miner-stat:nth-child(3) .miner-stat-value');
         if (powerEl) powerEl.textContent = `${(status.power || 0).toFixed(1)} W`;
 
-        // Update fan speed
         const fanEl = statsContainer.querySelector('.miner-stat:nth-child(4) .miner-stat-value');
         if (fanEl) fanEl.textContent = status.fan_speed || 'N/A';
 
-        // Update shares
         const sharesEl = statsContainer.querySelector('.miner-stat:nth-child(5) .miner-stat-value');
         if (sharesEl) sharesEl.textContent = formatNumber(status.shares_accepted || 0);
 
-        // Update best difficulty
         const diffEl = statsContainer.querySelector('.miner-stat:nth-child(6) .miner-stat-value');
         if (diffEl) diffEl.textContent = formatDifficulty(status.best_difficulty || 0);
     }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mining Fleet Manager</title>
+    <title>DirtySats</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><rect x='4' y='4' width='16' height='16' rx='2'/><rect x='9' y='9' width='6' height='6'/><path d='M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2'/></svg>">
 </head>
@@ -18,7 +18,7 @@
                     <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
                 </svg>
             </div>
-            <span class="sidebar-title">Fleet Manager</span>
+            <span class="sidebar-title">DirtySats</span>
         </div>
 
         <div class="sidebar-nav">
@@ -107,9 +107,9 @@
                         <rect x="9" y="9" width="6" height="6"/>
                         <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
                     </svg>
-                    Home Mining Fleet
+                    DirtySats
                 </h1>
-                <div class="header-subtitle">Bitcoin Mining Dashboard</div>
+                <div class="header-subtitle">Bitcoin Mining Fleet Manager</div>
             </div>
             <div class="header-center">
                 <button id="discover-btn" class="btn btn-primary">
@@ -165,6 +165,10 @@
                     <div class="stat-card">
                         <div class="stat-label">Offline</div>
                         <div class="stat-value danger" id="offline-miners">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Overheated</div>
+                        <div class="stat-value warning" id="overheated-miners">0</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Total Hashrate</div>
@@ -255,119 +259,170 @@
                                 <line x1="2" y1="12" x2="22" y2="12"/>
                                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                             </svg>
-                            Worldwide Energy Company Selection
+                            Utility Rate Configuration
                         </h3>
-                        <form id="energy-config-form">
-                            <div class="form-group">
-                                <label for="energy-company">Energy Company or Provider:</label>
-                                <select id="energy-company" name="energy_company">
-                                    <option value="">Select a company or enter custom...</option>
-                                    <optgroup label="United States - Major Providers">
-                                        <option value="Xcel Energy (Colorado)">Xcel Energy (Colorado)</option>
-                                        <option value="Xcel Energy (Minnesota)">Xcel Energy (Minnesota)</option>
-                                        <option value="Xcel Energy (Texas)">Xcel Energy (Texas)</option>
-                                    </optgroup>
-                                    <optgroup label="United States - California">
-                                        <option value="PG&E (California)">PG&E (Northern CA)</option>
-                                        <option value="SCE (Southern California Edison)">SCE (Southern CA)</option>
-                                        <option value="SDG&E (San Diego Gas & Electric)">SDG&E (San Diego)</option>
-                                    </optgroup>
-                                    <optgroup label="United States - Texas">
-                                        <option value="Oncor (Texas)">Oncor (Dallas/Fort Worth)</option>
-                                        <option value="CenterPoint Energy (Texas)">CenterPoint (Houston)</option>
-                                        <option value="AEP Texas">AEP Texas</option>
-                                    </optgroup>
-                                    <optgroup label="United States - Other States">
-                                        <option value="ConEd (Consolidated Edison)">ConEd (New York)</option>
-                                        <option value="FPL (Florida Power & Light)">FPL (Florida)</option>
-                                        <option value="Duke Energy Florida">Duke Energy (Florida)</option>
-                                        <option value="Georgia Power">Georgia Power</option>
-                                        <option value="ComEd (Commonwealth Edison)">ComEd (Illinois)</option>
-                                        <option value="DTE Energy">DTE Energy (Michigan)</option>
-                                        <option value="Seattle City Light">Seattle City Light</option>
-                                        <option value="APS (Arizona Public Service)">APS (Arizona)</option>
-                                    </optgroup>
-                                    <optgroup label="Canada">
-                                        <option value="Hydro-Québec (Canada)">Hydro-Québec</option>
-                                        <option value="BC Hydro (Canada)">BC Hydro</option>
-                                        <option value="Ontario Hydro (Canada)">Ontario Hydro</option>
-                                    </optgroup>
-                                    <optgroup label="Europe">
-                                        <option value="EDF (France)">EDF (France)</option>
-                                        <option value="E.ON (Germany)">E.ON (Germany)</option>
-                                        <option value="Enel (Italy)">Enel (Italy)</option>
-                                        <option value="British Gas (UK)">British Gas (UK)</option>
-                                    </optgroup>
-                                    <optgroup label="Asia-Pacific">
-                                        <option value="TEPCO (Japan)">TEPCO (Japan)</option>
-                                        <option value="AGL Energy (Australia)">AGL Energy (Australia)</option>
-                                    </optgroup>
-                                    <optgroup label="Low-Cost Mining Regions">
-                                        <option value="Landsvirkjun (Iceland)">Landsvirkjun (Iceland)</option>
-                                    </optgroup>
-                                    <optgroup label="Custom">
-                                        <option value="Custom (Manual Entry)">Custom / Enter Manually</option>
-                                    </optgroup>
-                                </select>
-                            </div>
 
-                            <!-- Custom Rate Entry -->
-                            <div id="custom-rate-entry" class="custom-rate-panel" style="display: none;">
-                                <h4>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon-sm">
-                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                                    </svg>
-                                    Custom Energy Rates
-                                </h4>
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label for="custom-rate">Standard Rate ($/kWh):</label>
-                                        <input type="number" id="custom-rate" name="custom_rate" step="0.001" min="0" placeholder="e.g., 0.12">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="custom-peak-rate">Peak Rate ($/kWh):</label>
-                                        <input type="number" id="custom-peak-rate" name="custom_peak_rate" step="0.001" min="0" placeholder="e.g., 0.25">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="custom-offpeak-rate">Off-Peak Rate ($/kWh):</label>
-                                        <input type="number" id="custom-offpeak-rate" name="custom_offpeak_rate" step="0.001" min="0" placeholder="e.g., 0.08">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="location-fields">
-                                <h4>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon-sm">
-                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                        <circle cx="12" cy="10" r="3"/>
-                                    </svg>
-                                    Your Location (Optional)
-                                </h4>
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label for="city">City:</label>
-                                        <input type="text" id="city" name="city" placeholder="e.g., Denver">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="state">State/Province:</label>
-                                        <input type="text" id="state" name="state" placeholder="e.g., Colorado">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="country">Country:</label>
-                                        <input type="text" id="country" name="country" placeholder="e.g., USA">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                    <polyline points="17 21 17 13 7 13 7 21"/>
-                                    <polyline points="7 3 7 8 15 8"/>
+                        <!-- Tab buttons for OpenEI vs Manual -->
+                        <div class="rate-config-tabs">
+                            <button type="button" class="rate-tab active" data-tab="openei">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon-sm">
+                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                                 </svg>
-                                Apply Energy Settings
+                                Search Utility Database
                             </button>
-                        </form>
+                            <button type="button" class="rate-tab" data-tab="manual">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon-sm">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                Enter Rates Manually
+                            </button>
+                        </div>
+
+                        <!-- OpenEI Search Panel -->
+                        <div id="openei-panel" class="rate-panel active">
+                            <!-- API Key Configuration -->
+                            <div id="api-key-section" class="api-key-section">
+                                <div class="api-key-header">
+                                    <h4>OpenEI API Key</h4>
+                                    <span id="api-key-status" class="api-key-status"></span>
+                                </div>
+                                <p class="panel-description">
+                                    To search utility rates, you need a free API key from OpenEI (maintained by NREL).
+                                    Each user should get their own key.
+                                </p>
+                                <div id="api-key-form" class="api-key-form">
+                                    <div class="api-key-steps">
+                                        <p><strong>Setup Instructions:</strong></p>
+                                        <ol>
+                                            <li>Visit <a href="https://openei.org/services/api/signup" target="_blank">OpenEI API Signup</a></li>
+                                            <li>Create a free account and get your API key</li>
+                                            <li>Paste your key below and click Save</li>
+                                        </ol>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="openei-api-key">Your API Key:</label>
+                                        <div class="api-key-input-wrapper">
+                                            <input type="password" id="openei-api-key" placeholder="Paste your OpenEI API key here..." autocomplete="off">
+                                            <button type="button" id="toggle-api-key-visibility" class="btn btn-icon-only" title="Show/Hide">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                            </button>
+                                            <button type="button" id="save-api-key" class="btn btn-primary btn-sm">Save Key</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="panel-hint">
+                                    Don't want to set up an API key? Use the <strong>Manual Entry</strong> tab instead to enter your rates directly.
+                                </p>
+                            </div>
+
+                            <hr class="section-divider">
+
+                            <!-- Search Section (shown when API key is configured) -->
+                            <div id="utility-search-section">
+                                <p class="panel-description">
+                                    Search the <a href="https://openei.org/wiki/Utility_Rate_Database" target="_blank">OpenEI Utility Rate Database</a> for official utility rates.
+                                </p>
+
+                                <div class="form-group">
+                                    <label for="utility-search">Search for your utility:</label>
+                                    <div class="search-input-wrapper">
+                                        <input type="text" id="utility-search" placeholder="e.g., Xcel Energy, PG&E, ConEd..." autocomplete="off">
+                                        <button type="button" id="utility-search-btn" class="btn btn-secondary btn-sm">Search</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Search Results -->
+                            <div id="utility-search-results" class="search-results" style="display: none;">
+                                <h4>Select Your Utility:</h4>
+                                <div id="utility-list" class="utility-list"></div>
+                            </div>
+
+                            <!-- Rate Plans -->
+                            <div id="rate-plans-container" style="display: none;">
+                                <h4>Select Your Rate Plan:</h4>
+                                <p class="panel-hint">Choose the rate plan that matches your utility bill. If unsure, look for "Residential" or "Time of Use" plans.</p>
+                                <div id="rate-plans-list" class="rate-plans-list"></div>
+                            </div>
+
+                            <!-- Selected Rate Preview -->
+                            <div id="rate-preview" class="rate-preview" style="display: none;">
+                                <h4>Rate Schedule Preview:</h4>
+                                <div id="rate-preview-content"></div>
+                                <button type="button" id="apply-openei-rate" class="btn btn-primary">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    Apply This Rate Plan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Manual Entry Panel -->
+                        <div id="manual-panel" class="rate-panel">
+                            <p class="panel-description">
+                                Enter your rates manually if your utility isn't in the database, or if you have a custom rate plan.
+                                Check your utility bill or website for accurate rates.
+                            </p>
+
+                            <form id="manual-rate-form">
+                                <div class="form-group">
+                                    <label for="manual-utility-name">Utility Name (optional):</label>
+                                    <input type="text" id="manual-utility-name" placeholder="e.g., My Local Utility">
+                                </div>
+
+                                <div class="rate-type-toggle">
+                                    <label>Rate Type:</label>
+                                    <div class="toggle-buttons">
+                                        <button type="button" class="toggle-btn active" data-type="tou">Time-of-Use (TOU)</button>
+                                        <button type="button" class="toggle-btn" data-type="flat">Flat Rate</button>
+                                    </div>
+                                </div>
+
+                                <!-- TOU Rate Entry -->
+                                <div id="tou-rate-entry" class="rate-entry-section">
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label for="manual-peak-rate">Peak Rate ($/kWh):</label>
+                                            <input type="number" id="manual-peak-rate" step="0.001" min="0" placeholder="e.g., 0.18" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="manual-offpeak-rate">Off-Peak Rate ($/kWh):</label>
+                                            <input type="number" id="manual-offpeak-rate" step="0.001" min="0" placeholder="e.g., 0.08" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label for="manual-peak-start">Peak Hours Start:</label>
+                                            <input type="time" id="manual-peak-start" value="14:00" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="manual-peak-end">Peak Hours End:</label>
+                                            <input type="time" id="manual-peak-end" value="19:00" required>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Flat Rate Entry -->
+                                <div id="flat-rate-entry" class="rate-entry-section" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="manual-flat-rate">Energy Rate ($/kWh):</label>
+                                        <input type="number" id="manual-flat-rate" step="0.001" min="0" placeholder="e.g., 0.12">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    Apply Manual Rates
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </section>
 
@@ -398,46 +453,86 @@
                     </div>
                 </section>
 
-                <!-- Rate Schedule -->
-                <section class="rate-schedule-section">
-                    <h2>Rate Schedule</h2>
-                    <div id="rate-schedule-container">
-                        <p class="loading">Loading rate schedule...</p>
+                <!-- Rate Schedule - Collapsible -->
+                <section class="collapsible-section collapsed" id="rate-schedule-section">
+                    <div class="collapsible-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            Rate Schedule
+                        </h2>
+                        <svg class="collapsible-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="collapsible-content">
+                        <div id="rate-schedule-container">
+                            <p class="loading">Loading rate schedule...</p>
+                        </div>
                     </div>
                 </section>
 
-                <!-- Mining Schedule Configuration -->
-                <section class="mining-schedule-section">
-                    <h2>Mining Schedule</h2>
-                    <div class="config-card">
-                        <p>Automatically adjust miner frequency based on energy rates:</p>
-                        <form id="mining-schedule-form">
-                            <div class="form-group">
-                                <label for="max-rate-threshold">Turn Off When Rate Exceeds ($/kWh):</label>
-                                <input type="number" id="max-rate-threshold" step="0.01" value="0.25" min="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="high-rate-frequency">Frequency During Peak Rates (MHz):</label>
-                                <input type="number" id="high-rate-frequency" value="0" min="0" max="600" placeholder="0 = OFF">
-                                <small class="form-hint">Set to 0 to turn miners OFF during expensive electricity.</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="low-rate-frequency">Frequency During Off-Peak (MHz):</label>
-                                <input type="number" id="low-rate-frequency" value="0" min="0" max="600" placeholder="0 = MAX">
-                                <small class="form-hint">Set to 0 to run at MAX frequency during cheap electricity.</small>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Auto-Create Schedule</button>
-                        </form>
+                <!-- Mining Schedule Configuration - Collapsible -->
+                <section class="collapsible-section collapsed" id="mining-schedule-section">
+                    <div class="collapsible-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            Mining Schedule
+                        </h2>
+                        <svg class="collapsible-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="config-card">
+                            <p>Automatically adjust miner frequency based on energy rates:</p>
+                            <form id="mining-schedule-form">
+                                <div class="form-group">
+                                    <label for="max-rate-threshold">Turn Off When Rate Exceeds ($/kWh):</label>
+                                    <input type="number" id="max-rate-threshold" step="0.01" value="0.25" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="high-rate-frequency">Frequency During Peak Rates (MHz):</label>
+                                    <input type="number" id="high-rate-frequency" value="0" min="0" max="600" placeholder="0 = OFF">
+                                    <small class="form-hint">Set to 0 to turn miners OFF during expensive electricity.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="low-rate-frequency">Frequency During Off-Peak (MHz):</label>
+                                    <input type="number" id="low-rate-frequency" value="0" min="0" max="600" placeholder="0 = MAX">
+                                    <small class="form-hint">Set to 0 to run at MAX frequency during cheap electricity.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Auto-Create Schedule</button>
+                            </form>
+                        </div>
                     </div>
                 </section>
 
-                <!-- AI Schedule Simulation -->
-                <section class="schedule-simulation-section">
-                    <h2>AI Schedule Simulation</h2>
-                    <p class="section-description">Compare different mining strategies and apply the best one for your energy rates:</p>
-                    <div id="simulation-strategies" class="simulation-grid">
-                        <div class="loading-simulation">
-                            <p>Loading simulations...</p>
+                <!-- AI Schedule Simulation - Collapsible -->
+                <section class="collapsible-section collapsed" id="ai-simulation-section">
+                    <div class="collapsible-header">
+                        <h2>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            AI Schedule Simulation
+                        </h2>
+                        <svg class="collapsible-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="collapsible-content">
+                        <p class="section-description">Compare different mining strategies and apply the best one for your energy rates:</p>
+                        <div id="simulation-strategies" class="simulation-grid">
+                            <div class="loading-simulation">
+                                <p>Loading simulations...</p>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -447,24 +542,7 @@
             <div id="charts-tab" class="tab-content">
                 <section class="chart-controls-section">
                     <h2>Historical Data</h2>
-                    <div class="form-group-inline chart-time-controls">
-                        <label for="chart-time-range">Time Range:</label>
-                        <select id="chart-time-range">
-                            <option value="1">Last Hour</option>
-                            <option value="6">Last 6 Hours</option>
-                            <option value="24" selected>Last 24 Hours</option>
-                            <option value="168">Last Week</option>
-                            <option value="720">Last 30 Days</option>
-                        </select>
-                        <button id="refresh-charts-btn" class="btn btn-secondary">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <polyline points="1 20 1 14 7 14"/>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
+                    <p class="section-hint">Each chart has its own time range selector. Data refreshes automatically every 30 seconds.</p>
                 </section>
 
                 <!-- Combined Hashrate & Temperature Chart -->
@@ -564,7 +642,7 @@
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-label">Fleet Efficiency</div>
-                            <div class="stat-value" id="fleet-efficiency">0 TH/W</div>
+                            <div class="stat-value" id="fleet-efficiency">0 W/TH</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-label">Accepted Shares</div>
@@ -577,10 +655,6 @@
                         <div class="stat-card">
                             <div class="stat-label">Accept Rate</div>
                             <div class="stat-value success" id="accept-rate">0%</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Reject Rate</div>
-                            <div class="stat-value" id="reject-rate">0%</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-label">Avg Temp</div>
@@ -713,7 +787,7 @@
                             </svg>
                             <div class="metric-center">
                                 <span class="metric-value" id="modal-hashrate">0</span>
-                                <span class="metric-unit">TH/s</span>
+                                <span class="metric-unit" id="modal-hashrate-unit">TH/s</span>
                             </div>
                         </div>
                         <div class="metric-label">Real Hashrate</div>
@@ -852,14 +926,45 @@
                     </div>
 
                     <!-- Share Stats -->
-                    <div class="share-stats">
+                    <div class="share-stats-redesign">
                         <h4>Share Statistics</h4>
-                        <div class="share-bar">
-                            <div class="share-accepted" id="share-bar-accepted" style="width: 98%"></div>
-                        </div>
-                        <div class="share-numbers">
-                            <span class="accepted">Accepted: <strong id="modal-pool-shares">0</strong></span>
-                            <span class="rejected">Rejected: <strong id="modal-rejected-shares">0</strong></span>
+                        <div class="share-stats-content">
+                            <div class="acceptance-gauge">
+                                <svg viewBox="0 0 100 100" class="gauge-svg">
+                                    <!-- Background circle -->
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+                                    <!-- Progress arc -->
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="url(#gaugeGradient)" stroke-width="8"
+                                            stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="0"
+                                            id="acceptance-gauge-arc" transform="rotate(-90 50 50)"/>
+                                    <defs>
+                                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="var(--success)"/>
+                                            <stop offset="100%" stop-color="var(--cyan)"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div class="gauge-center">
+                                    <span class="gauge-percent" id="acceptance-rate-percent">99.8%</span>
+                                    <span class="gauge-label">Accept Rate</span>
+                                </div>
+                            </div>
+                            <div class="share-counts">
+                                <div class="share-count accepted">
+                                    <span class="count-icon">✓</span>
+                                    <div class="count-details">
+                                        <span class="count-value" id="modal-pool-shares">0</span>
+                                        <span class="count-label">Accepted</span>
+                                    </div>
+                                </div>
+                                <div class="share-count rejected">
+                                    <span class="count-icon">✗</span>
+                                    <div class="count-details">
+                                        <span class="count-value" id="modal-rejected-shares">0</span>
+                                        <span class="count-label">Rejected</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1091,7 +1196,7 @@
 
             <!-- Footer Actions -->
             <div class="miner-modal-footer">
-                <button class="btn btn-danger btn-sm" onclick="restartMinerFromModal()">
+                <button class="btn btn-secondary btn-sm" onclick="restartMinerFromModal()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <polyline points="23 4 23 10 17 10"/>
                         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
