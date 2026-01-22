@@ -1,345 +1,268 @@
-# Home Mining Fleet Manager
+# DirtySats - Bitcoin Mining Fleet Manager
 
-A production-ready Bitcoin mining fleet management system for home-scale miners on local networks. Supports **Bitaxe**, **Antminer**, **Whatsminer**, **Avalon**, and other ASIC miners with network connectivity.
+A production-ready Bitcoin mining fleet management dashboard for home-scale miners. Monitor, optimize, and manage your mining operation with real-time data, energy cost tracking, and profitability analysis.
+
+![DirtySats Dashboard](https://img.shields.io/badge/Status-Active-brightgreen) ![Python](https://img.shields.io/badge/Python-3.7+-blue) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
 
-### Multi-Miner Support
-- **Bitaxe** (ESP32 API)
-- **Antminer S9/S19** (CGMiner API)
-- **Whatsminer** (CGMiner API)
-- **Avalon** (CGMiner API)
-- Mixed fleet support (multiple miner types simultaneously)
+### Fleet Management
+- **Auto-Discovery**: Fast parallel network scanning finds all miners in 30-60 seconds
+- **Multi-Miner Support**: Bitaxe, NerdQAxe, Antminer, Whatsminer, Avalon, and more
+- **Real-Time Monitoring**: Live updates every 5 seconds with auto-refresh
+- **Miner Groups**: Organize miners by location (Garage, Office, etc.)
+- **Remote Control**: Restart miners, adjust frequency, control fan speeds
+- **Custom Naming**: Rename miners for easy identification
 
-### Core Capabilities
-- **Auto-Discovery**: Fast parallel network scanning (30-60 seconds)
-- **Auto-Detection**: Automatic miner type identification
-- **Real-Time Monitoring**: Updates every 15 seconds
-- **Web Dashboard**: Modern, responsive UI with auto-refresh
-- **Data Persistence**: SQLite database for miner list and historical stats
-- **REST API**: Full API access for automation
+### Energy & Profitability
+- **Live Profitability**: Real-time profit/loss calculations based on your energy rates
+- **Time-of-Use (TOU) Rates**: Support for peak/off-peak electricity pricing
+- **OpenEI Integration**: Search and apply official utility rates from the OpenEI database
+- **Energy Consumption Tracking**: Historical kWh usage with cost breakdowns
+- **Break-Even Calculator**: See the BTC price needed to break even
+- **Key Metrics**:
+  - Sats/kWh (mining efficiency)
+  - $/TH/day (hosting cost comparison)
+  - J/TH (energy efficiency)
 
-### Dashboard Features
-- Total fleet hashrate and power consumption
-- Per-miner statistics (hashrate, temperature, power, fan speed)
-- Online/offline status monitoring
-- Miner type indicators
-- Remote restart capability
-- Fleet management (add/remove miners)
+### Automated Mining Control
+- **Peak Hour Management**: Automatically turn off or reduce power during expensive electricity
+- **Off-Peak Optimization**: Run at maximum power when electricity is cheapest
+- **Rate Threshold Override**: Emergency shutoff when rates exceed your limit
+- **Visual Controls**: Easy radio-button interface with frequency sliders
+
+### Strategy Optimizer
+- Compare mining strategies based on your actual energy rates:
+  - **Off-Peak Only**: Mine only during cheapest hours
+  - **Conservative**: Turn off during peak, reduce otherwise
+  - **24/7 Maximum**: Full power all day
+  - **Smart Scheduling**: Reduce during peak, maximize during off-peak
+- One-click apply for any strategy
+
+### Charts & Analytics
+- **Fleet Performance**: Combined hashrate and temperature over time
+- **Power Consumption**: Historical power usage graphs
+- **Profitability Trend**: Daily profit/loss visualization
+- **Mining Efficiency**: J/TH tracking over time
+- **Share Statistics**: Accepted vs rejected shares
+- **Energy History**: kWh consumption with cost breakdown
+
+### Alerts & Notifications
+- **Telegram Integration**: Get alerts on your phone
+- **Overheat Warnings**: Automatic notifications when miners run hot
+- **Offline Detection**: Know immediately when a miner goes down
+- **Auto-Recovery**: Automatic reboot when miners cool down after overheating
+
+### Additional Features
+- **Solo Mining Odds**: Calculate your chance of finding a block
+- **Pool Configuration**: Manage mining pool settings per miner
+- **Data Export**: Export miners, history, and profitability data (CSV/JSON)
+- **Dark/Light Theme**: Toggle between visual modes
+- **Mobile Responsive**: Works on phones and tablets
+- **Lightning Donations**: Support development via Lightning Network
+
+## Supported Miners
+
+### ESP-Miner Devices (Full Support)
+- **BitAxe** (Ultra, Supra, Gamma, Max)
+- **NerdQAxe** / **NerdQAxe++**
+- **NerdAxe**
+- **Hex**
+- Other ESP32-based miners
+
+### CGMiner Devices (Monitoring)
+- **Antminer** S9, S19, etc.
+- **Whatsminer** M30, M50, etc.
+- **Avalon** miners
+- Any miner with CGMiner API on port 4028
 
 ## Requirements
 
-- **Raspberry Pi** (or any Linux system)
 - **Python 3.7+**
-- Local network with miners (default: 10.0.0.0/24)
-- Miners with network connectivity
+- **Local network** with miners
+- **Optional**: OpenEI API key for utility rate lookup
 
 ## Quick Start
 
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/home-mining-fleet-manager.git
+git clone https://github.com/supremeshortty/home-mining-fleet-manager.git
 cd home-mining-fleet-manager
-chmod +x install.sh
-./install.sh
+pip install -r requirements.txt
 ```
 
 ### Running
 
 ```bash
-# Start the application
-chmod +x start.sh
-./start.sh
-
-# Or manually:
-source venv/bin/activate
 python3 app.py
 ```
 
 ### Access Dashboard
 
-Open your browser to: **http://localhost:5000**
+Open your browser to: **http://localhost:5001**
 
-Or from another device on your network: **http://<raspberry-pi-ip>:5000**
-
-## Usage
-
-### 1. Discover Miners
-
-Click the **"Discover Miners"** button on the dashboard to scan your network. The system will:
-- Scan all IPs in your subnet (default: 10.0.0.0/24)
-- Detect miner types automatically
-- Display all found miners on the dashboard
-
-Discovery typically takes 30-60 seconds.
-
-### 2. Monitor Fleet
-
-The dashboard automatically refreshes every 5 seconds and shows:
-- **Fleet Statistics**: Total miners, online/offline count, total hashrate, power, avg temperature
-- **Individual Miners**: Per-miner hashrate, temperature, power, fan speed
-- **Miner Types**: Visual indicators for different miner models
-
-### 3. Manage Miners
-
-- **Restart**: Click "Restart" on any miner card to reboot it
-- **Remove**: Click "Remove" to delete a miner from the fleet
-- **Re-discover**: Run discovery again to find new miners
+Or from another device: **http://<your-ip>:5001**
 
 ## Configuration
 
-Edit `config.py` to customize settings:
+Edit `config.py` to customize:
 
 ```python
-# Network settings
-NETWORK_SUBNET = "10.0.0.0/24"  # Your network subnet
-DISCOVERY_TIMEOUT = 2           # Seconds per IP during discovery
-DISCOVERY_THREADS = 20          # Parallel discovery threads
+# Network
+NETWORK_SUBNET = "10.0.0.0/24"    # Your network subnet
+DISCOVERY_TIMEOUT = 2             # Seconds per IP
+DISCOVERY_THREADS = 20            # Parallel scan threads
 
 # Monitoring
-UPDATE_INTERVAL = 15            # Seconds between status updates
+UPDATE_INTERVAL = 30              # Seconds between updates
 
 # Flask
-FLASK_HOST = "0.0.0.0"         # Listen on all interfaces
-FLASK_PORT = 5000              # Web server port
+FLASK_HOST = "0.0.0.0"
+FLASK_PORT = 5001
+
+# Thermal Management
+OVERHEAT_AUTO_REBOOT = True       # Auto-reboot after cooldown
+OVERHEAT_RECOVERY_TEMP = 38       # Temperature to trigger reboot
+
+# OpenEI (optional - for utility rate lookup)
+OPENEI_API_KEY = "your-api-key"   # Get free key at openei.org
 ```
 
-## API Documentation
+## Dashboard Tabs
 
-### Get All Miners
-```bash
-GET /api/miners
+### Fleet Tab
+- Fleet statistics (miners, hashrate, shares, efficiency)
+- Performance chart with hashrate and temperature
+- Miner cards with live stats and controls
+- Group filtering and selection mode
+
+### Energy Tab
+- **Utility Rate Configuration**: Search OpenEI or enter rates manually
+- **Current Status**: Period indicator, current rate, energy/cost today
+- **Energy Consumption History**: Bar chart with daily/weekly/monthly views
+- **Profitability**: Complete breakdown with all key metrics
+- **Rate Schedule**: View your configured TOU rates
+- **Automated Mining Control**: Set up automatic frequency adjustments
+- **Strategy Optimizer**: Compare and apply mining strategies
+
+### Charts Tab
+- Historical data visualization
+- Multiple chart types with time range selectors
+- Export functionality
+
+### Alerts Tab
+- Telegram bot configuration
+- Alert history
+
+### Pools Tab
+- Mining pool management per miner
+
+## API Endpoints
+
+### Fleet Management
 ```
-Returns list of all miners with current status.
-
-### Get Fleet Statistics
-```bash
-GET /api/stats
+GET  /api/miners              # List all miners
+GET  /api/stats               # Fleet statistics
+POST /api/discover            # Scan network for miners
+POST /api/miner/<ip>/restart  # Restart a miner
+DELETE /api/miner/<ip>        # Remove a miner
 ```
-Returns aggregated fleet statistics.
 
-### Discover Miners
-```bash
-POST /api/discover
-Content-Type: application/json
-
-{
-  "subnet": "10.0.0.0/24"  # Optional
-}
+### Energy & Profitability
 ```
-Trigger network discovery.
-
-### Restart Miner
-```bash
-POST /api/miner/<ip>/restart
+GET  /api/energy/rates              # Current rate schedule
+POST /api/energy/rates              # Apply rate preset
+GET  /api/energy/profitability      # Current profitability
+GET  /api/energy/consumption/actual # Actual energy consumption
 ```
-Send restart command to specific miner.
 
-### Delete Miner
-```bash
-DELETE /api/miner/<ip>
+### History & Analytics
 ```
-Remove miner from fleet.
+GET /api/history/hashrate?hours=24    # Hashrate history
+GET /api/history/temperature?hours=24 # Temperature history
+GET /api/history/power?hours=24       # Power history
+```
 
-## Supported Miner Types
-
-### Bitaxe (ESP32 API)
-- **Detection**: `/api/system/info` endpoint
-- **Features**: Hashrate, temperature, power, fan speed, frequency
-- **Actions**: Status monitoring, settings changes, restart
-
-### Antminer/Whatsminer/Avalon (CGMiner API)
-- **Detection**: CGMiner JSON-RPC on port 4028
-- **Features**: Hashrate, temperature, fan speed, pool stats
-- **Actions**: Status monitoring, restart
-- **Note**: Power consumption not directly available from API
+### Export
+```
+GET /api/export/miners?format=csv
+GET /api/export/history?format=csv
+GET /api/export/profitability?format=csv
+```
 
 ## Architecture
 
-### Strategy Pattern Design
 ```
-MinerDetector (Factory)
-    │
-    ├─> BitaxeAPIHandler (ESP32 API)
-    └─> CGMinerAPIHandler (CGMiner API)
-
-Each miner has:
-    - Miner instance (data)
-    - APIHandler (protocol-specific logic)
+DirtySats/
+├── app.py                 # Flask app and FleetManager
+├── config.py              # Configuration settings
+├── database/
+│   └── db.py              # SQLite operations
+├── miners/
+│   ├── base.py            # Abstract base class
+│   ├── bitaxe.py          # ESP-Miner API handler
+│   ├── cgminer.py         # CGMiner API handler
+│   └── detector.py        # Auto-detection factory
+├── energy/
+│   ├── rates.py           # Energy rate management
+│   ├── profitability.py   # Profit calculations
+│   └── openei.py          # OpenEI API integration
+├── alerts/
+│   └── telegram.py        # Telegram notifications
+├── templates/
+│   └── dashboard.html     # Main dashboard template
+└── static/
+    ├── script.js          # Frontend JavaScript
+    └── style.css          # Styling
 ```
-
-### Key Components
-- **`app.py`**: Flask application and FleetManager
-- **`miners/`**: Miner type implementations
-  - `base.py`: Abstract base class
-  - `bitaxe.py`: Bitaxe ESP32 API
-  - `cgminer.py`: CGMiner API (Antminer/Whatsminer/Avalon)
-  - `detector.py`: Auto-detection factory
-- **`database/`**: SQLite operations
-- **`templates/`**: Web dashboard HTML
-- **`static/`**: CSS and JavaScript
-
-### Parallel Processing
-- **Discovery**: ThreadPoolExecutor with 20 workers
-- **Monitoring**: Parallel status updates for all miners
-- **Speed**: Updates complete fleet in 2-3 seconds
 
 ## Troubleshooting
 
-### No miners found during discovery
-1. Check network subnet in `config.py`
-2. Verify miners are powered on and connected to network
-3. Check firewall settings on Raspberry Pi
-4. Try accessing miner web interface manually to verify connectivity
+### No miners found
+1. Verify network subnet in `config.py`
+2. Check miners are powered on and connected
+3. Try pinging miner IPs manually
+4. Ensure no firewall blocking ports 80/4028
 
 ### Miner showing offline
-1. Verify miner is powered on
-2. Check network connectivity
-3. Try pinging the miner IP
-4. Check miner API is enabled (some miners require API to be enabled)
+1. Check physical connection
+2. Verify miner web interface is accessible
+3. Restart the miner
+4. Check API is enabled (some miners require this)
 
-### Dashboard not loading
-1. Check Flask is running: `python3 app.py`
-2. Verify port 5000 is not blocked
-3. Check browser console for JavaScript errors
-4. Try accessing from localhost first: `http://localhost:5000`
+### Energy rates not working
+1. Get a free API key from [OpenEI](https://openei.org/services/api/signup)
+2. Add key to `config.py` or environment variable
+3. Or use manual rate entry instead
 
-### CGMiner API not responding
-1. Some miners require enabling the API in settings
-2. Verify port 4028 is open
-3. Check miner documentation for API configuration
-
-## Testing
-
-Run unit tests:
-
-```bash
-source venv/bin/activate
-python3 -m pytest tests/
-```
-
-Or run individual test files:
-
-```bash
-python3 tests/test_miners.py
-python3 tests/test_database.py
-```
-
-Tests use mock API responses and don't require actual hardware.
-
-## Adding New Miner Types
-
-To add support for a new miner type:
-
-1. Create handler in `miners/your_miner.py`:
-```python
-from .base import MinerAPIHandler
-
-class YourMinerAPIHandler(MinerAPIHandler):
-    def detect(self, ip: str) -> bool:
-        # Detection logic
-
-    def get_status(self, ip: str) -> Dict:
-        # Return standardized status dict
-
-    # Implement other required methods
-```
-
-2. Register in `miners/detector.py`:
-```python
-self.handlers = [
-    (config.MINER_TYPES['BITAXE'], BitaxeAPIHandler()),
-    (config.MINER_TYPES['YOUR_MINER'], YourMinerAPIHandler()),
-    # ...
-]
-```
-
-3. Add to `config.py`:
-```python
-MINER_TYPES = {
-    'YOUR_MINER': 'Your Miner',
-    # ...
-}
-```
-
-## Performance
-
-- **Discovery**: 30-60 seconds for 254 IPs (10.0.0.0/24)
-- **Monitoring**: 2-3 seconds to update all miners
-- **Dashboard Refresh**: Every 5 seconds (configurable)
-- **Background Updates**: Every 15 seconds (configurable)
-
-## Security Considerations
-
-- **Local Network Only**: Designed for home networks, not exposed to internet
-- **No Authentication**: Add reverse proxy with auth if needed
-- **API Access**: No rate limiting by default
-- **Database**: SQLite file - backup regularly for data persistence
-
-## Database Schema
-
-### Miners Table
-```sql
-- id: INTEGER PRIMARY KEY
-- ip: TEXT UNIQUE
-- miner_type: TEXT
-- model: TEXT
-- discovered_at: TIMESTAMP
-- last_seen: TIMESTAMP
-```
-
-### Stats Table
-```sql
-- id: INTEGER PRIMARY KEY
-- miner_id: INTEGER
-- timestamp: TIMESTAMP
-- hashrate: REAL
-- temperature: REAL
-- power: REAL
-- fan_speed: INTEGER
-- status: TEXT
-```
+### Dashboard slow/unresponsive
+1. Reduce number of miners polled
+2. Increase UPDATE_INTERVAL in config
+3. Check network latency to miners
 
 ## Contributing
 
-This project follows simple, maintainable design principles:
-- Keep handlers isolated and testable
-- Use parallel processing for network operations
-- Graceful error handling (offline miners shouldn't crash the app)
-- Test before committing
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License - See LICENSE file
 
-## Roadmap
+## Support Development
 
-### Phase 2 (Future)
-- [ ] Auto-tuning (temperature-based frequency adjustment)
-- [ ] Scheduling (time-based mining on/off)
-- [ ] Energy monitoring (cost tracking)
-- [ ] Pool configuration management
-- [ ] Email/Telegram alerts
-- [ ] Historical charts
-- [ ] Export data (CSV/JSON)
+If DirtySats helps your mining operation, consider supporting development:
 
-### Phase 3 (Future)
-- [ ] Multi-subnet support
-- [ ] Authentication/authorization
-- [ ] Mobile app
-- [ ] Cloud sync
-- [ ] Advanced analytics
-
-## Support
-
-For issues, feature requests, or questions:
-- Open an issue on GitHub
-- Check troubleshooting section above
-- Review miner-specific documentation
+- **Lightning**: Via the Donate button in the dashboard
+- **GitHub**: Star the repository
 
 ## Acknowledgments
 
-Built for the home mining community. Supports any wall-outlet powered Bitcoin ASIC miner.
+Built for the home mining community. Special thanks to the BitAxe and open-source mining communities.
 
-**Philosophy**: "Working and simple beats feature-rich and broken"
+---
+
+**DirtySats** - *Stack sats, track stats*
