@@ -127,6 +127,10 @@ def get_thermal_profile_key(miner_type: str) -> str:
         return 'Antminer'
     if 'WHATSMINER' in miner_upper:
         return 'Whatsminer'
+
+    # Avalon - check specific models first
+    if 'NANO3S' in miner_upper or 'NANO 3S' in miner_upper:
+        return 'AvalonNano3s'
     if 'AVALON' in miner_upper:
         return 'Avalon'
 

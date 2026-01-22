@@ -4,7 +4,8 @@ CGMiner API Handler (Antminer, Whatsminer, Avalon, etc.)
 import socket
 import json
 import logging
-from typing import Dict
+import re
+from typing import Dict, Optional, Tuple
 from .base import MinerAPIHandler
 import config
 
@@ -17,6 +18,63 @@ class CGMinerAPIHandler(MinerAPIHandler):
     def __init__(self):
         self.timeout = config.CGMINER_API_TIMEOUT
         self.port = config.CGMINER_PORT
+
+    def _parse_avalon_stats(self, stats_str: str) -> Optional[Dict]:
+        """
+        Parse Avalon miner stats from MM ID string
+
+        Example format: "...OTemp[56] TMax[97] TAvg[89] Fan1[2040] FanR[41%] PS[0 0 27535 4 0 3626 129]..."
+
+        Returns dict with: temp, temp_max, fan_rpm, fan_percent, chip_type, power
+        """
+        try:
+            result = {}
+
+            # Temperature - use TAvg (average chip temp) as main temp
+            if match := re.search(r'TAvg\[(\d+)\]', stats_str):
+                result['temp'] = int(match.group(1))
+
+            # Max temperature
+            if match := re.search(r'TMax\[(\d+)\]', stats_str):
+                result['temp_max'] = int(match.group(1))
+
+            # Outer/operating temperature as backup
+            if 'temp' not in result:
+                if match := re.search(r'OTemp\[(\d+)\]', stats_str):
+                    result['temp'] = int(match.group(1))
+
+            # Fan RPM
+            if match := re.search(r'Fan1\[(\d+)\]', stats_str):
+                result['fan_rpm'] = int(match.group(1))
+
+            # Fan percentage
+            if match := re.search(r'FanR\[(\d+)%\]', stats_str):
+                result['fan_percent'] = int(match.group(1))
+
+            # Chip type/core
+            if match := re.search(r'Core\[([^\]]+)\]', stats_str):
+                result['chip_type'] = match.group(1)
+
+            # Power - PS field format: PS[v1 v2 power v4 v5 v6 v7]
+            # The third value appears to be power in milliwatts
+            if match := re.search(r'PS\[(\d+)\s+(\d+)\s+(\d+)', stats_str):
+                power_mw = int(match.group(3))
+                result['power'] = power_mw / 1000.0  # Convert to watts
+
+            # Model/Version
+            if match := re.search(r'Ver\[([^\]]+)\]', stats_str):
+                model_str = match.group(1)
+                # Extract just the model name (e.g., "Nano3s" from "Nano3s-25021401_56abae7")
+                if '-' in model_str:
+                    result['model'] = model_str.split('-')[0]
+                else:
+                    result['model'] = model_str
+
+            return result if result else None
+
+        except Exception as e:
+            logger.debug(f"Error parsing Avalon stats: {e}")
+            return None
 
     def _send_command(self, ip: str, command: str) -> Dict:
         """Send command to CGMiner API"""
@@ -39,8 +97,9 @@ class CGMinerAPIHandler(MinerAPIHandler):
 
             sock.close()
 
-            # Parse response
-            return json.loads(response.decode())
+            # Parse response (strip null bytes that some miners append)
+            response_str = response.decode().rstrip('\x00')
+            return json.loads(response_str)
 
         except socket.timeout:
             logger.warning(f"Timeout sending command '{command}' to {ip}")
@@ -77,6 +136,8 @@ class CGMinerAPIHandler(MinerAPIHandler):
                 devs = self._send_command(ip, 'devs')
                 temp = 0
                 fan_speed = 0
+                chip_type = None
+                power = 0
 
                 if 'DEVS' in devs and devs['DEVS']:
                     dev = devs['DEVS'][0]
@@ -86,23 +147,53 @@ class CGMinerAPIHandler(MinerAPIHandler):
                 # Detect miner model from version
                 version = self._send_command(ip, 'version')
                 model = 'CGMiner'
+                is_avalon = False
+
                 if 'VERSION' in version and version['VERSION']:
-                    desc = version['VERSION'][0].get('Description', '')
+                    version_data = version['VERSION'][0]
+                    desc = version_data.get('Description', '')
+                    prod = version_data.get('PROD', '')
+
                     if 'Antminer' in desc:
                         model = 'Antminer'
                     elif 'Whatsminer' in desc:
                         model = 'Whatsminer'
-                    elif 'Avalon' in desc:
+                    elif 'Avalon' in desc or 'Avalon' in prod:
                         model = 'Avalon'
+                        is_avalon = True
+                        # Get more specific model from PROD field
+                        if prod:
+                            model = prod  # e.g., "Avalon Nano3s"
+
+                # For Avalon miners, parse detailed stats from STATS command
+                if is_avalon:
+                    try:
+                        stats = self._send_command(ip, 'stats')
+                        if 'STATS' in stats and stats['STATS']:
+                            # Find the miner stats (not pool stats)
+                            for stat in stats['STATS']:
+                                if 'MM ID0' in stat:
+                                    avalon_data = self._parse_avalon_stats(stat['MM ID0'])
+                                    if avalon_data:
+                                        temp = avalon_data.get('temp', temp)
+                                        fan_speed = avalon_data.get('fan_percent', fan_speed)
+                                        chip_type = avalon_data.get('chip_type')
+                                        power = avalon_data.get('power', power)
+                                        # Use more specific model if available
+                                        if 'model' in avalon_data:
+                                            model = avalon_data['model']
+                                    break
+                    except Exception as e:
+                        logger.debug(f"Could not parse Avalon stats for {ip}: {e}")
 
                 # Convert MHS to H/s
                 hashrate_mhs = data.get('MHS av', 0)
                 hashrate = hashrate_mhs * 1_000_000  # Convert to H/s
 
-                return {
+                result = {
                     'hashrate': float(hashrate),
                     'temperature': float(temp),
-                    'power': 0,  # CGMiner doesn't provide power directly
+                    'power': float(power),
                     'fan_speed': int(fan_speed),
                     'model': model,
                     'status': 'online',
@@ -117,6 +208,12 @@ class CGMinerAPIHandler(MinerAPIHandler):
                         'devs': devs
                     }
                 }
+
+                # Add chip type if available (for Avalon miners)
+                if chip_type:
+                    result['asic_model'] = chip_type
+
+                return result
 
         except Exception as e:
             logger.error(f"Error getting status from CGMiner at {ip}: {e}")

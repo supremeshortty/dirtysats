@@ -86,11 +86,18 @@ class MinerDetector:
         # Try CGMiner-based devices (Antminer, Whatsminer, Avalon)
         try:
             if self.cgminer_handler.detect(ip):
-                miner_type = config.MINER_TYPES['ANTMINER']
-                logger.info(f"Detected {miner_type} at {ip}")
-                miner = Miner(ip, miner_type, self.cgminer_handler)
-                miner.update_status()
-                return miner
+                # Get initial status to determine specific miner type
+                status = self.cgminer_handler.get_status(ip)
+                if status and status.get('status') == 'online':
+                    # Use the detected model as the miner type
+                    miner_type = status.get('model', config.MINER_TYPES['ANTMINER'])
+                    logger.info(f"Detected {miner_type} at {ip}")
+                    miner = Miner(ip, miner_type, self.cgminer_handler)
+                    # Status already fetched, store it
+                    miner.last_status = status
+                    if 'model' in status:
+                        miner.model = status['model']
+                    return miner
         except Exception as e:
             logger.debug(f"CGMiner detection error at {ip}: {e}")
 

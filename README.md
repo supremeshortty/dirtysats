@@ -83,10 +83,11 @@ A production-ready Bitcoin mining fleet management dashboard for home-scale mine
 - **Hex**
 - Other ESP32-based miners
 
-### CGMiner Devices (Monitoring)
+### CGMiner Devices (Full Support)
+- **Avalon Nano 3S** (A3197S chip) - Full thermal management with 75°C target temp
 - **Antminer** S9, S19, etc.
 - **Whatsminer** M30, M50, etc.
-- **Avalon** miners
+- **Avalon** miners (traditional large models)
 - Any miner with CGMiner API on port 4028
 
 ## Requirements
@@ -230,6 +231,15 @@ DirtySats/
     └── style.css          # Styling
 ```
 
+## Recent Updates
+
+### Avalon Nano 3S Support (Latest)
+- **Full CGMiner API Support**: Fixed null byte parsing issue in API responses
+- **Accurate Stats Parsing**: Temperature, fan speed, power consumption, and chip type (A3197S) now display correctly
+- **Custom Thermal Profile**: Optimized for 75°C target temperature (manufacturer spec)
+- **Auto-Tuning**: Thermal management targets 75°C optimal, 85°C warning, 92°C critical
+- **Proper Detection**: Nano 3S now correctly identified instead of generic "Antminer" label
+
 ## Troubleshooting
 
 ### No miners found
@@ -237,6 +247,12 @@ DirtySats/
 2. Check miners are powered on and connected
 3. Try pinging miner IPs manually
 4. Ensure no firewall blocking ports 80/4028
+
+### Avalon Nano 3S not detected
+1. Ensure miner is connected to the same network
+2. Try accessing miner web interface (should show QR code for Avalon Family app)
+3. CGMiner API runs on port 4028 (should be accessible automatically)
+4. After scanning, remove and re-scan if it shows as generic "Antminer"
 
 ### Miner showing offline
 1. Check physical connection

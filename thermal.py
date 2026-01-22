@@ -247,7 +247,7 @@ MINER_PROFILES = {
         freq_step=25
     ),
 
-    # Canaan Avalon series
+    # Canaan Avalon series (traditional large miners)
     # Research: ambient -5 to 35°C, some models to 45°C
     'Avalon': FrequencyProfile(
         min_freq=400,
@@ -259,6 +259,21 @@ MINER_PROFILES = {
         max_chip_temp=85.0,
         temp_hysteresis=3.0,
         freq_step=25
+    ),
+
+    # Canaan Avalon Nano 3S - A3197S chip, USB-powered compact device
+    # Small form factor with limited cooling, similar to ESP-Miner devices
+    # Target 75°C optimal based on manufacturer specs
+    'AvalonNano3s': FrequencyProfile(
+        min_freq=400,
+        max_freq=550,
+        stock_freq=435,      # Default frequency from stats
+        optimal_temp=75.0,   # Manufacturer recommended target
+        warning_temp=85.0,
+        critical_temp=92.0,
+        max_chip_temp=97.0,  # Observed max in stats
+        temp_hysteresis=3.0,
+        freq_step=20
     ),
 
     # =========================================================================
@@ -310,6 +325,17 @@ MINER_PROFILES = {
         max_chip_temp=85.0,
         temp_hysteresis=3.0,
         freq_step=25
+    ),
+    'AvalonNano3s': FrequencyProfile(
+        min_freq=400,
+        max_freq=550,
+        stock_freq=435,
+        optimal_temp=75.0,
+        warning_temp=85.0,
+        critical_temp=92.0,
+        max_chip_temp=97.0,
+        temp_hysteresis=3.0,
+        freq_step=20
     ),
     'Unknown': FrequencyProfile(
         min_freq=400,

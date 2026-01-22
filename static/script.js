@@ -5005,6 +5005,15 @@ const MINER_OC_PROFILES = {
         power: { stock: 3344, max: 4000 },
         temp: { optimal: 60, efficiency: { min: 50, max: 65 }, safeMax: 75, throttle: 80, shutdown: 90 }
     },
+    // Avalon Nano 3S - A3197S chip, USB-powered compact device (~5.5 TH/s)
+    'Nano3s': {
+        chip: 'A3197S',
+        hashrate: { stock: '5.5 TH/s', max: '6.5 TH/s' },
+        voltage: { min: 1100, max: 1300, safe: { min: 1150, max: 1250 }, danger: 1280, stock: 1200 },
+        frequency: { min: 400, max: 550, stock: 435, mild: 450, med: 475, heavy: 500 },
+        power: { stock: 27, max: 35 },
+        temp: { optimal: 75, efficiency: { min: 65, max: 80 }, safeMax: 85, throttle: 92, shutdown: 97 }
+    },
     // Default fallback for unknown miners
     'default': {
         chip: 'Unknown',
@@ -5036,6 +5045,7 @@ function getMinerOCProfileByIP(ip) {
     }
 
     // Chip-based matching
+    if (model.includes('nano3s') || model.includes('nano 3s')) return MINER_OC_PROFILES['Nano3s'];
     if (model.includes('bm1370') || model.includes('gamma')) return MINER_OC_PROFILES['BitAxe Gamma'];
     if (model.includes('bm1368') || model.includes('supra')) return MINER_OC_PROFILES['BitAxe Supra'];
     if (model.includes('bm1366') || model.includes('ultra')) return MINER_OC_PROFILES['BitAxe Ultra'];
@@ -5903,6 +5913,10 @@ const THERMAL_PROFILES = {
     'Whatsminer': { optimal: 65, warning: 75, critical: 80, target: 70 },        // Warning at 80°C
     'Avalon': { optimal: 65, warning: 75, critical: 80, target: 70 },
 
+    // Avalon Nano 3S - A3197S chip, USB-powered compact device
+    // Small form factor with limited cooling, target 75°C
+    'Nano3s': { optimal: 75, warning: 85, critical: 92, target: 75 },           // Manufacturer recommended target
+
     'default': { optimal: 55, warning: 62, critical: 68, target: 58 }
 };
 
@@ -5915,7 +5929,7 @@ function getThermalProfile(minerType) {
         return THERMAL_PROFILES[minerType];
     }
 
-    // Try partial match
+    // Try partial match (check specific models before generic ones)
     const typeUpper = minerType.toUpperCase();
     if (typeUpper.includes('NERDOCTAXE')) return THERMAL_PROFILES['NerdOctaxe'];
     if (typeUpper.includes('NERDQAXE')) return THERMAL_PROFILES['NerdQAxe+'];
@@ -5923,6 +5937,8 @@ function getThermalProfile(minerType) {
     if (typeUpper.includes('BITAXE')) return THERMAL_PROFILES['BitAxe'];
     if (typeUpper.includes('ANTMINER')) return THERMAL_PROFILES['Antminer'];
     if (typeUpper.includes('WHATSMINER')) return THERMAL_PROFILES['Whatsminer'];
+    // Check for Avalon Nano 3S before generic Avalon
+    if (typeUpper.includes('NANO3S') || typeUpper.includes('NANO 3S')) return THERMAL_PROFILES['Nano3s'];
     if (typeUpper.includes('AVALON')) return THERMAL_PROFILES['Avalon'];
 
     return THERMAL_PROFILES['default'];
