@@ -66,6 +66,14 @@ A production-ready Bitcoin mining fleet management dashboard for home-scale mine
 - **Offline Detection**: Know immediately when a miner goes down
 - **Auto-Recovery**: Automatic reboot when miners cool down after overheating
 
+### Remote Access
+- **Tailscale Integration**: Securely access your dashboard from anywhere in the world
+- **No Port Forwarding**: Zero router configuration needed
+- **End-to-End Encrypted**: Secure VPN connection between your devices
+- **Works on Cellular**: Check your miners from anywhere with internet
+- **Mobile Friendly**: Access from iPhone, Android, or any device
+- **Free for Personal Use**: Up to 100 devices on free tier
+
 ### Additional Features
 - **Solo Mining Odds**: Calculate your chance of finding a block
 - **Pool Configuration**: Manage mining pool settings per miner
@@ -403,6 +411,7 @@ Detailed guides available:
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick command reference
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start guide
 - **[TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)** - Setting up Telegram alerts
+- **[TAILSCALE_SETUP.md](TAILSCALE_SETUP.md)** - Remote access setup with Tailscale VPN
 
 ## Troubleshooting
 
