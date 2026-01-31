@@ -31,6 +31,7 @@ from metrics import (
     PredictiveRevenueModel
 )
 from telegram_setup_helper import TelegramSetupHelper
+from lightning import get_lightning_manager, init_lightning
 
 # Setup logging
 logging.basicConfig(
@@ -3598,6 +3599,82 @@ def get_revenue_projection():
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error getting revenue projection: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# LIGHTNING DONATIONS - Support Development
+# =============================================================================
+
+
+@app.route('/api/lightning/donation-amounts', methods=['GET'])
+def get_donation_amounts():
+    """Get suggested donation amounts in satoshis"""
+    try:
+        lightning = get_lightning_manager()
+        amounts = lightning.get_standard_amounts()
+        return jsonify({
+            'success': True,
+            'amounts': amounts,
+            'description': 'Support DirtySats Development ☕'
+        })
+    except Exception as e:
+        logger.error(f"Error getting donation amounts: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lightning/create-invoice', methods=['POST'])
+def create_donation_invoice():
+    """Create Lightning invoice for donation"""
+    try:
+        data = request.get_json() or {}
+        amount_sats = data.get('amount', 1000)
+
+        if amount_sats < 100:
+            return jsonify({'error': 'Minimum donation: 100 sats'}), 400
+
+        lightning = get_lightning_manager()
+        invoice = lightning.create_invoice(amount_sats)
+
+        if not invoice:
+            return jsonify({'error': 'Failed to create invoice'}), 500
+
+        return jsonify({
+            'success': True,
+            'invoice': invoice
+        })
+    except Exception as e:
+        logger.error(f"Error creating invoice: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lightning/check-payment/<checking_id>', methods=['GET'])
+def check_donation_payment(checking_id):
+    """Check if donation payment was received"""
+    try:
+        lightning = get_lightning_manager()
+        status = lightning.check_payment_status(checking_id)
+        return jsonify({
+            'success': True,
+            'payment_status': status
+        })
+    except Exception as e:
+        logger.error(f"Error checking payment: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lightning/stats', methods=['GET'])
+def get_donation_stats():
+    """Get donation statistics"""
+    try:
+        lightning = get_lightning_manager()
+        stats = lightning.get_donation_stats()
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
         return jsonify({'error': str(e)}), 500
 
 
