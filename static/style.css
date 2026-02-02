@@ -6181,6 +6181,328 @@ section {
 }
 
 /* ============================================================================
+   METRICS DASHBOARD CARDS
+   ============================================================================ */
+.metrics-section {
+    margin-bottom: 32px;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.metric-card {
+    background: var(--space-light);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 8px 32px var(--cyan-glow);
+    transform: translateY(-2px);
+}
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.metric-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-bright);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.metric-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--cyan);
+}
+
+.metric-status {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.metric-content .primary-metric {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.primary-metric .metric-value {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--cyan);
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1;
+}
+
+.primary-metric .metric-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.secondary-metric {
+    text-align: center;
+    padding: 12px;
+    background: var(--space);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.secondary-metric .metric-value {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.secondary-metric .metric-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.metric-chart {
+    height: 80px;
+    position: relative;
+}
+
+.metric-chart canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Sats Earned Card Specific */
+.sats-earned-card .primary-metric .metric-value {
+    background: linear-gradient(45deg, var(--amber), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.trend-indicator {
+    font-size: 1.2rem;
+    animation: pulse 2s infinite;
+}
+
+/* Fleet Health Card Specific */
+.health-summary {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 16px;
+}
+
+.health-stat {
+    text-align: center;
+}
+
+.health-count {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.health-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.health-label.healthy {
+    color: var(--success);
+}
+
+.health-label.warning {
+    color: var(--warning);
+}
+
+.health-label.critical {
+    color: var(--danger);
+}
+
+.health-count {
+    color: var(--text-bright);
+}
+
+.health-details {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    background: var(--space);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.health-indicator {
+    font-size: 1.2rem;
+}
+
+/* Efficiency Card Specific */
+.efficiency-summary {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 16px;
+}
+
+.efficiency-stat {
+    text-align: center;
+}
+
+.efficiency-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.efficiency-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 4px;
+}
+
+.efficiency-avg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    color: var(--cyan);
+}
+
+/* Pool Performance Card */
+.pool-comparison {
+    font-size: 0.9rem;
+}
+
+.pool-status {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Revenue Card Specific */
+.revenue-projections {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.revenue-projection {
+    text-align: center;
+    padding: 12px;
+    background: var(--space);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.projection-period {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.projection-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--success);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 4px;
+}
+
+.revenue-targets {
+    background: var(--space);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+}
+
+.target-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.target-label {
+    color: var(--text-secondary);
+}
+
+.target-value {
+    color: var(--text-bright);
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+.revenue-indicator {
+    font-size: 1.2rem;
+}
+
+/* Animation for glowing metrics */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .metrics-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .revenue-projections {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .metric-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+/* ============================================================================
    PRINT STYLES
    ============================================================================ */
 @media print {

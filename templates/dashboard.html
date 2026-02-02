@@ -277,6 +277,170 @@
                     </div>
                 </section>
 
+                <!-- Metrics Dashboard Cards -->
+                <section class="metrics-section">
+                    <div class="metrics-grid">
+                        <!-- Sats Earned Tracker Card -->
+                        <div class="metric-card sats-earned-card">
+                            <div class="metric-header">
+                                <h3>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83M16.62 12l-5.74 9.94"/>
+                                    </svg>
+                                    Sats Earned
+                                </h3>
+                                <div class="metric-status" id="sats-trending">
+                                    <span class="trend-indicator">📈</span>
+                                </div>
+                            </div>
+                            <div class="metric-content">
+                                <div class="primary-metric">
+                                    <span class="metric-value" id="sats-today">--</span>
+                                    <span class="metric-label">sats today</span>
+                                </div>
+                                <div class="metric-grid">
+                                    <div class="secondary-metric">
+                                        <span class="metric-value" id="sats-rate">--</span>
+                                        <span class="metric-label">sats/hr</span>
+                                    </div>
+                                    <div class="secondary-metric">
+                                        <span class="metric-value" id="sats-week">--</span>
+                                        <span class="metric-label">this week</span>
+                                    </div>
+                                </div>
+                                <div class="metric-chart">
+                                    <canvas id="sats-earned-chart" width="300" height="80"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fleet Health Dashboard -->
+                        <div class="metric-card fleet-health-card">
+                            <div class="metric-header">
+                                <h3>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                                    </svg>
+                                    Fleet Health
+                                </h3>
+                                <div class="metric-status" id="fleet-health-status">
+                                    <span class="health-indicator">🟢</span>
+                                </div>
+                            </div>
+                            <div class="metric-content">
+                                <div class="health-summary">
+                                    <div class="health-stat">
+                                        <span class="health-count" id="healthy-count">--</span>
+                                        <span class="health-label healthy">Healthy</span>
+                                    </div>
+                                    <div class="health-stat">
+                                        <span class="health-count" id="warning-count">--</span>
+                                        <span class="health-label warning">Warning</span>
+                                    </div>
+                                    <div class="health-stat">
+                                        <span class="health-count" id="critical-count">--</span>
+                                        <span class="health-label critical">Critical</span>
+                                    </div>
+                                </div>
+                                <div class="health-details" id="health-issues">
+                                    <p class="loading">Loading health status...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Power Efficiency Matrix -->
+                        <div class="metric-card efficiency-card">
+                            <div class="metric-header">
+                                <h3>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                    </svg>
+                                    Power Efficiency
+                                </h3>
+                                <div class="metric-status" id="efficiency-status">
+                                    <span class="efficiency-avg" id="fleet-efficiency">-- W/TH</span>
+                                </div>
+                            </div>
+                            <div class="metric-content">
+                                <div class="efficiency-summary">
+                                    <div class="efficiency-stat">
+                                        <span class="efficiency-label">Best</span>
+                                        <span class="efficiency-value" id="best-efficiency">-- W/TH</span>
+                                    </div>
+                                    <div class="efficiency-stat">
+                                        <span class="efficiency-label">Worst</span>
+                                        <span class="efficiency-value" id="worst-efficiency">-- W/TH</span>
+                                    </div>
+                                </div>
+                                <div class="efficiency-chart">
+                                    <canvas id="efficiency-matrix-chart" width="300" height="120"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pool Performance Comparison -->
+                        <div class="metric-card pool-performance-card">
+                            <div class="metric-header">
+                                <h3>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                                    </svg>
+                                    Pool Performance
+                                </h3>
+                                <div class="metric-status" id="pool-recommendation">
+                                    <span class="pool-status">Analyzing...</span>
+                                </div>
+                            </div>
+                            <div class="metric-content">
+                                <div class="pool-comparison" id="pool-comparison-content">
+                                    <p class="loading">Loading pool data...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Predictive Revenue Model -->
+                        <div class="metric-card revenue-card">
+                            <div class="metric-header">
+                                <h3>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
+                                        <line x1="12" y1="1" x2="12" y2="23"/>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                    </svg>
+                                    Revenue Projector
+                                </h3>
+                                <div class="metric-status" id="revenue-trend">
+                                    <span class="revenue-indicator">📊</span>
+                                </div>
+                            </div>
+                            <div class="metric-content">
+                                <div class="revenue-projections">
+                                    <div class="revenue-projection">
+                                        <span class="projection-period">Daily</span>
+                                        <span class="projection-value" id="daily-projection">$--</span>
+                                    </div>
+                                    <div class="revenue-projection">
+                                        <span class="projection-period">Monthly</span>
+                                        <span class="projection-value" id="monthly-projection">$--</span>
+                                    </div>
+                                    <div class="revenue-projection">
+                                        <span class="projection-period">Annual</span>
+                                        <span class="projection-value" id="annual-projection">$--</span>
+                                    </div>
+                                </div>
+                                <div class="revenue-targets" id="revenue-targets">
+                                    <div class="target-item">
+                                        <span class="target-label">Break-even:</span>
+                                        <span class="target-value" id="breakeven-days">-- days</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Miners List -->
                 <section class="miners-section">
                     <div class="miners-header">
@@ -1725,6 +1889,199 @@
         // Close on escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeDonationModal({target: {}, currentTarget: {}});
+        });
+
+        // ============================================================================
+        // METRICS DASHBOARD INTEGRATION
+        // ============================================================================
+        
+        // Initialize metrics charts
+        let satsEarnedChart = null;
+        let efficiencyChart = null;
+
+        // Load and display metrics data
+        async function loadMetricsData() {
+            try {
+                // Load Sats Earned Tracker
+                const satsResponse = await fetch('/api/metrics/sats-earned?hours=24');
+                const satsData = await satsResponse.json();
+                updateSatsEarnedCard(satsData);
+
+                // Load Fleet Health Monitor
+                const healthResponse = await fetch('/api/metrics/fleet-health');
+                const healthData = await healthResponse.json();
+                updateFleetHealthCard(healthData);
+
+                // Load Power Efficiency Matrix
+                const efficiencyResponse = await fetch('/api/metrics/power-efficiency');
+                const efficiencyData = await efficiencyResponse.json();
+                updateEfficiencyCard(efficiencyData);
+
+                // Load Pool Performance Comparison
+                const poolResponse = await fetch('/api/metrics/pool-performance');
+                const poolData = await poolResponse.json();
+                updatePoolPerformanceCard(poolData);
+
+                // Load Predictive Revenue Model
+                const revenueResponse = await fetch('/api/metrics/revenue-projections');
+                const revenueData = await revenueResponse.json();
+                updateRevenueCard(revenueData);
+
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            }
+        }
+
+        function updateSatsEarnedCard(data) {
+            document.getElementById('sats-today').textContent = formatSats(data.sats_today);
+            document.getElementById('sats-rate').textContent = Math.round(data.rate_sats_per_hour);
+            document.getElementById('sats-week').textContent = formatSats(data.sats_this_week);
+            
+            // Update trending indicator
+            const trendIndicator = document.getElementById('sats-trending').querySelector('.trend-indicator');
+            const trendEmojis = { up: '📈', down: '📉', stable: '➡️' };
+            trendIndicator.textContent = trendEmojis[data.trending] || '📊';
+
+            // Create mini chart
+            createSatsEarnedChart(data.chart_data);
+        }
+
+        function updateFleetHealthCard(data) {
+            document.getElementById('healthy-count').textContent = data.summary.healthy;
+            document.getElementById('warning-count').textContent = data.summary.warning;
+            document.getElementById('critical-count').textContent = data.summary.critical;
+
+            // Update health indicator
+            const healthIndicator = document.getElementById('fleet-health-status').querySelector('.health-indicator');
+            const healthEmojis = { healthy: '🟢', warning: '🟡', critical: '🔴' };
+            healthIndicator.textContent = healthEmojis[data.overall_status] || '🟡';
+
+            // Update issues list
+            const issuesContainer = document.getElementById('health-issues');
+            if (data.issues && data.issues.length > 0) {
+                issuesContainer.innerHTML = data.issues.slice(0, 3).map(issue => 
+                    `<div class="health-issue">${issue}</div>`
+                ).join('');
+            } else {
+                issuesContainer.innerHTML = '<div class="health-issue">All systems operational ✅</div>';
+            }
+        }
+
+        function updateEfficiencyCard(data) {
+            document.getElementById('fleet-efficiency').textContent = `${data.fleet_average.toFixed(1)} W/TH`;
+            document.getElementById('best-efficiency').textContent = `${data.best_efficiency.toFixed(1)} W/TH`;
+            document.getElementById('worst-efficiency').textContent = `${data.worst_efficiency.toFixed(1)} W/TH`;
+
+            // Create efficiency chart
+            createEfficiencyChart(data.miner_efficiency_data);
+        }
+
+        function updatePoolPerformanceCard(data) {
+            const poolContainer = document.getElementById('pool-comparison-content');
+            const poolStatus = document.getElementById('pool-recommendation').querySelector('.pool-status');
+
+            if (data.pools && data.pools.length > 0) {
+                const topPool = data.pools[0];
+                poolStatus.textContent = data.recommendation || 'Optimized';
+                
+                poolContainer.innerHTML = data.pools.slice(0, 3).map(pool => 
+                    `<div class="pool-item">
+                        <span class="pool-name">${pool.name}</span>
+                        <span class="pool-performance">${pool.relative_performance}%</span>
+                    </div>`
+                ).join('');
+            } else {
+                poolContainer.innerHTML = '<div class="pool-item">No pool data available</div>';
+            }
+        }
+
+        function updateRevenueCard(data) {
+            document.getElementById('daily-projection').textContent = `$${data.daily_revenue.toFixed(2)}`;
+            document.getElementById('monthly-projection').textContent = `$${data.monthly_revenue.toFixed(0)}`;
+            document.getElementById('annual-projection').textContent = `$${data.annual_revenue.toFixed(0)}`;
+            document.getElementById('breakeven-days').textContent = data.breakeven_days || '--';
+        }
+
+        function createSatsEarnedChart(chartData) {
+            const ctx = document.getElementById('sats-earned-chart');
+            if (satsEarnedChart) {
+                satsEarnedChart.destroy();
+            }
+
+            satsEarnedChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(d => new Date(d.timestamp).getHours() + ':00'),
+                    datasets: [{
+                        data: chartData.map(d => d.sats),
+                        borderColor: '#f7931a',
+                        backgroundColor: 'rgba(247, 147, 26, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    interaction: { intersect: false }
+                }
+            });
+        }
+
+        function createEfficiencyChart(minerData) {
+            const ctx = document.getElementById('efficiency-matrix-chart');
+            if (efficiencyChart) {
+                efficiencyChart.destroy();
+            }
+
+            efficiencyChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Miners',
+                        data: minerData.map(m => ({ x: m.hashrate, y: m.efficiency })),
+                        backgroundColor: minerData.map(m => 
+                            m.efficiency < 20 ? '#00e676' :
+                            m.efficiency < 30 ? '#ffab00' : '#ff5252'
+                        ),
+                        borderColor: '#00d4ff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'TH/s', color: '#9ca3af' } },
+                        y: { title: { display: true, text: 'W/TH', color: '#9ca3af' } }
+                    }
+                }
+            });
+        }
+
+        function formatSats(sats) {
+            if (sats >= 1000000) {
+                return `${(sats / 1000000).toFixed(1)}M`;
+            } else if (sats >= 1000) {
+                return `${(sats / 1000).toFixed(1)}K`;
+            }
+            return sats.toString();
+        }
+
+        // Auto-refresh metrics every 60 seconds
+        setInterval(loadMetricsData, 60000);
+
+        // Load metrics when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMetricsData();
         });
     </script>
 

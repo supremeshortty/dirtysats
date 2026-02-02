@@ -8,6 +8,18 @@ from database import Database
 
 logger = logging.getLogger(__name__)
 
+# Temporary database adapter until full migration
+def execute_db_query(db, query, params=()):
+    """Adapter function for database queries"""
+    try:
+        with db._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Database query failed: {e}")
+        return []
+
 
 class SatsEarnedTracker:
     """
@@ -38,10 +50,13 @@ class SatsEarnedTracker:
         now = datetime.utcnow()
 
         # Get share data for all miners
-        all_shares = self.db.execute(
-            "SELECT timestamp, shares_accepted FROM miner_history WHERE timestamp > ?",
-            (now - timedelta(days=30)).timestamp(),
-        )
+        with self.db._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT timestamp, shares_accepted FROM stats WHERE timestamp > ?",
+                ((now - timedelta(days=30)).timestamp(),)
+            )
+            all_shares = cursor.fetchall()
 
         sats_today = self._calculate_sats_for_period(
             now - timedelta(hours=24), now

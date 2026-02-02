@@ -23,7 +23,7 @@ from energy import (
 from thermal import ThermalManager
 from alerts import AlertManager
 from weather import WeatherManager
-from metrics import (
+from metrics_temp_fix import (
     SatsEarnedTracker,
     MinerHealthMonitor,
     PowerEfficiencyMatrix,
