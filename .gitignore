@@ -9,3 +9,6 @@ venv/
 # Raspberry Pi credentials (DO NOT COMMIT)
 pi-config.sh
 *.backup
+
+# Social media poster (local only - DO NOT COMMIT)
+social-poster/

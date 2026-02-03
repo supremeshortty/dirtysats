@@ -3724,6 +3724,81 @@ def clear_mock_miners():
     return jsonify({'status': 'success', 'message': f'Cleared {len(miner_ips)} miners'})
 
 
+@app.route('/api/diagnostic', methods=['GET'])
+def diagnostic():
+    """Diagnostic endpoint to check system health and data issues"""
+    try:
+        # Check miners in memory
+        miners_count = len(fleet.miners)
+        miners_list = []
+        for ip, miner in fleet.miners.items():
+            last_status = miner.get('last_status', {})
+            miners_list.append({
+                'ip': ip,
+                'model': miner.get('model', 'Unknown'),
+                'hashrate_th': last_status.get('hashrate_th', 0),
+                'temperature': last_status.get('temperature', 0),
+                'power_watts': last_status.get('power_watts', 0),
+                'status': last_status.get('status', 'unknown')
+            })
+
+        # Check database stats
+        stats_count = fleet.db.conn.execute("SELECT COUNT(*) FROM stats").fetchone()[0]
+        recent_stats = fleet.db.conn.execute(
+            "SELECT miner_ip, timestamp, hashrate_ths, temperature, power_watts FROM stats ORDER BY timestamp DESC LIMIT 10"
+        ).fetchall()
+
+        # Check history tables
+        temp_history_count = fleet.db.conn.execute("SELECT COUNT(*) FROM temperature_history").fetchone()[0]
+        hashrate_history_count = fleet.db.conn.execute("SELECT COUNT(*) FROM hashrate_history").fetchone()[0]
+
+        # Recent temperature history
+        recent_temp = fleet.db.conn.execute(
+            "SELECT miner_ip, timestamp, temperature FROM temperature_history ORDER BY timestamp DESC LIMIT 5"
+        ).fetchall()
+
+        # Recent hashrate history
+        recent_hashrate = fleet.db.conn.execute(
+            "SELECT miner_ip, timestamp, hashrate_ths FROM hashrate_history ORDER BY timestamp DESC LIMIT 5"
+        ).fetchall()
+
+        return jsonify({
+            'success': True,
+            'timestamp': datetime.now().isoformat(),
+            'miners': {
+                'count': miners_count,
+                'list': miners_list
+            },
+            'database': {
+                'stats_count': stats_count,
+                'recent_stats': [
+                    {
+                        'ip': s[0],
+                        'timestamp': s[1],
+                        'hashrate_th': s[2],
+                        'temp': s[3],
+                        'power': s[4]
+                    } for s in recent_stats
+                ],
+                'temp_history_count': temp_history_count,
+                'hashrate_history_count': hashrate_history_count,
+                'recent_temp_history': [
+                    {'ip': t[0], 'timestamp': t[1], 'temp': t[2]} for t in recent_temp
+                ],
+                'recent_hashrate_history': [
+                    {'ip': h[0], 'timestamp': h[1], 'hashrate': h[2]} for h in recent_hashrate
+                ]
+            }
+        })
+    except Exception as e:
+        logger.error(f"Diagnostic error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 # =============================================================================
 # METRICS ENDPOINTS - NEW FEATURE SET
 # =============================================================================
