@@ -3732,10 +3732,10 @@ def diagnostic():
         miners_count = len(fleet.miners)
         miners_list = []
         for ip, miner in fleet.miners.items():
-            last_status = miner.get('last_status', {})
+            last_status = miner.last_status or {}
             miners_list.append({
                 'ip': ip,
-                'model': miner.get('model', 'Unknown'),
+                'model': miner.model or 'Unknown',
                 'hashrate_th': last_status.get('hashrate_th', 0),
                 'temperature': last_status.get('temperature', 0),
                 'power_watts': last_status.get('power_watts', 0),
