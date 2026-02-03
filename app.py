@@ -3755,18 +3755,16 @@ def diagnostic():
                 ORDER BY s.timestamp DESC LIMIT 10
             """).fetchall()
 
-            # History tables
-            temp_history_count = cursor.execute("SELECT COUNT(*) FROM temperature_history").fetchone()[0]
-            hashrate_history_count = cursor.execute("SELECT COUNT(*) FROM hashrate_history").fetchone()[0]
-
-            # Recent temperature history
-            recent_temp = cursor.execute(
-                "SELECT miner_ip, timestamp, temperature FROM temperature_history ORDER BY timestamp DESC LIMIT 5"
+            # Profitability log
+            profitability_count = cursor.execute("SELECT COUNT(*) FROM profitability_log").fetchone()[0]
+            recent_profitability = cursor.execute(
+                "SELECT timestamp, sats_earned, btc_price FROM profitability_log ORDER BY timestamp DESC LIMIT 5"
             ).fetchall()
 
-            # Recent hashrate history
-            recent_hashrate = cursor.execute(
-                "SELECT miner_ip, timestamp, hashrate_ths FROM hashrate_history ORDER BY timestamp DESC LIMIT 5"
+            # Energy consumption
+            energy_count = cursor.execute("SELECT COUNT(*) FROM energy_consumption").fetchone()[0]
+            recent_energy = cursor.execute(
+                "SELECT timestamp, total_power_watts, energy_kwh, cost FROM energy_consumption ORDER BY timestamp DESC LIMIT 5"
             ).fetchall()
 
         return jsonify({
@@ -3782,18 +3780,18 @@ def diagnostic():
                     {
                         'ip': s[0],
                         'timestamp': s[1],
-                        'hashrate_th': s[2],
+                        'hashrate': s[2],
                         'temp': s[3],
                         'power': s[4]
                     } for s in recent_stats
                 ],
-                'temp_history_count': temp_history_count,
-                'hashrate_history_count': hashrate_history_count,
-                'recent_temp_history': [
-                    {'ip': t[0], 'timestamp': t[1], 'temp': t[2]} for t in recent_temp
+                'profitability_count': profitability_count,
+                'recent_profitability': [
+                    {'timestamp': p[0], 'sats_earned': p[1], 'btc_price': p[2]} for p in recent_profitability
                 ],
-                'recent_hashrate_history': [
-                    {'ip': h[0], 'timestamp': h[1], 'hashrate': h[2]} for h in recent_hashrate
+                'energy_count': energy_count,
+                'recent_energy': [
+                    {'timestamp': e[0], 'power_watts': e[1], 'kwh': e[2], 'cost': e[3]} for e in recent_energy
                 ]
             }
         })
