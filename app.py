@@ -3733,12 +3733,15 @@ def diagnostic():
         miners_list = []
         for ip, miner in fleet.miners.items():
             last_status = miner.last_status or {}
+            # Convert hashrate from H/s to TH/s if needed
+            hashrate_hs = last_status.get('hashrate', 0)
+            hashrate_th = hashrate_hs / 1e12 if hashrate_hs else 0
             miners_list.append({
                 'ip': ip,
                 'model': miner.model or 'Unknown',
-                'hashrate_th': last_status.get('hashrate_th', 0),
+                'hashrate_th': round(hashrate_th, 3),
                 'temperature': last_status.get('temperature', 0),
-                'power_watts': last_status.get('power_watts', 0),
+                'power_watts': last_status.get('power', 0),
                 'status': last_status.get('status', 'unknown')
             })
 
