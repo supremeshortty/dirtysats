@@ -3758,7 +3758,7 @@ def diagnostic():
             # Profitability log
             profitability_count = cursor.execute("SELECT COUNT(*) FROM profitability_log").fetchone()[0]
             recent_profitability = cursor.execute(
-                "SELECT timestamp, sats_earned, btc_price FROM profitability_log ORDER BY timestamp DESC LIMIT 5"
+                "SELECT timestamp, estimated_btc_per_day, btc_price, profit_per_day FROM profitability_log ORDER BY timestamp DESC LIMIT 5"
             ).fetchall()
 
             # Energy consumption
@@ -3787,7 +3787,7 @@ def diagnostic():
                 ],
                 'profitability_count': profitability_count,
                 'recent_profitability': [
-                    {'timestamp': p[0], 'sats_earned': p[1], 'btc_price': p[2]} for p in recent_profitability
+                    {'timestamp': p[0], 'btc_per_day': p[1], 'btc_price': p[2], 'profit_per_day': p[3]} for p in recent_profitability
                 ],
                 'energy_count': energy_count,
                 'recent_energy': [
