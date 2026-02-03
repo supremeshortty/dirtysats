@@ -3742,25 +3742,29 @@ def diagnostic():
                 'status': last_status.get('status', 'unknown')
             })
 
-        # Check database stats
-        stats_count = fleet.db.conn.execute("SELECT COUNT(*) FROM stats").fetchone()[0]
-        recent_stats = fleet.db.conn.execute(
-            "SELECT miner_ip, timestamp, hashrate_ths, temperature, power_watts FROM stats ORDER BY timestamp DESC LIMIT 10"
-        ).fetchall()
+        # Check database stats using proper connection context
+        with fleet.db._get_connection() as conn:
+            cursor = conn.cursor()
 
-        # Check history tables
-        temp_history_count = fleet.db.conn.execute("SELECT COUNT(*) FROM temperature_history").fetchone()[0]
-        hashrate_history_count = fleet.db.conn.execute("SELECT COUNT(*) FROM hashrate_history").fetchone()[0]
+            # Stats table
+            stats_count = cursor.execute("SELECT COUNT(*) FROM stats").fetchone()[0]
+            recent_stats = cursor.execute(
+                "SELECT miner_ip, timestamp, hashrate_ths, temperature, power_watts FROM stats ORDER BY timestamp DESC LIMIT 10"
+            ).fetchall()
 
-        # Recent temperature history
-        recent_temp = fleet.db.conn.execute(
-            "SELECT miner_ip, timestamp, temperature FROM temperature_history ORDER BY timestamp DESC LIMIT 5"
-        ).fetchall()
+            # History tables
+            temp_history_count = cursor.execute("SELECT COUNT(*) FROM temperature_history").fetchone()[0]
+            hashrate_history_count = cursor.execute("SELECT COUNT(*) FROM hashrate_history").fetchone()[0]
 
-        # Recent hashrate history
-        recent_hashrate = fleet.db.conn.execute(
-            "SELECT miner_ip, timestamp, hashrate_ths FROM hashrate_history ORDER BY timestamp DESC LIMIT 5"
-        ).fetchall()
+            # Recent temperature history
+            recent_temp = cursor.execute(
+                "SELECT miner_ip, timestamp, temperature FROM temperature_history ORDER BY timestamp DESC LIMIT 5"
+            ).fetchall()
+
+            # Recent hashrate history
+            recent_hashrate = cursor.execute(
+                "SELECT miner_ip, timestamp, hashrate_ths FROM hashrate_history ORDER BY timestamp DESC LIMIT 5"
+            ).fetchall()
 
         return jsonify({
             'success': True,
@@ -3792,6 +3796,7 @@ def diagnostic():
         })
     except Exception as e:
         logger.error(f"Diagnostic error: {e}")
+        import traceback
         return jsonify({
             'success': False,
             'error': str(e),
