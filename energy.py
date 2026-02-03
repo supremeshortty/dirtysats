@@ -649,13 +649,13 @@ class ProfitabilityCalculator:
     For accurate earnings tracking, compare with your pool's reported earnings.
     """
 
-    def __init__(self, btc_fetcher: BitcoinDataFetcher):
+    def __init__(self, btc_fetcher: BitcoinDataFetcher, pool_manager=None):
         self.btc_fetcher = btc_fetcher
+        self.pool_manager = pool_manager
         # Default pool fee (2% is typical for most pools)
         self.default_pool_fee_percent = 2.0
-        # Transaction fee multiplier - FPPS pools include tx fees which can add 20-40%
-        # Braiins and other FPPS+ pools typically show ~30% extra from tx fees
-        self.tx_fee_multiplier = 1.30
+        # NOTE: tx_fee_multiplier removed - use pool-specific calculations instead
+        # FPPS+ pools like Braiins include tx fees in their fee structure
         # Cache for block subsidy (updated when block height is fetched)
         self._cached_block_subsidy = None
 
@@ -676,17 +676,17 @@ class ProfitabilityCalculator:
         return self._cached_block_subsidy or 3.125
 
     def calculate_btc_per_day(self, hashrate_th: float, difficulty: float = None,
-                             include_tx_fees: bool = True) -> float:
+                             pool_fee_percent: float = None) -> float:
         """
-        Calculate estimated BTC mined per day
+        Calculate estimated BTC mined per day (after pool fees)
 
         Args:
             hashrate_th: Hashrate in TH/s
             difficulty: Network difficulty (fetched if not provided)
-            include_tx_fees: If True, adds estimated transaction fee revenue (FPPS-style)
+            pool_fee_percent: Pool fee percentage (auto-detected from pool_manager if available)
 
         Returns:
-            Estimated BTC per day
+            Estimated BTC per day after pool fees
         """
         if difficulty is None:
             difficulty = self.btc_fetcher.get_network_difficulty()
@@ -709,11 +709,24 @@ class ProfitabilityCalculator:
         hashrate_hs = hashrate_th * 1e12  # Convert TH/s to H/s
         btc_per_day = (hashrate_hs * 86400 * block_subsidy) / (difficulty * 2**32)
 
-        # FPPS pools also pay out transaction fees proportionally
-        # Transaction fees typically add 20-40% on top of block subsidy
-        # depending on network congestion and fee market conditions
-        if include_tx_fees:
-            btc_per_day *= self.tx_fee_multiplier
+        # Apply pool fee if specified or auto-detected
+        if pool_fee_percent is None and self.pool_manager:
+            # Get pool fee from pool manager
+            pool_configs = self.pool_manager.get_all_pool_configs()
+            if pool_configs:
+                pool_fee_percent = pool_configs[0].get('fee_percent') or self.default_pool_fee_percent
+            else:
+                pool_fee_percent = self.default_pool_fee_percent
+        elif pool_fee_percent is None:
+            pool_fee_percent = self.default_pool_fee_percent
+
+        # Ensure we have a valid fee (defensive programming)
+        if pool_fee_percent is None or pool_fee_percent < 0:
+            pool_fee_percent = self.default_pool_fee_percent
+
+        # Subtract pool fee (FPPS+ pools like Braiins include tx fees in their payout structure)
+        # So we just subtract the fee percentage from gross revenue
+        btc_per_day *= (1 - pool_fee_percent / 100)
 
         return btc_per_day
 
@@ -940,11 +953,10 @@ class ProfitabilityCalculator:
     def calculate_profitability(self, total_hashrate: float, total_power_watts: float,
                                energy_rate_per_kwh: float, btc_price: float = None,
                                difficulty: float = None, pool_fee_percent: float = None,
-                               include_tx_fees: bool = True,
                                rate_manager: 'EnergyRateManager' = None,
                                mining_scheduler: 'MiningScheduler' = None) -> Dict:
         """
-        Calculate comprehensive profitability metrics
+        Calculate comprehensive profitability metrics with accurate pool calculations
 
         Args:
             total_hashrate: Total fleet hashrate in H/s
@@ -952,8 +964,7 @@ class ProfitabilityCalculator:
             energy_rate_per_kwh: Current energy rate in $/kWh
             btc_price: BTC price in USD (fetched if not provided)
             difficulty: Network difficulty (fetched if not provided)
-            pool_fee_percent: Pool fee percentage (0-100). If None, uses default (2%)
-            include_tx_fees: Include estimated transaction fee revenue (FPPS-style)
+            pool_fee_percent: Pool fee percentage (0-100). Auto-detected from pool_manager if not provided
 
         Returns:
             Dictionary with profitability metrics
@@ -973,14 +984,30 @@ class ProfitabilityCalculator:
         # Convert hashrate to TH/s
         hashrate_th = total_hashrate / 1e12
 
-        # Calculate BTC mined per day (gross, before pool fees)
-        btc_per_day_gross = self.calculate_btc_per_day(hashrate_th, difficulty, include_tx_fees)
+        # Calculate BTC mined per day using accurate pool-specific method
+        # This already accounts for pool fees (FPPS+ includes tx fees in payout structure)
+        btc_per_day = self.calculate_btc_per_day(hashrate_th, difficulty, pool_fee_percent)
 
-        # Apply pool fee
-        if pool_fee_percent is None:
+        # For display purposes, calculate gross (what would be earned solo)
+        block_subsidy = self.get_block_subsidy()
+        hashrate_hs = hashrate_th * 1e12
+        btc_per_day_gross = (hashrate_hs * 86400 * block_subsidy) / (difficulty * 2**32)
+
+        # Auto-detect pool fee and type if not provided
+        pool_type = None
+        if pool_fee_percent is None and self.pool_manager:
+            pool_configs = self.pool_manager.get_all_pool_configs()
+            if pool_configs:
+                pool_fee_percent = pool_configs[0].get('fee_percent') or self.default_pool_fee_percent
+                pool_type = pool_configs[0].get('pool_type') or 'PPS'
+        elif pool_fee_percent is None:
             pool_fee_percent = self.default_pool_fee_percent
+
+        # Ensure we have a valid fee (defensive programming)
+        if pool_fee_percent is None or pool_fee_percent < 0:
+            pool_fee_percent = self.default_pool_fee_percent
+
         pool_fee_decimal = pool_fee_percent / 100
-        btc_per_day = btc_per_day_gross * (1 - pool_fee_decimal)
         pool_fee_btc = btc_per_day_gross * pool_fee_decimal
 
         # Calculate revenue
@@ -1046,9 +1073,9 @@ class ProfitabilityCalculator:
             'blocks_until_halving': halving_info.get('blocks_until_halving'),
             'days_until_halving': halving_info.get('estimated_days_until_halving'),
             # Metadata
-            'includes_tx_fees': include_tx_fees,
+            'pool_type': pool_type if pool_type else 'PPS',
             'is_estimate': True,
-            'estimate_note': 'Estimated based on current difficulty. Actual pool earnings may vary.'
+            'estimate_note': f'Pool earnings based on {pool_type or "PPS"} calculation. Pool fee: {pool_fee_percent}%.'
         }
 
         # Add detailed energy cost breakdown if available
@@ -1249,15 +1276,17 @@ class EnergyRateManager:
             for hour in range(24)
         ]
 
-    def calculate_cost_with_tou(self, hourly_breakdown: List[Dict]) -> Dict:
+    def calculate_cost_with_tou(self, hourly_breakdown: List[Dict], use_historical: bool = True) -> Dict:
         """
         Calculate energy cost using actual TOU rates for each hour.
+        Uses historical rates from energy_rates_history if available.
 
         Args:
             hourly_breakdown: List of {'hour': '2024-01-19 14:00', 'kwh': 0.5, 'readings': 10}
+            use_historical: If True, attempts to use historical rates for accuracy
 
         Returns:
-            Dict with total_cost, breakdown by rate type, and details
+            Dict with total_cost, breakdown by rate type, weighted_avg_rate, and details
         """
         total_cost = 0
         cost_by_rate_type = {'peak': 0, 'off-peak': 0, 'standard': 0}
@@ -1275,24 +1304,37 @@ class EnergyRateManager:
             except ValueError:
                 continue
 
-            # Find the rate for this hour
-            time_str = hour_dt.strftime("%H:%M")
-            day_name = hour_dt.strftime("%A")
+            # Try to get historical rate first if enabled
             rate = None
             rate_type = 'standard'
+            rate_source = 'current'
 
-            for r in rates:
-                if r['day_of_week'] and r['day_of_week'] != day_name:
-                    continue
-                if self._time_in_range(time_str, r['start_time'], r['end_time']):
-                    rate = r['rate_per_kwh']
-                    rate_type = r.get('rate_type', 'standard')
-                    break
+            if use_historical:
+                historical_rate_data = self.db.get_historical_rate(hour_dt)
+                if historical_rate_data:
+                    rate = historical_rate_data.get('rate_per_kwh')
+                    rate_type = historical_rate_data.get('rate_type', 'standard')
+                    rate_source = 'historical'
 
+            # Fallback to current rates if no historical rate found
+            if rate is None:
+                time_str = hour_dt.strftime("%H:%M")
+                day_name = hour_dt.strftime("%A")
+
+                for r in rates:
+                    if r['day_of_week'] and r['day_of_week'] != day_name:
+                        continue
+                    if self._time_in_range(time_str, r['start_time'], r['end_time']):
+                        rate = r['rate_per_kwh']
+                        rate_type = r.get('rate_type', 'standard')
+                        break
+
+            # Final fallback to default rate
             if rate is None:
                 config_data = self.db.get_energy_config()
                 rate = config_data.get('default_rate', 0.12) if config_data else 0.12
                 rate_type = 'standard'
+                rate_source = 'default'
 
             # Calculate cost for this hour
             cost = kwh * rate
@@ -1308,13 +1350,19 @@ class EnergyRateManager:
                 'kwh': kwh,
                 'rate': rate,
                 'rate_type': rate_type,
+                'rate_source': rate_source,
                 'cost': cost
             })
+
+        # Calculate weighted average rate
+        total_kwh = sum(kwh_by_rate_type.values())
+        weighted_avg_rate = total_cost / total_kwh if total_kwh > 0 else 0
 
         return {
             'total_cost': total_cost,
             'cost_by_rate_type': cost_by_rate_type,
             'kwh_by_rate_type': kwh_by_rate_type,
+            'weighted_avg_rate': weighted_avg_rate,
             'detailed_breakdown': detailed_breakdown
         }
 

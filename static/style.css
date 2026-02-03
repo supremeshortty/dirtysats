@@ -1004,6 +1004,40 @@ main {
     border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
+/* Accuracy badge for metrics */
+.accuracy-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    margin-left: 8px;
+    background: rgba(0, 230, 118, 0.12);
+    color: var(--success);
+    border: 1px solid rgba(0, 230, 118, 0.25);
+    opacity: 0.9;
+}
+
+.accuracy-badge.high-accuracy {
+    background: rgba(0, 230, 118, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.accuracy-badge.medium-accuracy {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.accuracy-badge.low-accuracy {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--purple);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
 /* Solo mining odds display */
 .solo-odds-details {
     display: flex;

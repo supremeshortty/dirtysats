@@ -250,6 +250,76 @@ class Database:
                 ON miner_group_members(group_id)
             """)
 
+            # Pool configuration table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pool_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    miner_ip TEXT NOT NULL,
+                    pool_index INTEGER DEFAULT 0,
+                    pool_name TEXT NOT NULL,
+                    pool_url TEXT NOT NULL,
+                    pool_port INTEGER DEFAULT 3333,
+                    stratum_user TEXT,
+                    stratum_password TEXT DEFAULT 'x',
+                    fee_percent REAL DEFAULT 2.0,
+                    pool_type TEXT DEFAULT 'FPPS',
+                    pool_difficulty REAL,
+                    active BOOLEAN DEFAULT 1,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (miner_ip) REFERENCES miners(ip),
+                    UNIQUE(miner_ip, pool_index)
+                )
+            """)
+
+            # Pool earnings history
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pool_earnings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    miner_ip TEXT NOT NULL,
+                    pool_name TEXT NOT NULL,
+                    earned_sats INTEGER DEFAULT 0,
+                    shares_accepted INTEGER DEFAULT 0,
+                    shares_rejected INTEGER DEFAULT 0,
+                    pool_difficulty REAL,
+                    estimated_sats INTEGER DEFAULT 0,
+                    variance_percent REAL,
+                    data_source TEXT DEFAULT 'calculated',
+                    FOREIGN KEY (miner_ip) REFERENCES miners(ip)
+                )
+            """)
+
+            # Historical energy rates (for accurate historical cost calculation)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS energy_rates_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rate_id INTEGER NOT NULL,
+                    effective_date DATE NOT NULL,
+                    end_date DATE,
+                    rate_per_kwh REAL NOT NULL,
+                    rate_type TEXT NOT NULL,
+                    FOREIGN KEY (rate_id) REFERENCES energy_rates(id)
+                )
+            """)
+
+            # Create indexes for pool tables
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_pool_config_miner_ip
+                ON pool_config(miner_ip)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_pool_earnings_timestamp
+                ON pool_earnings(timestamp)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_pool_earnings_miner_ip
+                ON pool_earnings(miner_ip)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_energy_rates_history_effective_date
+                ON energy_rates_history(effective_date)
+            """)
+
             # Migrations: Add custom_name column if it doesn't exist
             cursor.execute("PRAGMA table_info(miners)")
             columns = [col[1] for col in cursor.fetchall()]
@@ -939,3 +1009,202 @@ class Database:
                     INSERT INTO miner_group_members (miner_ip, group_id)
                     VALUES (?, ?)
                 """, (miner_ip, group_id))
+
+    # Pool Configuration Methods
+    def add_pool_config(self, miner_ip: str, pool_index: int, pool_name: str,
+                       pool_url: str, pool_port: int = 3333, stratum_user: str = None,
+                       stratum_password: str = 'x', fee_percent: float = 2.0,
+                       pool_type: str = 'FPPS', pool_difficulty: float = None):
+        """Add or update pool configuration for a miner"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO pool_config (
+                    miner_ip, pool_index, pool_name, pool_url, pool_port,
+                    stratum_user, stratum_password, fee_percent, pool_type,
+                    pool_difficulty, active, last_updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                ON CONFLICT (miner_ip, pool_index) DO UPDATE SET
+                    pool_name = excluded.pool_name,
+                    pool_url = excluded.pool_url,
+                    pool_port = excluded.pool_port,
+                    stratum_user = excluded.stratum_user,
+                    stratum_password = excluded.stratum_password,
+                    fee_percent = excluded.fee_percent,
+                    pool_type = excluded.pool_type,
+                    pool_difficulty = excluded.pool_difficulty,
+                    last_updated = excluded.last_updated
+            """, (miner_ip, pool_index, pool_name, pool_url, pool_port,
+                  stratum_user, stratum_password, fee_percent, pool_type,
+                  pool_difficulty, datetime.now()))
+
+    def get_pool_config(self, miner_ip: str = None, pool_name: str = None) -> List[Dict]:
+        """Get pool configuration(s)"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if miner_ip and pool_name:
+                cursor.execute("""
+                    SELECT * FROM pool_config
+                    WHERE miner_ip = ? AND pool_name = ? AND active = 1
+                    ORDER BY pool_index
+                """, (miner_ip, pool_name))
+            elif miner_ip:
+                cursor.execute("""
+                    SELECT * FROM pool_config
+                    WHERE miner_ip = ? AND active = 1
+                    ORDER BY pool_index
+                """, (miner_ip,))
+            elif pool_name:
+                cursor.execute("""
+                    SELECT * FROM pool_config
+                    WHERE pool_name = ? AND active = 1
+                    ORDER BY miner_ip, pool_index
+                """, (pool_name,))
+            else:
+                cursor.execute("""
+                    SELECT * FROM pool_config
+                    WHERE active = 1
+                    ORDER BY miner_ip, pool_index
+                """)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def update_pool_difficulty(self, miner_ip: str, pool_index: int, pool_difficulty: float):
+        """Update pool difficulty for a specific miner's pool"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE pool_config
+                SET pool_difficulty = ?, last_updated = ?
+                WHERE miner_ip = ? AND pool_index = ?
+            """, (pool_difficulty, datetime.now(), miner_ip, pool_index))
+
+    def add_pool_earnings(self, miner_ip: str, pool_name: str, earned_sats: int = 0,
+                         shares_accepted: int = 0, shares_rejected: int = 0,
+                         pool_difficulty: float = None, estimated_sats: int = 0,
+                         data_source: str = 'calculated'):
+        """Log pool earnings data"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            variance_percent = None
+            if earned_sats > 0 and estimated_sats > 0:
+                variance_percent = ((earned_sats - estimated_sats) / estimated_sats) * 100
+
+            cursor.execute("""
+                INSERT INTO pool_earnings (
+                    timestamp, miner_ip, pool_name, earned_sats,
+                    shares_accepted, shares_rejected, pool_difficulty,
+                    estimated_sats, variance_percent, data_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (datetime.now(), miner_ip, pool_name, earned_sats,
+                  shares_accepted, shares_rejected, pool_difficulty,
+                  estimated_sats, variance_percent, data_source))
+
+    def get_pool_earnings_history(self, miner_ip: str = None, pool_name: str = None,
+                                  hours: int = 24) -> List[Dict]:
+        """Get pool earnings history"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            since = datetime.now() - timedelta(hours=hours)
+
+            if miner_ip and pool_name:
+                cursor.execute("""
+                    SELECT * FROM pool_earnings
+                    WHERE miner_ip = ? AND pool_name = ? AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                """, (miner_ip, pool_name, since))
+            elif miner_ip:
+                cursor.execute("""
+                    SELECT * FROM pool_earnings
+                    WHERE miner_ip = ? AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                """, (miner_ip, since))
+            elif pool_name:
+                cursor.execute("""
+                    SELECT * FROM pool_earnings
+                    WHERE pool_name = ? AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                """, (pool_name, since))
+            else:
+                cursor.execute("""
+                    SELECT * FROM pool_earnings
+                    WHERE timestamp >= ?
+                    ORDER BY timestamp DESC
+                """, (since,))
+
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    # Energy Rate History Methods
+    def add_energy_rate_history(self, rate_id: int, effective_date: str,
+                                rate_per_kwh: float, rate_type: str, end_date: str = None):
+        """Add historical energy rate entry"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO energy_rates_history (
+                    rate_id, effective_date, end_date, rate_per_kwh, rate_type
+                ) VALUES (?, ?, ?, ?, ?)
+            """, (rate_id, effective_date, end_date, rate_per_kwh, rate_type))
+
+    def get_historical_rate(self, timestamp: datetime) -> Optional[Dict]:
+        """Get the energy rate that was active at a specific time"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            date_str = timestamp.strftime('%Y-%m-%d')
+            time_str = timestamp.strftime('%H:%M:%S')
+            day_of_week = timestamp.strftime('%A')
+
+            # First try to get from history table
+            cursor.execute("""
+                SELECT erh.*, er.day_of_week, er.start_time, er.end_time
+                FROM energy_rates_history erh
+                JOIN energy_rates er ON erh.rate_id = er.id
+                WHERE erh.effective_date <= ?
+                AND (erh.end_date IS NULL OR erh.end_date >= ?)
+                AND (er.day_of_week IS NULL OR er.day_of_week = ?)
+                AND er.start_time <= ? AND er.end_time > ?
+                ORDER BY erh.effective_date DESC
+                LIMIT 1
+            """, (date_str, date_str, day_of_week, time_str, time_str))
+
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+
+            # Fallback to current energy_rates table
+            cursor.execute("""
+                SELECT * FROM energy_rates
+                WHERE (day_of_week IS NULL OR day_of_week = ?)
+                AND start_time <= ? AND end_time > ?
+                ORDER BY id DESC
+                LIMIT 1
+            """, (day_of_week, time_str, time_str))
+
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_energy_rate_history(self, rate_id: int = None,
+                               start_date: str = None, end_date: str = None) -> List[Dict]:
+        """Get energy rate history entries"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM energy_rates_history WHERE 1=1"
+            params = []
+
+            if rate_id:
+                query += " AND rate_id = ?"
+                params.append(rate_id)
+            if start_date:
+                query += " AND effective_date >= ?"
+                params.append(start_date)
+            if end_date:
+                query += " AND (end_date IS NULL OR end_date <= ?)"
+                params.append(end_date)
+
+            query += " ORDER BY effective_date DESC"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
