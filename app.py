@@ -3746,11 +3746,14 @@ def diagnostic():
         with fleet.db._get_connection() as conn:
             cursor = conn.cursor()
 
-            # Stats table
+            # Stats table (join with miners to get IP)
             stats_count = cursor.execute("SELECT COUNT(*) FROM stats").fetchone()[0]
-            recent_stats = cursor.execute(
-                "SELECT miner_ip, timestamp, hashrate_ths, temperature, power_watts FROM stats ORDER BY timestamp DESC LIMIT 10"
-            ).fetchall()
+            recent_stats = cursor.execute("""
+                SELECT m.ip, s.timestamp, s.hashrate, s.temperature, s.power
+                FROM stats s
+                JOIN miners m ON s.miner_id = m.id
+                ORDER BY s.timestamp DESC LIMIT 10
+            """).fetchall()
 
             # History tables
             temp_history_count = cursor.execute("SELECT COUNT(*) FROM temperature_history").fetchone()[0]
