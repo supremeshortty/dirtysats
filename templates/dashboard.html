@@ -261,6 +261,7 @@
                                 <option value="12">Last 12 Hours</option>
                                 <option value="24">Last 24 Hours</option>
                                 <option value="168">Last Week</option>
+                                <option value="720">Last 30 Days</option>
                             </select>
                             <button id="fleet-chart-refresh" class="btn btn-secondary btn-sm">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
@@ -279,162 +280,98 @@
 
                 <!-- Metrics Dashboard Cards -->
                 <section class="metrics-section">
-                    <div class="metrics-grid">
-                        <!-- Sats Earned Tracker Card -->
-                        <div class="metric-card sats-earned-card">
+                    <div class="metrics-grid metrics-grid-compact">
+                        <!-- Card 1: Fleet Status -->
+                        <div class="metric-card fleet-status-card">
                             <div class="metric-header">
-                                <h3>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
-                                        <circle cx="12" cy="12" r="10"/>
-                                        <path d="M14.31 8l5.74 9.94M9.69 8h11.48M7.38 12l5.74-9.94M9.69 16L3.95 6.06M14.31 16H2.83M16.62 12l-5.74 9.94"/>
-                                    </svg>
-                                    Sats Earned
-                                    <span class="accuracy-badge" id="sats-accuracy" title="Calculation accuracy based on pool difficulty">~95% estimated</span>
-                                </h3>
-                                <div class="metric-status" id="sats-trending">
-                                    <span class="trend-indicator">📈</span>
+                                <div class="metric-icon-wrap">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                                 </div>
+                                <h3>Fleet Status</h3>
+                                <div class="fleet-status-indicator" id="fleet-status-indicator"></div>
                             </div>
                             <div class="metric-content">
-                                <div class="primary-metric">
-                                    <span class="metric-value" id="sats-today">--</span>
-                                    <span class="metric-label">sats today</span>
-                                </div>
-                                <div class="metric-grid">
-                                    <div class="secondary-metric">
-                                        <span class="metric-value" id="sats-rate">--</span>
-                                        <span class="metric-label">sats/hr</span>
+                                <div class="fleet-status-row">
+                                    <div class="fleet-status-item">
+                                        <div class="fleet-status-label">Miners Online</div>
+                                        <div class="fleet-status-value">
+                                            <span id="card-miners-online" class="status-number success">0</span>
+                                            <span class="status-separator">/</span>
+                                            <span id="card-miners-total" class="status-number">0</span>
+                                        </div>
                                     </div>
-                                    <div class="secondary-metric">
-                                        <span class="metric-value" id="sats-week">--</span>
-                                        <span class="metric-label">this week</span>
+                                    <div class="fleet-status-item">
+                                        <div class="fleet-status-label">Total Hashrate</div>
+                                        <div class="fleet-status-value">
+                                            <span id="card-total-hashrate" class="hashrate-value">0 TH/s</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="metric-chart">
-                                    <canvas id="sats-earned-chart" width="300" height="80"></canvas>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Fleet Health Dashboard -->
-                        <div class="metric-card fleet-health-card">
+                        <!-- Card 2: Today's Earnings -->
+                        <div class="metric-card todays-earnings-card">
                             <div class="metric-header">
-                                <h3>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
-                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                                    </svg>
-                                    Fleet Health
-                                </h3>
-                                <div class="metric-status" id="fleet-health-status">
-                                    <span class="health-indicator">🟢</span>
+                                <div class="metric-icon-wrap icon-amber">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>
                                 </div>
+                                <h3>Today's Earnings</h3>
                             </div>
                             <div class="metric-content">
-                                <div class="health-summary">
-                                    <div class="health-stat">
-                                        <span class="health-count" id="healthy-count">--</span>
-                                        <span class="health-label healthy">Healthy</span>
-                                    </div>
-                                    <div class="health-stat">
-                                        <span class="health-count" id="warning-count">--</span>
-                                        <span class="health-label warning">Warning</span>
-                                    </div>
-                                    <div class="health-stat">
-                                        <span class="health-count" id="critical-count">--</span>
-                                        <span class="health-label critical">Critical</span>
+                                <div class="earnings-primary">
+                                    <div class="earnings-sats">
+                                        <span class="earnings-value sats-gradient" id="card-sats-today">0</span>
+                                        <span class="earnings-unit">sats</span>
                                     </div>
                                 </div>
-                                <div class="health-details" id="health-issues">
-                                    <p class="loading">Loading health status...</p>
+                                <div class="earnings-financial">
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Revenue/day</span>
+                                        <span class="earnings-amount revenue-color" id="card-daily-revenue">$0.00</span>
+                                    </div>
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Energy cost/day</span>
+                                        <span class="earnings-amount cost-color" id="card-daily-cost">$0.00</span>
+                                    </div>
+                                    <div class="earnings-divider"></div>
+                                    <div class="earnings-row earnings-row-profit">
+                                        <span class="earnings-label">Net profit/day</span>
+                                        <span class="earnings-amount" id="card-daily-profit">$0.00</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Power Efficiency Matrix -->
-                        <div class="metric-card efficiency-card">
+                        <!-- Card 3: Fleet Efficiency -->
+                        <div class="metric-card fleet-efficiency-card">
                             <div class="metric-header">
-                                <h3>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
-                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                                    </svg>
-                                    Power Efficiency
-                                </h3>
-                                <div class="metric-status" id="efficiency-status">
-                                    <span class="efficiency-avg" id="fleet-efficiency">-- W/TH</span>
+                                <div class="metric-icon-wrap icon-bolt">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                                 </div>
+                                <h3>Fleet Efficiency</h3>
                             </div>
                             <div class="metric-content">
-                                <div class="efficiency-summary">
-                                    <div class="efficiency-stat">
-                                        <span class="efficiency-label">Best</span>
-                                        <span class="efficiency-value" id="best-efficiency">-- W/TH</span>
+                                <div class="efficiency-primary">
+                                    <div class="efficiency-metric">
+                                        <span class="efficiency-value" id="card-fleet-efficiency">--</span>
+                                        <span class="efficiency-unit">J/TH</span>
                                     </div>
-                                    <div class="efficiency-stat">
-                                        <span class="efficiency-label">Worst</span>
-                                        <span class="efficiency-value" id="worst-efficiency">-- W/TH</span>
-                                    </div>
-                                </div>
-                                <div class="efficiency-chart">
-                                    <canvas id="efficiency-matrix-chart" width="300" height="120"></canvas>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pool Performance Comparison -->
-                        <div class="metric-card pool-performance-card">
-                            <div class="metric-header">
-                                <h3>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
-                                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                                    </svg>
-                                    Pool Performance
-                                </h3>
-                                <div class="metric-status" id="pool-recommendation">
-                                    <span class="pool-status">Analyzing...</span>
-                                </div>
-                            </div>
-                            <div class="metric-content">
-                                <div class="pool-comparison" id="pool-comparison-content">
-                                    <p class="loading">Loading pool data...</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Predictive Revenue Model -->
-                        <div class="metric-card revenue-card">
-                            <div class="metric-header">
-                                <h3>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="metric-icon">
-                                        <line x1="12" y1="1" x2="12" y2="23"/>
-                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                    </svg>
-                                    Revenue Projector
-                                </h3>
-                                <div class="metric-status" id="revenue-trend">
-                                    <span class="revenue-indicator">📊</span>
-                                </div>
-                            </div>
-                            <div class="metric-content">
-                                <div class="revenue-projections">
-                                    <div class="revenue-projection">
-                                        <span class="projection-period">Daily</span>
-                                        <span class="projection-value" id="daily-projection">$--</span>
-                                    </div>
-                                    <div class="revenue-projection">
-                                        <span class="projection-period">Monthly</span>
-                                        <span class="projection-value" id="monthly-projection">$--</span>
-                                    </div>
-                                    <div class="revenue-projection">
-                                        <span class="projection-period">Annual</span>
-                                        <span class="projection-value" id="annual-projection">$--</span>
+                                    <div class="efficiency-temp">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="temp-icon"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                                        <span id="card-avg-temp">0°C</span>
                                     </div>
                                 </div>
-                                <div class="revenue-targets" id="revenue-targets">
-                                    <div class="target-item">
-                                        <span class="target-label">Break-even:</span>
-                                        <span class="target-value" id="breakeven-days">-- days</span>
+                                <div class="efficiency-miners">
+                                    <div class="efficiency-miner-row">
+                                        <span class="efficiency-miner-label">Best:</span>
+                                        <span class="efficiency-miner-name" id="card-best-miner">--</span>
+                                        <span class="efficiency-miner-value success" id="card-best-efficiency">--</span>
+                                    </div>
+                                    <div class="efficiency-miner-row">
+                                        <span class="efficiency-miner-label">Worst:</span>
+                                        <span class="efficiency-miner-name" id="card-worst-miner">--</span>
+                                        <span class="efficiency-miner-value warning" id="card-worst-efficiency">--</span>
                                     </div>
                                 </div>
                             </div>
@@ -692,6 +629,99 @@
                                     Apply Manual Rates
                                 </button>
                             </form>
+
+                            <!-- Seasonal Rate Configuration -->
+                            <div class="seasonal-config" id="seasonal-config">
+                                <div class="seasonal-config-header" onclick="toggleSeasonalConfig()">
+                                    <h4>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon" style="width:18px;height:18px;">
+                                            <circle cx="12" cy="12" r="5"/>
+                                            <line x1="12" y1="1" x2="12" y2="3"/>
+                                            <line x1="12" y1="21" x2="12" y2="23"/>
+                                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                                            <line x1="1" y1="12" x2="3" y2="12"/>
+                                            <line x1="21" y1="12" x2="23" y2="12"/>
+                                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                                        </svg>
+                                        Seasonal Rate Configuration
+                                    </h4>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="collapse-icon">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                    </svg>
+                                </div>
+                                <div class="seasonal-config-body">
+                                    <div class="seasonal-toggle">
+                                        <button type="button" class="toggle-btn active" data-seasonal="off" onclick="setSeasonalMode('off')">Same rates year-round</button>
+                                        <button type="button" class="toggle-btn" data-seasonal="on" onclick="setSeasonalMode('on')">Different summer/winter rates</button>
+                                    </div>
+
+                                    <div class="season-blocks" id="season-blocks">
+                                        <!-- Summer Block -->
+                                        <div class="season-block summer">
+                                            <h5><span class="season-icon">&#9728;</span> Summer Rates</h5>
+                                            <div class="season-date-row">
+                                                <div class="form-group">
+                                                    <label for="summer-start-date">Summer Starts (MM/DD):</label>
+                                                    <input type="date" id="summer-start-date" value="2025-06-01">
+                                                </div>
+                                            </div>
+                                            <div class="form-grid">
+                                                <div class="form-group">
+                                                    <label for="summer-peak-rate">Peak Rate ($/kWh):</label>
+                                                    <input type="number" id="summer-peak-rate" step="0.001" min="0" placeholder="e.g., 0.22">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="summer-offpeak-rate">Off-Peak Rate ($/kWh):</label>
+                                                    <input type="number" id="summer-offpeak-rate" step="0.001" min="0" placeholder="e.g., 0.10">
+                                                </div>
+                                            </div>
+                                            <div class="form-grid">
+                                                <div class="form-group">
+                                                    <label for="summer-peak-start">Peak Hours Start:</label>
+                                                    <input type="time" id="summer-peak-start" value="14:00">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="summer-peak-end">Peak Hours End:</label>
+                                                    <input type="time" id="summer-peak-end" value="19:00">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Winter Block -->
+                                        <div class="season-block winter">
+                                            <h5><span class="season-icon">&#10052;</span> Winter Rates</h5>
+                                            <div class="season-date-row">
+                                                <div class="form-group">
+                                                    <label for="winter-start-date">Winter Starts (MM/DD):</label>
+                                                    <input type="date" id="winter-start-date" value="2025-10-01">
+                                                </div>
+                                            </div>
+                                            <div class="form-grid">
+                                                <div class="form-group">
+                                                    <label for="winter-peak-rate">Peak Rate ($/kWh):</label>
+                                                    <input type="number" id="winter-peak-rate" step="0.001" min="0" placeholder="e.g., 0.15">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="winter-offpeak-rate">Off-Peak Rate ($/kWh):</label>
+                                                    <input type="number" id="winter-offpeak-rate" step="0.001" min="0" placeholder="e.g., 0.06">
+                                                </div>
+                                            </div>
+                                            <div class="form-grid">
+                                                <div class="form-group">
+                                                    <label for="winter-peak-start">Peak Hours Start:</label>
+                                                    <input type="time" id="winter-peak-start" value="06:00">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="winter-peak-end">Peak Hours End:</label>
+                                                    <input type="time" id="winter-peak-end" value="10:00">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -966,6 +996,71 @@
                     </div>
                 </section>
 
+                <!-- Advanced Auto-Controls -->
+                <section class="auto-controls-section">
+                    <h3>Advanced Mining Controls</h3>
+                    <div class="auto-controls-grid">
+                        <div class="auto-control-card">
+                            <div class="auto-control-header">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                                <span>Profitability Guard</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="profitability-auto-pause">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <p class="auto-control-desc">Auto-pause mining when energy cost exceeds mining revenue at current BTC price.</p>
+                        </div>
+                        <div class="auto-control-card">
+                            <div class="auto-control-header">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                </svg>
+                                <span>BTC Price Floor</span>
+                            </div>
+                            <p class="auto-control-desc">Pause mining if BTC drops below this price. Set to 0 to disable.</p>
+                            <div class="auto-control-input-group">
+                                <span class="input-prefix">$</span>
+                                <input type="number" id="btc-price-floor" min="0" step="1000" value="0" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="auto-control-card">
+                            <div class="auto-control-header">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                                <span>Difficulty Alert</span>
+                            </div>
+                            <p class="auto-control-desc">Alert when network difficulty changes by more than this percentage.</p>
+                            <div class="auto-control-input-group">
+                                <input type="number" id="difficulty-alert-threshold" min="1" max="50" step="1" value="5" placeholder="5">
+                                <span class="input-suffix">%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveMiningAutoControls()">
+                        Save Auto-Controls
+                    </button>
+                </section>
+
+                <!-- 24-Hour Visual Timeline -->
+                <section class="mining-timeline-section">
+                    <h3>24-Hour Mining Timeline</h3>
+                    <p class="section-hint">Visual overview of your mining schedule. Green = full power, yellow = reduced, red = off.</p>
+                    <div class="mining-timeline" id="mining-timeline">
+                        <div class="timeline-loading">Loading timeline...</div>
+                    </div>
+                    <div class="timeline-legend">
+                        <span class="legend-item"><span class="legend-dot legend-full"></span> Full Power</span>
+                        <span class="legend-item"><span class="legend-dot legend-reduced"></span> Reduced</span>
+                        <span class="legend-item"><span class="legend-dot legend-off"></span> Off</span>
+                        <span class="legend-item"><span class="legend-dot legend-current"></span> Current Hour</span>
+                    </div>
+                </section>
+
                 <!-- Strategy Optimizer - Collapsible -->
                 <section class="collapsible-section collapsed" id="ai-simulation-section">
                     <div class="collapsible-header">
@@ -1002,6 +1097,47 @@
 
             <!-- Charts Tab -->
             <div id="charts-tab" class="tab-content">
+                <!-- Performance Metrics (moved above Historical Data) -->
+                <section class="chart-section performance-metrics-section">
+                    <h3>Fleet Performance Overview</h3>
+                    <div class="stats-grid stats-grid-performance">
+                        <div class="stat-card stat-card-highlight">
+                            <div class="stat-label">Fleet Efficiency <span class="help-icon" onclick="showEfficiencyTooltip(event)" title="Power consumption per terahash. Lower is better.">?</span></div>
+                            <div class="stat-value" id="charts-fleet-efficiency">-- J/TH</div>
+                            <div class="stat-benchmark" id="charts-efficiency-benchmark"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Hashrate</div>
+                            <div class="stat-value" id="fleet-total-hashrate">-- TH/s</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Power</div>
+                            <div class="stat-value" id="fleet-total-power">-- W</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Daily Energy Cost</div>
+                            <div class="stat-value" id="fleet-daily-energy">-- kWh</div>
+                            <div class="stat-sub" id="fleet-daily-cost"></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Accepted Shares</div>
+                            <div class="stat-value success" id="charts-accepted-shares">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Rejected Shares</div>
+                            <div class="stat-value danger" id="charts-rejected-shares">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Accept Rate</div>
+                            <div class="stat-value success" id="charts-accept-rate">0%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Avg Temperature</div>
+                            <div class="stat-value" id="charts-avg-temp">0°C</div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="chart-controls-section">
                     <div class="section-header-with-actions">
                         <div>
@@ -1043,10 +1179,10 @@
                         <h3>Fleet Performance - Hashrate & Temperature</h3>
                         <div class="chart-controls">
                             <select id="combined-chart-timerange" class="chart-timerange-select">
-                                <option value="1">Last Hour</option>
                                 <option value="6" selected>Last 6 Hours</option>
                                 <option value="24">Last 24 Hours</option>
-                                <option value="168">Last Week</option>
+                                <option value="168">Last 7 Days</option>
+                                <option value="720">Last 30 Days</option>
                             </select>
                             <button id="combined-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
                         </div>
@@ -1054,6 +1190,7 @@
                     <div class="chart-container">
                         <canvas id="combined-chart"></canvas>
                     </div>
+                    <div class="chart-meta" id="combined-chart-meta"></div>
                 </section>
 
                 <!-- Power Chart -->
@@ -1062,10 +1199,10 @@
                         <h3>Power Consumption History</h3>
                         <div class="chart-controls">
                             <select id="power-chart-timerange" class="chart-timerange-select">
-                                <option value="1">Last Hour</option>
                                 <option value="6" selected>Last 6 Hours</option>
                                 <option value="24">Last 24 Hours</option>
-                                <option value="168">Last Week</option>
+                                <option value="168">Last 7 Days</option>
+                                <option value="720">Last 30 Days</option>
                             </select>
                             <button id="power-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
                         </div>
@@ -1073,6 +1210,7 @@
                     <div class="chart-container">
                         <canvas id="power-chart"></canvas>
                     </div>
+                    <div class="chart-meta" id="power-chart-meta"></div>
                 </section>
 
                 <!-- Profitability Chart -->
@@ -1091,17 +1229,19 @@
                     <div class="chart-container">
                         <canvas id="profitability-chart"></canvas>
                     </div>
+                    <div class="chart-meta" id="profitability-chart-meta"></div>
                 </section>
 
                 <!-- Efficiency Chart -->
                 <section class="chart-section">
                     <div class="chart-header">
-                        <h3>Mining Efficiency - Hashrate per Watt</h3>
+                        <h3>Mining Efficiency (J/TH)</h3>
                         <div class="chart-controls">
                             <select id="efficiency-chart-timerange" class="chart-timerange-select">
-                                <option value="1">Last Hour</option>
                                 <option value="6" selected>Last 6 Hours</option>
                                 <option value="24">Last 24 Hours</option>
+                                <option value="168">Last 7 Days</option>
+                                <option value="720">Last 30 Days</option>
                             </select>
                             <button id="efficiency-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
                         </div>
@@ -1109,6 +1249,7 @@
                     <div class="chart-container">
                         <canvas id="efficiency-chart"></canvas>
                     </div>
+                    <div class="chart-meta" id="efficiency-chart-meta"></div>
                 </section>
 
                 <!-- Shares Chart -->
@@ -1126,34 +1267,9 @@
                     <div class="chart-container" style="height: 300px;">
                         <canvas id="shares-chart"></canvas>
                     </div>
+                    <div class="chart-meta" id="shares-chart-meta"></div>
                 </section>
 
-                <!-- Performance Metrics -->
-                <section class="chart-section">
-                    <h3>Current Performance Metrics</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-label">Fleet Efficiency <span class="help-icon" onclick="showEfficiencyTooltip(event)" title="What is J/TH?">?</span></div>
-                            <div class="stat-value" id="fleet-efficiency">0 J/TH</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Accepted Shares</div>
-                            <div class="stat-value success" id="total-accepted-shares">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Rejected Shares</div>
-                            <div class="stat-value danger" id="total-rejected-shares">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Accept Rate</div>
-                            <div class="stat-value success" id="accept-rate">0%</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Avg Temp</div>
-                            <div class="stat-value" id="charts-avg-temp">0°C</div>
-                        </div>
-                    </div>
-                </section>
             </div>
 
             <!-- Alerts Tab -->
@@ -1200,6 +1316,67 @@
                     </div>
                 </section>
 
+                <!-- Alert Type Configuration -->
+                <section class="alert-types-section">
+                    <h3>Alert Type Configuration</h3>
+                    <p class="section-hint">Enable or disable individual alert types.</p>
+                    <div class="alert-types-grid" id="alert-types-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- Per-Miner Thresholds -->
+                <section class="miner-overrides-section">
+                    <h3>Per-Miner Thresholds</h3>
+                    <p class="section-hint">Set custom temperature thresholds for specific miners. Device defaults are shown as placeholders.</p>
+                    <div id="miner-overrides-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- Quiet Hours -->
+                <section class="quiet-hours-section">
+                    <h3>Quiet Hours</h3>
+                    <div class="quiet-hours-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="quiet-hours-enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Enable quiet hours (no notifications except emergencies)</span>
+                    </div>
+                    <div class="quiet-hours-times">
+                        <div class="form-group">
+                            <label>Start:</label>
+                            <input type="time" id="quiet-hours-start" value="22:00">
+                        </div>
+                        <div class="form-group">
+                            <label>End:</label>
+                            <input type="time" id="quiet-hours-end" value="07:00">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Daily Report -->
+                <section class="daily-report-section">
+                    <h3>Daily Report</h3>
+                    <div class="daily-report-controls">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="daily-report-enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Send daily mining report via Telegram</span>
+                    </div>
+                    <div class="daily-report-time">
+                        <div class="form-group">
+                            <label>Report Time:</label>
+                            <input type="time" id="daily-report-time" value="08:00">
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="triggerDailyReport()">Send Report Now</button>
+                    </div>
+                </section>
+
+                <button class="btn btn-primary" id="save-alert-config-btn" onclick="saveAlertConfig()">Save All Alert Settings</button>
+
                 <section class="alert-history-section">
                     <h2>Recent Alerts</h2>
                     <div id="alert-history-container">
@@ -1210,6 +1387,43 @@
 
             <!-- Pools Tab -->
             <div id="pools-tab" class="tab-content">
+                <!-- Pool Directory Section -->
+                <section class="pool-directory-section">
+                    <h2>Mining Pool Directory</h2>
+                    <p class="help-text">Browse and compare Bitcoin mining pools. Click any pool card for details.</p>
+
+                    <!-- Search and Filter Bar -->
+                    <div class="pool-directory-filters">
+                        <div class="pool-search-wrap">
+                            <svg class="pool-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                            <input type="text" id="pool-directory-search" class="pool-directory-search" placeholder="Search pools by name...">
+                        </div>
+                        <div class="pool-filter-buttons">
+                            <button class="pool-filter-btn active" data-filter="all">All</button>
+                            <button class="pool-filter-btn" data-filter="home-miner">Home Miner Friendly</button>
+                            <button class="pool-filter-btn" data-filter="no-kyc">No KYC</button>
+                            <button class="pool-filter-btn" data-filter="lightning">Lightning Support</button>
+                            <button class="pool-filter-btn" data-filter="low-fee">Low Fee (&lt;2%)</button>
+                            <button class="pool-filter-btn" data-filter="solo">Solo Mining</button>
+                            <button class="pool-filter-btn" data-filter="fpps">FPPS/PPS</button>
+                            <button class="pool-filter-btn" data-filter="pplns">PPLNS</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="compare-pools-btn" onclick="showPoolComparison()" disabled>
+                            Compare Selected (0)
+                        </button>
+                    </div>
+
+                    <!-- Pool Directory Cards Grid -->
+                    <div class="pool-directory-count" id="pool-directory-count"></div>
+                    <div class="pool-directory-grid" id="pool-directory-grid">
+                        <p class="loading">Loading pool directory...</p>
+                    </div>
+                </section>
+
+                <!-- Existing Pool Configuration Section -->
                 <section class="pools-section">
                     <h2>Mining Pool Configuration</h2>
                     <p class="help-text">Manage mining pools for each miner in your fleet.</p>
@@ -1221,6 +1435,21 @@
         </main>
 
         <div id="alert-box" class="alert" style="display: none;"></div>
+    </div>
+
+    <!-- Pool Comparison Modal -->
+    <div id="pool-comparison-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content pool-comparison-modal">
+            <div class="modal-header">
+                <h2>Pool Comparison</h2>
+                <button class="modal-close-btn" onclick="closePoolComparison()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div id="pool-comparison-content" class="pool-comparison-content">
+                <p class="loading">Loading comparison...</p>
+            </div>
+        </div>
     </div>
 
     <!-- Miner Detail Modal - Unique Tabbed Dashboard Layout -->
@@ -1434,20 +1663,7 @@
                         <h4>Share Statistics</h4>
                         <div class="share-stats-content">
                             <div class="acceptance-gauge">
-                                <svg viewBox="0 0 100 100" class="gauge-svg">
-                                    <!-- Background circle -->
-                                    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
-                                    <!-- Progress arc -->
-                                    <circle cx="50" cy="50" r="42" fill="none" stroke="url(#gaugeGradient)" stroke-width="8"
-                                            stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="0"
-                                            id="acceptance-gauge-arc" transform="rotate(-90 50 50)"/>
-                                    <defs>
-                                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                            <stop offset="0%" stop-color="var(--success)"/>
-                                            <stop offset="100%" stop-color="var(--cyan)"/>
-                                        </linearGradient>
-                                    </defs>
-                                </svg>
+                                <canvas id="acceptance-pie-chart" width="120" height="120"></canvas>
                                 <div class="gauge-center">
                                     <span class="gauge-percent" id="acceptance-rate-percent">99.8%</span>
                                     <span class="gauge-label">Accept Rate</span>
@@ -1516,56 +1732,95 @@
                         </div>
                     </div>
 
+                    <!-- Device Info Bar -->
+                    <div class="tuning-device-info" id="tuning-device-info">
+                        <div class="device-info-item">
+                            <span class="device-info-label">Device</span>
+                            <span class="device-info-value" id="tuning-device-type">--</span>
+                        </div>
+                        <div class="device-info-item">
+                            <span class="device-info-label">ASIC Chip</span>
+                            <span class="device-info-value device-chip-badge" id="tuning-asic-chip">--</span>
+                        </div>
+                        <div class="device-info-item">
+                            <span class="device-info-label">Temperature</span>
+                            <span class="device-info-value" id="tuning-live-temp">--</span>
+                        </div>
+                    </div>
+
                     <!-- Current Settings Display -->
                     <div class="tuning-current">
                         <div class="tuning-stat">
-                            <span class="tuning-label">Frequency</span>
-                            <span class="tuning-value" id="modal-frequency">525 MHz</span>
+                            <span class="tuning-label">Live Frequency</span>
+                            <span class="tuning-value" id="modal-frequency">-- MHz</span>
+                        </div>
+                        <div class="tuning-divider"></div>
+                        <div class="tuning-stat">
+                            <span class="tuning-label">Target Frequency</span>
+                            <span class="tuning-value target-freq" id="modal-target-frequency">-- MHz</span>
                         </div>
                         <div class="tuning-divider"></div>
                         <div class="tuning-stat">
                             <span class="tuning-label">Core Voltage</span>
-                            <span class="tuning-value warning" id="modal-voltage">1150 mV</span>
+                            <span class="tuning-value warning" id="modal-voltage">-- mV</span>
                         </div>
                     </div>
 
+                    <!-- Auto-tune conflict notice (shown when auto-tune is active) -->
+                    <div class="auto-tune-freq-notice" id="auto-tune-freq-notice" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <span>Auto-tune is active. Disable auto-tune to manually adjust frequency.</span>
+                    </div>
+
                     <!-- Frequency Presets -->
-                    <div class="tuning-section">
+                    <div class="tuning-section" id="frequency-tuning-section">
                         <h4>Frequency Presets</h4>
                         <p class="tuning-hint">Adjust frequency only. Voltage remains unchanged for safety.</p>
-                        <div class="preset-buttons">
-                            <button class="preset-btn active" data-preset="stock" onclick="setOCPreset('stock')">
-                                <span class="preset-name">Stock</span>
-                                <span class="preset-freq">485 MHz</span>
+                        <div class="preset-buttons" id="preset-buttons">
+                            <button class="preset-btn" data-preset="stock" onclick="setOCPreset('stock')">
+                                <span class="preset-name">Low</span>
+                                <span class="preset-freq" id="preset-freq-stock">-- MHz</span>
                             </button>
                             <button class="preset-btn" data-preset="mild" onclick="setOCPreset('mild')">
-                                <span class="preset-name">Mild</span>
-                                <span class="preset-freq">525 MHz</span>
+                                <span class="preset-name">Medium</span>
+                                <span class="preset-freq" id="preset-freq-mild">-- MHz</span>
                             </button>
                             <button class="preset-btn" data-preset="med" onclick="setOCPreset('med')">
-                                <span class="preset-name">Medium</span>
-                                <span class="preset-freq">550 MHz</span>
+                                <span class="preset-name">High</span>
+                                <span class="preset-freq" id="preset-freq-med">-- MHz</span>
                             </button>
                             <button class="preset-btn" data-preset="heavy" onclick="setOCPreset('heavy')">
-                                <span class="preset-name">Heavy</span>
-                                <span class="preset-freq">575 MHz</span>
+                                <span class="preset-name">Max</span>
+                                <span class="preset-freq" id="preset-freq-heavy">-- MHz</span>
                             </button>
                         </div>
 
-                        <!-- Custom Frequency Input -->
+                        <!-- Custom Frequency Slider + Input -->
                         <div class="custom-frequency-section">
                             <div class="custom-freq-header">
                                 <span class="custom-freq-label">Custom Frequency</span>
-                                <span class="freq-range-hint" id="freq-range-hint">Range: 400-700 MHz</span>
+                                <span class="freq-range-hint" id="freq-range-hint">Range: -- MHz, Step: -- MHz</span>
+                            </div>
+                            <div class="freq-slider-container">
+                                <input type="range" id="frequency-slider" min="50" max="900" step="25" value="485" oninput="onFrequencySliderInput()">
+                                <div class="freq-slider-labels">
+                                    <span id="freq-slider-min">50</span>
+                                    <span id="freq-slider-current" class="freq-slider-current-val">485 MHz</span>
+                                    <span id="freq-slider-max">900</span>
+                                </div>
                             </div>
                             <div class="custom-freq-controls">
                                 <button class="freq-adjust-btn" onclick="adjustFrequency(-25)">-25</button>
                                 <div class="freq-input-wrapper">
-                                    <input type="number" id="frequency-input" min="400" max="700" step="5" value="485">
+                                    <input type="number" id="frequency-input" min="50" max="900" step="25" value="485" oninput="onFrequencyInputChange()">
                                     <span class="freq-unit">MHz</span>
                                 </div>
                                 <button class="freq-adjust-btn" onclick="adjustFrequency(25)">+25</button>
-                                <button class="freq-apply-btn" onclick="applyFrequency()">Apply</button>
+                                <button class="freq-apply-btn" id="freq-apply-btn" onclick="applyFrequency()">Apply</button>
                             </div>
                         </div>
                     </div>
@@ -1969,9 +2224,9 @@
         }
 
         function updateEfficiencyCard(data) {
-            document.getElementById('fleet-efficiency').textContent = `${data.fleet_average.toFixed(1)} W/TH`;
-            document.getElementById('best-efficiency').textContent = `${data.best_efficiency.toFixed(1)} W/TH`;
-            document.getElementById('worst-efficiency').textContent = `${data.worst_efficiency.toFixed(1)} W/TH`;
+            document.getElementById('fleet-efficiency').textContent = `${data.fleet_average.toFixed(1)} J/TH`;
+            document.getElementById('best-efficiency').textContent = `${data.best_efficiency.toFixed(1)} J/TH`;
+            document.getElementById('worst-efficiency').textContent = `${data.worst_efficiency.toFixed(1)} J/TH`;
 
             // Create efficiency chart
             createEfficiencyChart(data.miner_efficiency_data);
@@ -2062,7 +2317,7 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { title: { display: true, text: 'TH/s', color: '#9ca3af' } },
-                        y: { title: { display: true, text: 'W/TH', color: '#9ca3af' } }
+                        y: { title: { display: true, text: 'J/TH', color: '#9ca3af' } }
                     }
                 }
             });

@@ -55,6 +55,31 @@ class AlertConfig:
         self.high_temp_threshold = 70.0  # °C
         self.low_hashrate_threshold_pct = 20.0  # % below expected
 
+        # Per-type enable/disable (extended)
+        self.enabled_alert_types = {
+            'miner_offline': True,
+            'high_temperature': True,
+            'critical_temperature': True,
+            'low_hashrate': True,
+            'unprofitable': False,
+            'emergency_shutdown': True,
+            'miner_online': False,
+            'weather_warning': True,
+            'overheat_recovery': True
+        }
+
+        # Per-miner threshold overrides: {miner_ip: {'temp_warning': 85, 'temp_critical': 92}}
+        self.miner_overrides = {}
+
+        # Quiet hours
+        self.quiet_hours_enabled = False
+        self.quiet_hours_start = "22:00"
+        self.quiet_hours_end = "07:00"
+
+        # Daily report
+        self.daily_report_enabled = False
+        self.daily_report_time = "08:00"
+
 
 class Alert:
     """Represents a single alert"""
@@ -90,17 +115,48 @@ class AlertManager:
         self.config = AlertConfig()
         self.alert_history = []
         self.last_alerts = {}  # Track last alert time per type/miner
+        self._load_config_from_db()
+
+    def _load_config_from_db(self):
+        """Load full config from database settings table"""
+        import json
+        try:
+            raw = self.db.get_setting('alert_config')
+            if raw:
+                data = json.loads(raw)
+                c = self.config
+                c.enabled_alert_types = data.get('enabled_alert_types', c.enabled_alert_types)
+                c.miner_overrides = data.get('miner_overrides', c.miner_overrides)
+                c.quiet_hours_enabled = data.get('quiet_hours_enabled', False)
+                c.quiet_hours_start = data.get('quiet_hours_start', '22:00')
+                c.quiet_hours_end = data.get('quiet_hours_end', '07:00')
+                c.daily_report_enabled = data.get('daily_report_enabled', False)
+                c.daily_report_time = data.get('daily_report_time', '08:00')
+                c.high_temp_threshold = data.get('high_temp_threshold', 70.0)
+                c.low_hashrate_threshold_pct = data.get('low_hashrate_threshold_pct', 20.0)
+        except Exception as e:
+            logger.debug(f"No saved alert config: {e}")
+
+    def _save_config_to_db(self):
+        """Persist full config as JSON in settings table"""
+        import json
+        c = self.config
+        data = {
+            'enabled_alert_types': c.enabled_alert_types,
+            'miner_overrides': c.miner_overrides,
+            'quiet_hours_enabled': c.quiet_hours_enabled,
+            'quiet_hours_start': c.quiet_hours_start,
+            'quiet_hours_end': c.quiet_hours_end,
+            'daily_report_enabled': c.daily_report_enabled,
+            'daily_report_time': c.daily_report_time,
+            'high_temp_threshold': c.high_temp_threshold,
+            'low_hashrate_threshold_pct': c.low_hashrate_threshold_pct
+        }
+        self.db.set_setting('alert_config', json.dumps(data))
 
     def configure(self, telegram_bot_token: str = None, telegram_chat_id: str = None,
-                  telegram_enabled: bool = None):
-        """
-        Configure Telegram bot settings
-
-        Args:
-            telegram_bot_token: Bot token from @BotFather
-            telegram_chat_id: Chat ID (positive for personal, negative for groups)
-            telegram_enabled: Enable/disable Telegram alerts
-        """
+                  telegram_enabled: bool = None, **kwargs):
+        """Configure Telegram bot settings and extended alert config"""
         if telegram_bot_token is not None:
             self.config.telegram_bot_token = telegram_bot_token
         if telegram_chat_id is not None:
@@ -108,6 +164,27 @@ class AlertManager:
         if telegram_enabled is not None:
             self.config.telegram_enabled = telegram_enabled
 
+        # Extended config
+        if 'enabled_alert_types' in kwargs:
+            self.config.enabled_alert_types.update(kwargs['enabled_alert_types'])
+        if 'miner_overrides' in kwargs:
+            self.config.miner_overrides = kwargs['miner_overrides']
+        if 'quiet_hours_enabled' in kwargs:
+            self.config.quiet_hours_enabled = kwargs['quiet_hours_enabled']
+        if 'quiet_hours_start' in kwargs:
+            self.config.quiet_hours_start = kwargs['quiet_hours_start']
+        if 'quiet_hours_end' in kwargs:
+            self.config.quiet_hours_end = kwargs['quiet_hours_end']
+        if 'daily_report_enabled' in kwargs:
+            self.config.daily_report_enabled = kwargs['daily_report_enabled']
+        if 'daily_report_time' in kwargs:
+            self.config.daily_report_time = kwargs['daily_report_time']
+        if 'high_temp_threshold' in kwargs:
+            self.config.high_temp_threshold = float(kwargs['high_temp_threshold'])
+        if 'low_hashrate_threshold_pct' in kwargs:
+            self.config.low_hashrate_threshold_pct = float(kwargs['low_hashrate_threshold_pct'])
+
+        self._save_config_to_db()
         logger.info("Telegram alert configuration updated")
 
     def get_config(self) -> Dict:
@@ -130,8 +207,87 @@ class AlertManager:
             'thresholds': {
                 'high_temp': self.config.high_temp_threshold,
                 'low_hashrate_pct': self.config.low_hashrate_threshold_pct
+            },
+            'enabled_alert_types': self.config.enabled_alert_types,
+            'miner_overrides': self.config.miner_overrides,
+            'quiet_hours': {
+                'enabled': self.config.quiet_hours_enabled,
+                'start': self.config.quiet_hours_start,
+                'end': self.config.quiet_hours_end
+            },
+            'daily_report': {
+                'enabled': self.config.daily_report_enabled,
+                'time': self.config.daily_report_time
             }
         }
+
+    def is_in_quiet_hours(self) -> bool:
+        """Check if current time falls in quiet window (handles overnight spans)"""
+        if not self.config.quiet_hours_enabled:
+            return False
+        try:
+            now = datetime.now().strftime("%H:%M")
+            start = self.config.quiet_hours_start
+            end = self.config.quiet_hours_end
+            now_dt = datetime.strptime(now, "%H:%M").time()
+            start_dt = datetime.strptime(start, "%H:%M").time()
+            end_dt = datetime.strptime(end, "%H:%M").time()
+
+            if start_dt <= end_dt:
+                return start_dt <= now_dt < end_dt
+            else:
+                return now_dt >= start_dt or now_dt < end_dt
+        except Exception:
+            return False
+
+    def get_device_temp_threshold(self, miner_ip: str, miner_type: str = '') -> Dict:
+        """Get temp thresholds for a device. Checks per-miner overrides first,
+        then device-specific profiles (e.g., Avalon Nano 3S uses 85/92C)."""
+        # Per-miner override
+        if miner_ip in self.config.miner_overrides:
+            override = self.config.miner_overrides[miner_ip]
+            return {
+                'warning': override.get('temp_warning', self.config.high_temp_threshold),
+                'critical': override.get('temp_critical', 90.0)
+            }
+
+        # Device-specific defaults
+        miner_type_lower = (miner_type or '').lower()
+        if 'nano' in miner_type_lower or 'avalon' in miner_type_lower:
+            return {'warning': 85.0, 'critical': 92.0}
+        if 'antminer' in miner_type_lower or 's19' in miner_type_lower or 's21' in miner_type_lower:
+            return {'warning': 80.0, 'critical': 95.0}
+        if 'whatsminer' in miner_type_lower:
+            return {'warning': 80.0, 'critical': 95.0}
+
+        return {
+            'warning': self.config.high_temp_threshold,
+            'critical': 90.0
+        }
+
+    def generate_daily_report(self, fleet_data: Dict) -> str:
+        """Format and return daily report message for Telegram"""
+        uptime = fleet_data.get('uptime_pct', 0)
+        sats = fleet_data.get('sats_earned', 0)
+        energy_cost = fleet_data.get('energy_cost', 0)
+        revenue = fleet_data.get('revenue', 0)
+        profit = revenue - energy_cost
+        avg_efficiency = fleet_data.get('avg_efficiency_jth', 0)
+        avg_temp = fleet_data.get('avg_temp', 0)
+        miners_online = fleet_data.get('miners_online', 0)
+        miners_total = fleet_data.get('miners_total', 0)
+
+        msg = "Daily Mining Report\n\n"
+        msg += f"Fleet: {miners_online}/{miners_total} miners online\n"
+        msg += f"Uptime: {uptime:.1f}%\n\n"
+        msg += f"Sats Earned: {sats:,}\n"
+        msg += f"Revenue: ${revenue:.4f}\n"
+        msg += f"Energy Cost: ${energy_cost:.4f}\n"
+        msg += f"Net Profit: ${profit:.4f}\n\n"
+        msg += f"Avg Efficiency: {avg_efficiency:.1f} J/TH\n"
+        msg += f"Avg Temperature: {avg_temp:.1f} C\n"
+
+        return msg
 
     def should_send_alert(self, alert: Alert) -> bool:
         """Check if alert should be sent (cooldown check)"""
@@ -148,7 +304,27 @@ class AlertManager:
         return True
 
     def send_alert(self, alert: Alert):
-        """Send alert through Telegram"""
+        """Send alert through Telegram - respects quiet hours and per-type toggles"""
+        # Check per-type enable/disable
+        alert_type_key = alert.alert_type.value
+        if not self.config.enabled_alert_types.get(alert_type_key, True):
+            logger.debug(f"Alert type {alert_type_key} is disabled, skipping")
+            return
+
+        # Check quiet hours (except EMERGENCY)
+        if alert.level != AlertLevel.EMERGENCY and self.is_in_quiet_hours():
+            logger.debug(f"In quiet hours, skipping non-emergency alert: {alert.title}")
+            # Still record in DB
+            import json
+            self.db.add_alert_to_history(
+                alert_type=alert.alert_type.value,
+                level=alert.level.value,
+                title=alert.title,
+                message=alert.message,
+                data_json=json.dumps(alert.data) if alert.data else None
+            )
+            return
+
         # Check cooldown
         if not self.should_send_alert(alert):
             return

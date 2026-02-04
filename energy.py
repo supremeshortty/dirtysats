@@ -24,8 +24,10 @@ class UtilityRateService:
     Set it via the OPENEI_API_KEY environment variable or pass it to the constructor.
     """
 
-    # OpenEI API endpoint
+    # OpenEI API endpoints
+    # /utility_rates uses version 7, /utility_companies uses version 'latest' (max v3)
     API_BASE_URL = "https://api.openei.org/utility_rates"
+    UTILITY_SEARCH_URL = "https://api.openei.org/utility_companies"
 
     def __init__(self, api_key: str = None, db=None):
         import os
@@ -50,10 +52,17 @@ class UtilityRateService:
 
     def search_utilities(self, query: str, limit: int = 20) -> List[Dict]:
         """
-        Search for utilities by name using OpenEI's server-side filtering.
+        Search for utilities by name using OpenEI's API endpoints.
+
+        Strategy:
+        1. Fetch the utility companies list and filter by query (the /utility_companies
+           endpoint does NOT support a 'search' parameter - it returns all companies,
+           so we filter client-side).
+        2. Search the /utility_rates endpoint with ratesforutility for broader matching.
+        3. Try address-based search if the query looks like a location.
 
         Args:
-            query: Utility name to search for
+            query: Utility name or partial name to search for
             limit: Maximum results to return
 
         Returns:
@@ -69,61 +78,150 @@ class UtilityRateService:
             )
 
         try:
-            # Use ratesforutility for server-side filtering
-            params = {
-                'version': '7',
-                'format': 'json',
-                'api_key': self.api_key,
-                'ratesforutility': query,  # Server-side utility name search
-                'detail': 'minimal',
-                'limit': 500  # Get more to find unique utilities
-            }
-
-            response = requests.get(self.API_BASE_URL, params=params, timeout=15)
-
-            # Check for API errors
-            if response.status_code != 200:
-                try:
-                    error_data = response.json()
-                    if 'error' in error_data:
-                        error_msg = error_data['error'].get('message', str(error_data['error']))
-                        raise ValueError(f"OpenEI API error: {error_msg}")
-                except ValueError:
-                    raise
-                except:
-                    response.raise_for_status()
-
-            data = response.json()
-
-            # Check for API error response
-            if 'error' in data:
-                error_msg = data['error'].get('message', str(data['error']))
-                raise ValueError(f"OpenEI API error: {error_msg}")
-
-            if 'items' not in data:
-                logger.warning(f"OpenEI search returned no items for '{query}': {data}")
-                return []
-
-            # Extract unique utilities from results
             utilities = {}
-            for item in data.get('items', []):
-                utility_name = item.get('utility', '')
-                if utility_name and utility_name not in utilities:
-                    utilities[utility_name] = {
-                        'utility_name': utility_name,
-                        'eia_id': item.get('eiaid', ''),
-                        'state': item.get('state', ''),
+            query_lower = query.lower()
+
+            # Strategy 1: Fetch utility companies list and filter locally.
+            # The /utility_companies endpoint only supports version 'latest' (up to v3),
+            # NOT version 7, and has NO 'search' parameter.
+            try:
+                params = {
+                    'version': 'latest',
+                    'format': 'json',
+                    'api_key': self.api_key,
+                }
+                logger.info(f"OpenEI: Fetching utility companies list, filtering for '{query}'")
+                response = requests.get(self.UTILITY_SEARCH_URL, params=params, timeout=20)
+                logger.info(f"OpenEI utility_companies response status: {response.status_code}")
+
+                if response.status_code == 200:
+                    data = response.json()
+                    # Response format varies: can be a flat list, or an object with 'items'
+                    # or 'result' key. Try multiple field names for utility name.
+                    if isinstance(data, list):
+                        items = data
+                    elif isinstance(data, dict):
+                        items = data.get('items', data.get('result', data.get('results', [])))
+                    else:
+                        items = []
+
+                    logger.info(f"OpenEI: utility_companies returned {len(items)} total items")
+                    if items and len(items) > 0:
+                        sample = items[0]
+                        logger.info(f"OpenEI: sample item keys: {list(sample.keys()) if isinstance(sample, dict) else type(sample)}")
+
+                    for item in items:
+                        if not isinstance(item, dict):
+                            continue
+                        # Try multiple field names for the utility name
+                        utility_name = (
+                            item.get('label', '') or
+                            item.get('utility_name', '') or
+                            item.get('name', '') or
+                            item.get('utility', '')
+                        )
+                        if utility_name and query_lower in utility_name.lower():
+                            if utility_name not in utilities:
+                                utilities[utility_name] = {
+                                    'utility_name': utility_name,
+                                    'eia_id': (
+                                        item.get('eiaid', '') or
+                                        item.get('eia_id', '') or
+                                        item.get('id', '')
+                                    ),
+                                    'state': item.get('state', '') or item.get('st', ''),
+                                }
+                    logger.info(f"OpenEI: utility_companies matched {len(utilities)} for '{query}'")
+                elif response.status_code == 401 or response.status_code == 403:
+                    logger.error(f"OpenEI API key rejected (HTTP {response.status_code}). Check your API key.")
+                    raise ValueError("OpenEI API key is invalid or expired. Please check your API key.")
+                else:
+                    logger.warning(f"OpenEI utility_companies returned HTTP {response.status_code}")
+                    try:
+                        err_data = response.json()
+                        logger.warning(f"OpenEI error response: {err_data}")
+                    except Exception:
+                        logger.warning(f"OpenEI error body: {response.text[:500]}")
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.warning(f"Utility companies endpoint failed: {e}")
+
+            # Strategy 2: Search the rates endpoint with ratesforutility
+            if len(utilities) < limit:
+                try:
+                    params = {
+                        'version': '7',
+                        'format': 'json',
+                        'api_key': self.api_key,
+                        'ratesforutility': query,
+                        'detail': 'minimal',
+                        'limit': 500
                     }
+                    logger.info(f"OpenEI: Searching rates endpoint for utility '{query}'")
+                    response = requests.get(self.API_BASE_URL, params=params, timeout=15)
+                    logger.info(f"OpenEI utility_rates response status: {response.status_code}")
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'error' not in data:
+                            for item in data.get('items', []):
+                                utility_name = item.get('utility', '')
+                                if utility_name and utility_name not in utilities:
+                                    utilities[utility_name] = {
+                                        'utility_name': utility_name,
+                                        'eia_id': item.get('eiaid', ''),
+                                        'state': item.get('state', ''),
+                                    }
+                            logger.info(f"OpenEI: rates endpoint found {len(data.get('items', []))} rate items")
+                        else:
+                            logger.warning(f"OpenEI rates endpoint returned error: {data.get('error')}")
+                    else:
+                        logger.warning(f"OpenEI rates endpoint returned HTTP {response.status_code}")
+                except Exception as e:
+                    logger.warning(f"Rates endpoint search failed: {e}")
+
+            # Strategy 3: Try address-based search if query looks like a location
+            if not utilities and (len(query.split()) <= 3 or any(c.isdigit() for c in query)):
+                try:
+                    params = {
+                        'version': '7',
+                        'format': 'json',
+                        'api_key': self.api_key,
+                        'address': query,
+                        'detail': 'minimal',
+                        'limit': 100
+                    }
+                    logger.info(f"OpenEI: Trying address-based search for '{query}'")
+                    response = requests.get(self.API_BASE_URL, params=params, timeout=15)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'error' not in data:
+                            for item in data.get('items', []):
+                                utility_name = item.get('utility', '')
+                                if utility_name and utility_name not in utilities:
+                                    utilities[utility_name] = {
+                                        'utility_name': utility_name,
+                                        'eia_id': item.get('eiaid', ''),
+                                        'state': item.get('state', ''),
+                                    }
+                            logger.info(f"OpenEI: address search found {len(data.get('items', []))} items")
+                except Exception as e:
+                    logger.warning(f"Address-based search failed: {e}")
+
+            if not utilities:
+                logger.warning(f"OpenEI search returned no results for '{query}' across all strategies")
 
             result = list(utilities.values())[:limit]
-            logger.info(f"OpenEI search for '{query}' found {len(result)} utilities")
+            logger.info(f"OpenEI search for '{query}' found {len(result)} unique utilities total")
             return result
 
         except ValueError:
             raise
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error searching utilities: {e}")
-            raise ValueError(f"Network error: Unable to reach OpenEI API. Please try again.")
+            raise ValueError(f"Network error: Unable to reach OpenEI API. Please check your internet connection and try again.")
         except Exception as e:
             logger.error(f"Error searching utilities: {e}")
             raise ValueError(f"Error searching utilities: {str(e)}")
@@ -1190,7 +1288,8 @@ class EnergyRateManager:
                 end_time=rate['end_time'],
                 rate_per_kwh=rate['rate_per_kwh'],
                 day_of_week=rate.get('day_of_week'),
-                rate_type=rate.get('rate_type', 'standard')
+                rate_type=rate.get('rate_type', 'standard'),
+                season=rate.get('season', 'all')
             )
 
     def get_rate_for_timestamp(self, timestamp: datetime) -> float:
@@ -1370,9 +1469,11 @@ class EnergyRateManager:
 class MiningScheduler:
     """Automated mining schedule based on energy rates"""
 
-    def __init__(self, db, rate_manager: EnergyRateManager):
+    def __init__(self, db, rate_manager: EnergyRateManager, btc_fetcher=None, profitability_calc=None):
         self.db = db
         self.rate_manager = rate_manager
+        self.btc_fetcher = btc_fetcher
+        self.profitability_calc = profitability_calc
 
     def get_schedule_for_hour(self, hour: int, day_of_week: str = None) -> Optional[Dict]:
         """
@@ -1437,29 +1538,127 @@ class MiningScheduler:
 
         return hourly_schedule
 
-    def should_mine_now(self) -> Tuple[bool, int]:
+    def check_profitability_gate(self, total_hashrate_hs: float, total_power_watts: float) -> Tuple[bool, Dict]:
+        """Check if mining revenue exceeds energy cost at current rate.
+        Returns (is_profitable, margin_details)"""
+        if not self.btc_fetcher or not self.profitability_calc:
+            return True, {'reason': 'profitability_calc_unavailable'}
+
+        btc_price = self.btc_fetcher.get_btc_price()
+        difficulty = self.btc_fetcher.get_network_difficulty()
+        if not btc_price or not difficulty:
+            return True, {'reason': 'market_data_unavailable'}
+
+        hashrate_th = total_hashrate_hs / 1e12
+        if hashrate_th <= 0 or total_power_watts <= 0:
+            return True, {'reason': 'no_active_miners'}
+
+        btc_per_day = self.profitability_calc.calculate_btc_per_day(hashrate_th, difficulty)
+        revenue_per_day = btc_per_day * btc_price
+        energy_rate = self.rate_manager.get_current_rate()
+        cost_per_day = (total_power_watts / 1000) * 24 * energy_rate
+        profit = revenue_per_day - cost_per_day
+
+        return profit > 0, {
+            'revenue_per_day': round(revenue_per_day, 4),
+            'cost_per_day': round(cost_per_day, 4),
+            'profit_per_day': round(profit, 4),
+            'btc_price': btc_price,
+            'energy_rate': energy_rate
+        }
+
+    def check_btc_price_floor(self) -> Tuple[bool, float, float]:
+        """Check if BTC price is above user-configured floor.
+        Returns (above_floor, current_price, floor_price)"""
+        import json
+        floor_setting = self.db.get_setting('btc_price_floor')
+        floor_price = float(floor_setting) if floor_setting else 0
+
+        if floor_price <= 0:
+            return True, 0, 0  # Disabled
+
+        if not self.btc_fetcher:
+            return True, 0, floor_price
+
+        current_price = self.btc_fetcher.get_btc_price() or 0
+        return current_price >= floor_price, current_price, floor_price
+
+    def check_difficulty_change(self) -> Tuple[bool, Dict]:
+        """Check if network difficulty changed significantly.
+        Returns (changed_significantly, details)"""
+        if not self.btc_fetcher:
+            return False, {}
+
+        threshold_setting = self.db.get_setting('difficulty_alert_threshold')
+        threshold = float(threshold_setting) if threshold_setting else 5.0
+
+        current_diff = self.btc_fetcher.get_network_difficulty()
+        if not current_diff:
+            return False, {}
+
+        last_known = self.db.get_setting('last_known_difficulty')
+        if not last_known:
+            self.db.set_setting('last_known_difficulty', str(current_diff))
+            return False, {'current': current_diff, 'previous': None}
+
+        last_diff = float(last_known)
+        if last_diff <= 0:
+            self.db.set_setting('last_known_difficulty', str(current_diff))
+            return False, {}
+
+        change_pct = abs(current_diff - last_diff) / last_diff * 100
+        if change_pct >= threshold:
+            self.db.set_setting('last_known_difficulty', str(current_diff))
+            return True, {
+                'current': current_diff,
+                'previous': last_diff,
+                'change_pct': round(change_pct, 2),
+                'threshold': threshold
+            }
+
+        return False, {
+            'current': current_diff,
+            'previous': last_diff,
+            'change_pct': round(change_pct, 2),
+            'threshold': threshold
+        }
+
+    def should_mine_now(self, total_hashrate_hs: float = 0, total_power_watts: float = 0) -> Tuple[bool, int, str]:
         """
-        Check if miners should be running now and at what frequency
+        Enhanced check: BTC price floor, profitability gate, then TOU schedule.
 
         Returns:
-            Tuple of (should_mine, target_frequency)
+            Tuple of (should_mine, target_frequency, reason_string)
         """
+        # Gate 1: BTC price floor
+        import json
+        auto_controls_raw = self.db.get_setting('profitability_auto_pause')
+        profitability_auto_pause = auto_controls_raw == 'true' or auto_controls_raw == '1'
+
+        above_floor, current_price, floor_price = self.check_btc_price_floor()
+        if not above_floor and floor_price > 0:
+            return False, 0, f"BTC price ${current_price:,.0f} below floor ${floor_price:,.0f}"
+
+        # Gate 2: Profitability gate
+        if profitability_auto_pause and total_hashrate_hs > 0 and total_power_watts > 0:
+            is_profitable, margin = self.check_profitability_gate(total_hashrate_hs, total_power_watts)
+            if not is_profitable:
+                return False, 0, f"Unprofitable: ${margin.get('profit_per_day', 0):.4f}/day"
+
+        # Gate 3: TOU schedule
         schedules = self.db.get_mining_schedules()
 
         if not schedules:
-            # No schedule configured, always mine at max
-            return True, 0  # 0 means no change
+            return True, 0, "No schedule configured"
 
         now = datetime.now()
         current_time = now.strftime("%H:%M")
         current_day = now.strftime("%A")
 
         for schedule in schedules:
-            # Check if day matches
             if schedule['day_of_week'] and schedule['day_of_week'] != current_day:
                 continue
 
-            # Check if time is in range
             if self.rate_manager._time_in_range(
                 current_time,
                 schedule['start_time'],
@@ -1467,10 +1666,44 @@ class MiningScheduler:
             ):
                 target_freq = schedule['target_frequency']
                 should_mine = target_freq > 0
-                return should_mine, target_freq
+                reason = f"Schedule: freq={target_freq}" if should_mine else "Schedule: mining paused"
+                return should_mine, target_freq, reason
 
-        # Default: mine at full speed
-        return True, 0
+        return True, 0, "Default: full power"
+
+    def get_24h_visual_schedule(self, day_of_week: str = None) -> List[Dict]:
+        """Get enriched 24h data combining schedule + rate info + profitability status for the timeline"""
+        if day_of_week is None:
+            day_of_week = datetime.now().strftime("%A")
+
+        current_hour = datetime.now().hour
+        hourly_data = []
+
+        for hour in range(24):
+            schedule = self.get_schedule_for_hour(hour, day_of_week)
+            rate_info = self.rate_manager.get_rate_info_for_hour(hour, day_of_week)
+
+            if schedule:
+                target_freq = schedule['target_frequency']
+                is_mining = target_freq > 0
+                status = 'full' if target_freq == 0 else ('reduced' if is_mining else 'off')
+            else:
+                target_freq = 0
+                is_mining = True
+                status = 'full'
+
+            hourly_data.append({
+                'hour': hour,
+                'is_current': hour == current_hour,
+                'target_frequency': target_freq,
+                'is_mining': is_mining,
+                'status': status,  # 'full', 'reduced', 'off'
+                'rate': rate_info.get('rate', 0),
+                'rate_type': rate_info.get('rate_type', 'standard'),
+                'hour_label': f"{hour:02d}:00"
+            })
+
+        return hourly_data
 
     def create_schedule_from_rates(self, max_rate_threshold: float,
                                    low_frequency: int = 0,
@@ -1502,6 +1735,189 @@ class MiningScheduler:
             )
 
         logger.info(f"Created {len(rates)} schedule entries from rate data")
+
+
+class StrategyOptimizer:
+    """Generate personalized mining strategies based on real fleet data and market conditions"""
+
+    def __init__(self, db, btc_fetcher: BitcoinDataFetcher, profitability_calc: ProfitabilityCalculator,
+                 rate_manager: EnergyRateManager, mining_scheduler: MiningScheduler):
+        self.db = db
+        self.btc_fetcher = btc_fetcher
+        self.profitability_calc = profitability_calc
+        self.rate_manager = rate_manager
+        self.mining_scheduler = mining_scheduler
+
+    def _estimate_at_frequency(self, freq: int, max_freq: int, max_hashrate_hs: float,
+                                max_power_watts: float) -> Tuple[float, float]:
+        """Estimate hashrate and power at a given frequency."""
+        if freq <= 0:
+            return 0, 0
+        freq_ratio = min(freq / max_freq, 1.0) if max_freq > 0 else 1.0
+        hashrate = max_hashrate_hs * freq_ratio
+        power = self.profitability_calc.calculate_power_at_frequency(max_power_watts, freq, max_freq)
+        return hashrate, power
+
+    def generate_strategies(self, fleet_hashrate_hs: float, fleet_power_watts: float,
+                            min_frequency: int, max_frequency: int) -> List[Dict]:
+        """Generate 3 personalized strategies based on real data."""
+        btc_price = self.btc_fetcher.get_btc_price() or 0
+        difficulty = self.btc_fetcher.get_network_difficulty() or 1
+        block_subsidy = self.btc_fetcher.get_block_subsidy() or 3.125
+        rates_24h = self.rate_manager.get_24h_rates()
+
+        if fleet_hashrate_hs <= 0 or fleet_power_watts <= 0 or btc_price <= 0:
+            return []
+
+        freq_step = max(10, (max_frequency - min_frequency) // 20) if max_frequency > min_frequency else 10
+        strategies = []
+
+        # === Strategy 1: Maximum Profit ===
+        max_profit_plan = []
+        for hour_info in rates_24h:
+            hour = hour_info['hour']
+            rate = hour_info['rate']
+            best_freq = 0
+            best_profit = float('-inf')
+
+            for freq in range(min_frequency, max_frequency + 1, freq_step):
+                hr_hs, hr_power = self._estimate_at_frequency(freq, max_frequency, fleet_hashrate_hs, fleet_power_watts)
+                hr_th = hr_hs / 1e12
+                revenue = (hr_hs * 3600 * block_subsidy) / (difficulty * (2**32)) * btc_price
+                cost = (hr_power / 1000) * rate
+                profit = revenue - cost
+
+                if profit > best_profit:
+                    best_profit = profit
+                    best_freq = freq
+
+            # If all unprofitable, turn off
+            if best_profit < 0:
+                max_profit_plan.append({
+                    'hour': hour, 'frequency': 0, 'profit': 0,
+                    'revenue': 0, 'cost': 0, 'rate': rate
+                })
+            else:
+                hr_hs, hr_power = self._estimate_at_frequency(best_freq, max_frequency, fleet_hashrate_hs, fleet_power_watts)
+                revenue = (hr_hs * 3600 * block_subsidy) / (difficulty * (2**32)) * btc_price
+                cost = (hr_power / 1000) * rate
+                max_profit_plan.append({
+                    'hour': hour, 'frequency': best_freq,
+                    'profit': round(revenue - cost, 6), 'revenue': round(revenue, 6),
+                    'cost': round(cost, 6), 'rate': rate
+                })
+
+        strategies.append(self._build_strategy('Maximum Profit', max_profit_plan, btc_price))
+
+        # === Strategy 2: Maximum Hashrate ===
+        max_hash_plan = []
+        for hour_info in rates_24h:
+            hour = hour_info['hour']
+            rate = hour_info['rate']
+            hr_hs = fleet_hashrate_hs
+            revenue = (hr_hs * 3600 * block_subsidy) / (difficulty * (2**32)) * btc_price
+            cost = (fleet_power_watts / 1000) * rate
+            max_hash_plan.append({
+                'hour': hour, 'frequency': max_frequency,
+                'profit': round(revenue - cost, 6), 'revenue': round(revenue, 6),
+                'cost': round(cost, 6), 'rate': rate
+            })
+
+        strategies.append(self._build_strategy('Maximum Hashrate', max_hash_plan, btc_price))
+
+        # === Strategy 3: Balanced ===
+        avg_rate = sum(h['rate'] for h in rates_24h) / 24 if rates_24h else 0.12
+        balanced_plan = []
+        reduced_freq = min_frequency + int((max_frequency - min_frequency) * 0.6)
+
+        for hour_info in rates_24h:
+            hour = hour_info['hour']
+            rate = hour_info['rate']
+
+            # Off-peak: max freq. Peak (rate > 110% avg): reduced freq
+            if rate <= avg_rate * 1.1:
+                freq = max_frequency
+            else:
+                freq = reduced_freq
+
+            hr_hs, hr_power = self._estimate_at_frequency(freq, max_frequency, fleet_hashrate_hs, fleet_power_watts)
+            revenue = (hr_hs * 3600 * block_subsidy) / (difficulty * (2**32)) * btc_price
+            cost = (hr_power / 1000) * rate
+            balanced_plan.append({
+                'hour': hour, 'frequency': freq,
+                'profit': round(revenue - cost, 6), 'revenue': round(revenue, 6),
+                'cost': round(cost, 6), 'rate': rate
+            })
+
+        strategies.append(self._build_strategy('Balanced', balanced_plan, btc_price))
+
+        return strategies
+
+    def _build_strategy(self, name: str, hourly_plan: List[Dict], btc_price: float) -> Dict:
+        """Build strategy summary with projections."""
+        daily_revenue = sum(h['revenue'] for h in hourly_plan)
+        daily_cost = sum(h['cost'] for h in hourly_plan)
+        daily_profit = daily_revenue - daily_cost
+        mining_hours = sum(1 for h in hourly_plan if h['frequency'] > 0)
+        btc_per_day = daily_revenue / btc_price if btc_price > 0 else 0
+
+        return {
+            'name': name,
+            'hourly_plan': hourly_plan,
+            'mining_hours': mining_hours,
+            'projections': {
+                'daily': {'revenue': round(daily_revenue, 4), 'cost': round(daily_cost, 4),
+                          'profit': round(daily_profit, 4), 'btc': round(btc_per_day, 8),
+                          'sats': round(btc_per_day * 1e8)},
+                'weekly': {'revenue': round(daily_revenue * 7, 4), 'cost': round(daily_cost * 7, 4),
+                           'profit': round(daily_profit * 7, 4), 'btc': round(btc_per_day * 7, 8),
+                           'sats': round(btc_per_day * 7 * 1e8)},
+                'monthly': {'revenue': round(daily_revenue * 30, 4), 'cost': round(daily_cost * 30, 4),
+                            'profit': round(daily_profit * 30, 4), 'btc': round(btc_per_day * 30, 8),
+                            'sats': round(btc_per_day * 30 * 1e8)}
+            }
+        }
+
+    def apply_strategy(self, strategy_name: str, hourly_plan: List[Dict]):
+        """Apply a strategy as a mining schedule by grouping consecutive hours with same frequency."""
+        # Clear existing schedules
+        for schedule in self.db.get_mining_schedules():
+            self.db.delete_mining_schedule(schedule['id'])
+
+        if not hourly_plan:
+            return
+
+        # Group consecutive hours with same frequency into time blocks
+        blocks = []
+        current_block = {'start_hour': hourly_plan[0]['hour'], 'frequency': hourly_plan[0]['frequency']}
+
+        for i in range(1, len(hourly_plan)):
+            if hourly_plan[i]['frequency'] == current_block['frequency']:
+                continue  # Same frequency, extend block
+            else:
+                current_block['end_hour'] = hourly_plan[i - 1]['hour']
+                blocks.append(current_block)
+                current_block = {'start_hour': hourly_plan[i]['hour'], 'frequency': hourly_plan[i]['frequency']}
+
+        # Close last block
+        current_block['end_hour'] = hourly_plan[-1]['hour']
+        blocks.append(current_block)
+
+        # Create schedule entries
+        for block in blocks:
+            start_time = f"{block['start_hour']:02d}:00"
+            end_hour = (block['end_hour'] + 1) % 24
+            end_time = "23:59" if end_hour == 0 else f"{end_hour:02d}:00"
+
+            self.db.add_mining_schedule(
+                start_time=start_time,
+                end_time=end_time,
+                target_frequency=block['frequency'],
+                day_of_week=None,
+                enabled=1
+            )
+
+        logger.info(f"Applied strategy '{strategy_name}' with {len(blocks)} schedule blocks")
 
 
 # Preset energy company rates

@@ -292,20 +292,50 @@ class SatsEarnedTracker:
 class MinerHealthMonitor:
     """Monitor fleet health from real temperature and status data"""
 
+    # Miner-specific temperature thresholds (warning, critical)
+    # These reflect actual operating specs per device type
+    MINER_TEMP_THRESHOLDS = {
+        'AvalonNano3s': {'warning': 88.0, 'critical': 95.0},
+        'Nano3s': {'warning': 88.0, 'critical': 95.0},
+        'Antminer': {'warning': 80.0, 'critical': 90.0},
+        'Whatsminer': {'warning': 75.0, 'critical': 85.0},
+        'Avalon': {'warning': 75.0, 'critical': 85.0},
+        'NerdQAxe++': {'warning': 65.0, 'critical': 75.0},
+        'NerdQAxe+': {'warning': 65.0, 'critical': 75.0},
+        'NerdOctaxe': {'warning': 63.0, 'critical': 72.0},
+        'BitAxe Gamma': {'warning': 65.0, 'critical': 75.0},
+        'BitAxe Supra': {'warning': 63.0, 'critical': 73.0},
+        'BitAxe Ultra': {'warning': 62.0, 'critical': 72.0},
+        'BitAxe Max': {'warning': 62.0, 'critical': 72.0},
+        'BitAxe': {'warning': 62.0, 'critical': 72.0},
+        'default': {'warning': 70.0, 'critical': 85.0},
+    }
+
     def __init__(self, db):
         self.db = db
-        self.TEMP_WARNING = 70
-        self.TEMP_CRITICAL = 85
+
+    def _get_temp_thresholds(self, model: str) -> Dict:
+        """Get temperature thresholds for a miner model"""
+        if not model:
+            return self.MINER_TEMP_THRESHOLDS['default']
+        model_upper = model.upper()
+        # Check specific models first
+        for key, thresholds in self.MINER_TEMP_THRESHOLDS.items():
+            if key == 'default':
+                continue
+            if key.upper() in model_upper or model_upper in key.upper():
+                return thresholds
+        return self.MINER_TEMP_THRESHOLDS['default']
 
     def get_fleet_health(self) -> Dict:
-        """Get real fleet health status"""
+        """Get real fleet health status with miner-specific thresholds"""
         try:
             with self.db._get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Get latest stats for each miner
+                # Get latest stats for each miner including model
                 cursor.execute("""
-                    SELECT m.id, m.ip, m.custom_name, s.temperature, s.status, s.hashrate
+                    SELECT m.id, m.ip, m.custom_name, m.model, s.temperature, s.status, s.hashrate
                     FROM miners m
                     LEFT JOIN (
                         SELECT miner_id, temperature, status, hashrate,
@@ -322,22 +352,23 @@ class MinerHealthMonitor:
                 issues = []
 
                 for row in miners_data:
-                    miner_id, ip, custom_name, temp, status, hashrate = row
+                    miner_id, ip, custom_name, model, temp, status, hashrate = row
                     name = custom_name or ip
+                    thresholds = self._get_temp_thresholds(model)
 
-                    # Check temperature
-                    if temp and temp >= self.TEMP_CRITICAL:
-                        critical += 1
-                        issues.append(f"🔴 {name} critical temperature: {temp}°C")
-                    elif temp and temp >= self.TEMP_WARNING:
-                        warning += 1
-                        issues.append(f"🟡 {name} high temperature: {temp}°C")
-                    elif status == 'offline':
+                    # Check status first
+                    if status == 'offline':
                         critical += 1
                         issues.append(f"🔴 {name} is offline")
                     elif status == 'overheating':
                         critical += 1
                         issues.append(f"🔴 {name} overheating")
+                    elif temp and temp >= thresholds['critical']:
+                        critical += 1
+                        issues.append(f"🔴 {name} critical temperature: {temp:.1f}°C")
+                    elif temp and temp >= thresholds['warning']:
+                        warning += 1
+                        issues.append(f"🟡 {name} high temperature: {temp:.1f}°C")
                     else:
                         healthy += 1
 
@@ -378,23 +409,21 @@ class PowerEfficiencyMatrix:
         self.db = db
 
     def get_efficiency_matrix(self, electricity_rate_per_kwh: float = 0.12) -> Dict:
-        """Calculate real power efficiency (W/TH)"""
+        """Calculate real power efficiency (J/TH) from actual miner data"""
         try:
             with self.db._get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Get latest power for each miner
-                # Note: hashrate in database is pool difficulty estimate (unreliable)
-                # For BitAxe miners, typical hashrate is 0.5-1 TH/s based on model
+                # Get latest power AND hashrate for each miner
                 cursor.execute("""
-                    SELECT m.id, m.ip, m.custom_name, m.model, s.power
+                    SELECT m.id, m.ip, m.custom_name, m.model, s.power, s.hashrate
                     FROM miners m
                     LEFT JOIN (
-                        SELECT miner_id, power,
+                        SELECT miner_id, power, hashrate,
                                ROW_NUMBER() OVER (PARTITION BY miner_id ORDER BY timestamp DESC) as rn
                         FROM stats
                     ) s ON m.id = s.miner_id AND s.rn = 1
-                    WHERE s.power > 0
+                    WHERE s.power > 0 AND s.hashrate > 0
                 """)
 
                 miners_data = cursor.fetchall()
@@ -403,29 +432,21 @@ class PowerEfficiencyMatrix:
                 miner_efficiency_data = []
 
                 for row in miners_data:
-                    miner_id, ip, name, model, power_w = row
+                    miner_id, ip, name, model, power_w, hashrate_hs = row
 
-                    # Estimate realistic hashrate based on power consumption
-                    # BitAxe typically: 15W = ~600 GH/s, 90W = ~4 TH/s
-                    # NerdQAxe: 80-100W = ~3-5 TH/s
-                    # Nano3s: 25-30W = ~6 TH/s
+                    # Convert hashrate from H/s to TH/s
+                    hashrate_th = hashrate_hs / 1e12
+                    if hashrate_th <= 0:
+                        continue
 
-                    if power_w < 20:  # Small BitAxe
-                        hashrate_th = 0.6  # 600 GH/s
-                    elif power_w < 40:  # Nano3s
-                        hashrate_th = 6.0
-                    elif power_w < 100:  # NerdQAxe
-                        hashrate_th = 4.0
-                    else:  # Large miner
-                        hashrate_th = power_w / 20  # Rough estimate
-
-                    # Calculate W/TH
-                    w_per_th = power_w / hashrate_th
-                    efficiencies.append(w_per_th)
+                    # Calculate J/TH (watts / TH/s = joules per terahash)
+                    j_per_th = power_w / hashrate_th
+                    efficiencies.append(j_per_th)
 
                     miner_efficiency_data.append({
-                        'hashrate': hashrate_th,
-                        'efficiency': w_per_th
+                        'name': name or ip,
+                        'hashrate': round(hashrate_th, 2),
+                        'efficiency': round(j_per_th, 1)
                     })
 
                 if not efficiencies:
@@ -433,13 +454,21 @@ class PowerEfficiencyMatrix:
                         'fleet_average': 0,
                         'best_efficiency': 0,
                         'worst_efficiency': 0,
+                        'best_performer': None,
+                        'worst_performer': None,
                         'miner_efficiency_data': []
                     }
+
+                # Find best and worst performers by name
+                best_miner = min(miner_efficiency_data, key=lambda m: m['efficiency'])
+                worst_miner = max(miner_efficiency_data, key=lambda m: m['efficiency'])
 
                 return {
                     'fleet_average': round(sum(efficiencies) / len(efficiencies), 1),
                     'best_efficiency': round(min(efficiencies), 1),
                     'worst_efficiency': round(max(efficiencies), 1),
+                    'best_performer': {'name': best_miner['name'], 'efficiency': best_miner['efficiency']},
+                    'worst_performer': {'name': worst_miner['name'], 'efficiency': worst_miner['efficiency']},
                     'miner_efficiency_data': miner_efficiency_data
                 }
 
@@ -521,6 +550,9 @@ class PredictiveRevenueModel:
 
                     return {
                         'daily_revenue': round(daily_revenue, 2),
+                        'daily_cost': round(daily_cost, 2),
+                        'daily_profit': round(daily_profit, 2),
+                        'btc_price': round(btc_price, 2),
                         'monthly_revenue': round(monthly_revenue, 0),
                         'annual_revenue': round(annual_revenue, 0),
                         'breakeven_days': breakeven_days
@@ -561,6 +593,9 @@ class PredictiveRevenueModel:
 
                 return {
                     'daily_revenue': round(daily_revenue, 2),
+                    'daily_cost': round(daily_cost, 2),
+                    'daily_profit': round(daily_revenue - daily_cost, 2),
+                    'btc_price': 0,
                     'monthly_revenue': round(daily_revenue * 30, 0),
                     'annual_revenue': round(daily_revenue * 365, 0),
                     'breakeven_days': None
@@ -570,6 +605,9 @@ class PredictiveRevenueModel:
             logger.error(f"Error estimating from stats: {e}")
             return {
                 'daily_revenue': 0,
+                'daily_cost': 0,
+                'daily_profit': 0,
+                'btc_price': 0,
                 'monthly_revenue': 0,
                 'annual_revenue': 0,
                 'breakeven_days': None

@@ -9,6 +9,10 @@ let updateTimer = null;
 let chartRefreshTimer = null;
 let currentTab = 'fleet';
 let minersCache = {}; // Cache for miner data including nicknames
+let deviceSpecsCache = null; // Cache for device_specifications.json data
+let isUserEditingFrequency = false; // Track if user is actively editing frequency
+let isUserEditingVoltage = false; // Track if user is actively editing voltage
+let lastSetTargetFrequency = {}; // Per-IP target frequency tracking: { ip: freq }
 
 // ============================================================================
 // AUTO-OPTIMIZATION STATE
@@ -21,6 +25,90 @@ let optimizationState = {
     // Intervals for optimization loops
     intervals: {}
 };
+
+// ============================================================================
+// DEVICE SPECIFICATIONS HELPERS
+// ============================================================================
+
+// Fetch and cache device_specifications.json from backend
+async function loadDeviceSpecs() {
+    if (deviceSpecsCache) return deviceSpecsCache;
+    try {
+        const response = await fetch(`${API_BASE}/api/miner-specs`);
+        const result = await response.json();
+        if (result.success && result.data && result.data.devices) {
+            deviceSpecsCache = result.data.devices;
+        }
+    } catch (error) {
+        console.error('Error loading device specs:', error);
+    }
+    return deviceSpecsCache;
+}
+
+// Map a miner model/type string to a device_specifications.json key
+function getDeviceSpecKey(miner) {
+    if (!miner) return null;
+    const model = (miner.model || miner.type || '').toLowerCase();
+    const asicChip = (miner.last_status?.raw?.ASICModel || miner.last_status?.asic_model || '').toLowerCase();
+    const numChips = miner.last_status?.raw?.asicCount || miner.last_status?.asic_count || 1;
+
+    // Check for Hex variants first (multi-chip BitAxe)
+    if (model.includes('hex') && (model.includes('supra') || asicChip.includes('bm1368'))) return 'bitaxe_hex_supra';
+    if (model.includes('hex') && (model.includes('gamma') || asicChip.includes('bm1370'))) return 'bitaxe_hex_gamma';
+    if (model.includes('hex')) return 'bitaxe_hex_ultra';
+
+    // NerdOctaxe
+    if (model.includes('nerdoctaxe') || model.includes('octaxe')) return 'nerdoctaxe_gamma';
+    // NerdQAxe++
+    if (model.includes('nerdqaxe++') || model.includes('qaxe++')) {
+        if (asicChip.includes('bm1370')) return 'nerdqaxe_plusplus';
+        return 'nerdqaxe_plusplus';
+    }
+    // NerdQAxe+
+    if (model.includes('nerdqaxe') || model.includes('qaxe+')) return 'nerdqaxe_plus';
+    // NerdAxe
+    if (model.includes('nerdaxe')) return 'nerdaxe';
+
+    // BitAxe single-chip variants
+    if (model.includes('gamma') || (asicChip.includes('bm1370') && numChips <= 1)) return 'bitaxe_gamma';
+    if (model.includes('supra') || (asicChip.includes('bm1368') && numChips <= 1)) return 'bitaxe_supra';
+    if (model.includes('ultra') || (asicChip.includes('bm1366') && numChips <= 1)) return 'bitaxe_ultra';
+    if (model.includes('max') || (asicChip.includes('bm1397') && numChips <= 1)) return 'bitaxe_max';
+    if (model.includes('bitaxe')) return 'bitaxe_ultra'; // default BitAxe fallback
+
+    // LuckyMiner
+    if (model.includes('lucky')) return 'luckyminer';
+    // Avalon Nano 3S
+    if (model.includes('nano3s') || model.includes('nano 3s')) return 'avalon_nano_3s';
+
+    return null;
+}
+
+// Get frequency specs for a miner from device_specifications.json
+function getDeviceFrequencySpecs(miner) {
+    if (!deviceSpecsCache) return null;
+    const key = getDeviceSpecKey(miner);
+    if (!key || !deviceSpecsCache[key]) return null;
+    return deviceSpecsCache[key].frequency || null;
+}
+
+// Get device display name and chip info
+function getDeviceDisplayInfo(miner) {
+    if (!deviceSpecsCache) return { name: '--', chip: '--' };
+    const key = getDeviceSpecKey(miner);
+    if (!key || !deviceSpecsCache[key]) return { name: miner?.model || '--', chip: '--' };
+    const spec = deviceSpecsCache[key];
+    return {
+        name: spec.name || miner?.model || '--',
+        chip: spec.asic_chip || '--',
+        numChips: spec.num_chips || 1
+    };
+}
+
+// Round a frequency value to the nearest valid step
+function roundToStep(value, min, step) {
+    return Math.round((value - min) / step) * step + min;
+}
 
 // ============================================================================
 // BATCH SELECTION STATE
@@ -1123,7 +1211,8 @@ async function loadDashboard() {
             loadStats(),
             loadMiners(),
             loadFleetCombinedChart(fleetChartHours),
-            loadSoloOdds()
+            loadSoloOdds(),
+            updateMetricCards()
         ]);
         updateLastUpdateTime();
 
@@ -1244,6 +1333,142 @@ async function loadSoloOdds() {
         }
     } catch (error) {
         console.error('Error loading solo odds:', error);
+    }
+}
+
+// Update the 3 homescreen metric cards (Fleet Status, Today's Earnings, Fleet Efficiency)
+async function updateMetricCards() {
+    try {
+        const [statsResponse, minersResponse] = await Promise.all([
+            fetch(`${API_BASE}/api/stats`),
+            fetch(`${API_BASE}/api/miners`)
+        ]);
+
+        const statsData = await statsResponse.json();
+        const minersData = await minersResponse.json();
+
+        if (!statsData.success || !minersData.success) return;
+
+        const stats = statsData.stats;
+        const miners = minersData.miners || [];
+
+        // --- Card 1: Fleet Status ---
+        const onlineCount = stats.online_miners ?? 0;
+        const totalCount = stats.total_miners ?? 0;
+        const offlineCount = stats.offline_miners ?? 0;
+        const overheatedCount = stats.overheated_miners ?? 0;
+
+        const onlineEl = document.getElementById('card-miners-online');
+        const totalEl = document.getElementById('card-miners-total');
+        const hashrateEl = document.getElementById('card-total-hashrate');
+        const indicatorEl = document.getElementById('fleet-status-indicator');
+
+        if (onlineEl) onlineEl.textContent = onlineCount;
+        if (totalEl) totalEl.textContent = totalCount;
+        if (hashrateEl) hashrateEl.textContent = formatHashrate(stats.total_hashrate ?? 0);
+
+        // Status indicator: green = all online, yellow = some offline/overheated, red = majority offline
+        if (indicatorEl) {
+            if (offlineCount === 0 && overheatedCount === 0 && totalCount > 0) {
+                indicatorEl.className = 'fleet-status-indicator status-green';
+            } else if (offlineCount > totalCount / 2) {
+                indicatorEl.className = 'fleet-status-indicator status-red';
+            } else if (offlineCount > 0 || overheatedCount > 0) {
+                indicatorEl.className = 'fleet-status-indicator status-yellow';
+            } else {
+                indicatorEl.className = 'fleet-status-indicator status-neutral';
+            }
+        }
+
+        // --- Card 2: Today's Earnings ---
+        // Fetch profitability data for revenue/cost/profit
+        try {
+            const profResponse = await fetch(`${API_BASE}/api/energy/profitability`);
+            const profData = await profResponse.json();
+
+            if (profData.success && profData.profitability) {
+                const prof = profData.profitability;
+                const satsPerDay = Math.round((prof.btc_per_day ?? 0) * 100000000);
+                const revenuePerDay = prof.revenue_per_day ?? 0;
+                const costPerDay = prof.energy_cost_per_day ?? 0;
+                const profitPerDay = prof.profit_per_day ?? 0;
+
+                const satsEl = document.getElementById('card-sats-today');
+                const revenueEl = document.getElementById('card-daily-revenue');
+                const costEl = document.getElementById('card-daily-cost');
+                const profitEl = document.getElementById('card-daily-profit');
+
+                if (satsEl) satsEl.textContent = satsPerDay.toLocaleString();
+                if (revenueEl) revenueEl.textContent = `$${revenuePerDay.toFixed(2)}`;
+                if (costEl) costEl.textContent = `$${costPerDay.toFixed(2)}`;
+                if (profitEl) {
+                    profitEl.textContent = `$${profitPerDay.toFixed(2)}`;
+                    if (profitPerDay >= 0) {
+                        profitEl.classList.add('profit-positive');
+                        profitEl.classList.remove('profit-negative');
+                    } else {
+                        profitEl.classList.add('profit-negative');
+                        profitEl.classList.remove('profit-positive');
+                    }
+                }
+            }
+        } catch (profError) {
+            console.error('Error loading profitability for metric cards:', profError);
+        }
+
+        // --- Card 3: Fleet Efficiency ---
+        const fleetEffEl = document.getElementById('card-fleet-efficiency');
+        const avgTempEl = document.getElementById('card-avg-temp');
+        const bestMinerEl = document.getElementById('card-best-miner');
+        const bestEffEl = document.getElementById('card-best-efficiency');
+        const worstMinerEl = document.getElementById('card-worst-miner');
+        const worstEffEl = document.getElementById('card-worst-efficiency');
+
+        // Fleet-wide efficiency
+        if (fleetEffEl && stats.total_hashrate && stats.total_power) {
+            const hashrateTH = stats.total_hashrate / 1e12;
+            if (hashrateTH > 0) {
+                const fleetEff = stats.total_power / hashrateTH;
+                fleetEffEl.textContent = fleetEff.toFixed(1);
+                fleetEffEl.className = 'efficiency-value ' + getEfficiencyClass(stats.total_hashrate, stats.total_power);
+            }
+        }
+
+        // Average temperature
+        if (avgTempEl) {
+            avgTempEl.textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}\u00B0C`;
+        }
+
+        // Find best and worst miners by efficiency (J/TH)
+        const minerEfficiencies = [];
+        for (const miner of miners) {
+            const status = miner.last_status || {};
+            const hr = status.hashrate || 0;
+            const pw = status.power || 0;
+            if (hr > 0 && pw > 0) {
+                const hrTH = hr / 1e12;
+                if (hrTH > 0) {
+                    minerEfficiencies.push({
+                        name: miner.custom_name || miner.ip,
+                        efficiency: pw / hrTH
+                    });
+                }
+            }
+        }
+
+        if (minerEfficiencies.length > 0) {
+            minerEfficiencies.sort(function(a, b) { return a.efficiency - b.efficiency; });
+            const best = minerEfficiencies[0];
+            const worst = minerEfficiencies[minerEfficiencies.length - 1];
+
+            if (bestMinerEl) bestMinerEl.textContent = best.name;
+            if (bestEffEl) bestEffEl.textContent = `${best.efficiency.toFixed(1)} J/TH`;
+            if (worstMinerEl) worstMinerEl.textContent = worst.name;
+            if (worstEffEl) worstEffEl.textContent = `${worst.efficiency.toFixed(1)} J/TH`;
+        }
+
+    } catch (error) {
+        console.error('Error updating metric cards:', error);
     }
 }
 
@@ -1370,6 +1595,14 @@ function displayMiners(miners) {
                         e.stopPropagation();
                         restartMiner(miner.ip);
                     });
+                }
+
+                // Initialize miner card share doughnut chart
+                const status = miner.last_status || {};
+                const minerStatus = status.status || 'offline';
+                const isOnline = minerStatus === 'online' || minerStatus === 'overheating';
+                if (isOnline) {
+                    initMinerCardShareChart(miner.ip, status.shares_accepted || 0, status.shares_rejected || 0);
                 }
             });
         } else {
@@ -1500,12 +1733,28 @@ function createMinerCard(miner) {
                         <span class="miner-stat-value">${formatFanSpeed(status.fan_speed)}</span>
                     </div>
                     <div class="miner-stat">
-                        <span class="miner-stat-label">Shares Found</span>
-                        <span class="miner-stat-value">${formatNumber(status.shares_accepted || 0)}</span>
-                    </div>
-                    <div class="miner-stat">
                         <span class="miner-stat-label">Best Difficulty</span>
                         <span class="miner-stat-value">${formatDifficulty(status.best_difficulty || 0)}</span>
+                    </div>
+                </div>
+                <div class="miner-card-shares">
+                    <div class="miner-card-shares-chart">
+                        <canvas class="miner-card-shares-canvas" data-ip="${miner.ip}" width="80" height="80"></canvas>
+                        <div class="miner-card-shares-center">
+                            <span class="miner-card-shares-pct">${(() => { const a = status.shares_accepted || 0; const r = status.shares_rejected || 0; const t = a + r; return t > 0 ? ((a / t) * 100).toFixed(1) + '%' : '100%'; })()}</span>
+                        </div>
+                    </div>
+                    <div class="miner-card-shares-details">
+                        <div class="miner-card-shares-row accepted">
+                            <span class="miner-card-shares-dot accepted"></span>
+                            <span class="miner-card-shares-label">Accepted</span>
+                            <span class="miner-card-shares-val">${formatNumber(status.shares_accepted || 0)}</span>
+                        </div>
+                        <div class="miner-card-shares-row rejected">
+                            <span class="miner-card-shares-dot rejected"></span>
+                            <span class="miner-card-shares-label">Rejected</span>
+                            <span class="miner-card-shares-val">${formatNumber(status.shares_rejected || 0)}</span>
+                        </div>
                     </div>
                 </div>
             ` : `
@@ -1546,6 +1795,28 @@ function formatHashrate(hashrate) {
 function formatNumber(num) {
     if (!num) return '0';
     return num.toLocaleString();
+}
+
+// Consistent metric formatting across all charts
+function formatMetric(value, type) {
+    if (value === null || value === undefined || isNaN(value)) return '--';
+    switch (type) {
+        case 'temp': return value.toFixed(1);
+        case 'hashrate': return value.toFixed(2);
+        case 'power': return Math.round(value);
+        case 'efficiency': return value.toFixed(1);
+        case 'profit': return value.toFixed(2);
+        default: return value.toFixed(2);
+    }
+}
+
+// Update chart-meta element with data point count and last updated time
+function updateChartMeta(chartId, dataPointCount, lastUpdated) {
+    const metaEl = document.getElementById(`${chartId}-chart-meta`);
+    if (!metaEl) return;
+    const countText = `${dataPointCount} data points`;
+    const timeText = lastUpdated ? `Last updated: ${new Date(lastUpdated).toLocaleTimeString()}` : '';
+    metaEl.textContent = `${countText}${timeText ? ' | ' + timeText : ''}`;
 }
 
 // Format fan speed with correct unit (% for PWM control, RPM for traditional ASIC miners)
@@ -1796,7 +2067,9 @@ async function loadEnergyTab(refreshChart = false) {
     const promises = [
         loadEnergyRates(),
         loadProfitability(),
-        loadEnergyConsumption()
+        loadEnergyConsumption(),
+        loadMiningTimeline(),
+        loadMiningAutoControls()
     ];
 
     // Only load chart on initial load or explicit refresh, not on auto-refresh
@@ -2133,7 +2406,7 @@ async function searchUtilities() {
     const ratePreview = document.getElementById('rate-preview');
 
     // Show loading state
-    utilityList.innerHTML = '<div class="loading">Searching utilities...</div>';
+    utilityList.innerHTML = '<div class="loading">Searching OpenEI database for utilities matching "' + query + '"...</div>';
     searchResultsWrapper.style.display = 'block';
     ratePlansContainer.style.display = 'none';
     ratePlansList.innerHTML = '';
@@ -2148,27 +2421,43 @@ async function searchUtilities() {
         if (data.success && data.utilities && data.utilities.length > 0) {
             displayUtilityResults(data.utilities);
         } else if (data.error) {
-            // Show API error (likely missing API key)
-            const isApiKeyError = data.error.includes('API key') || data.error.includes('API_KEY');
-            utilityList.innerHTML = `
-                <div class="error-message">
+            // Determine error type for specific messaging
+            const errorType = data.error_type || '';
+            const isApiKeyError = errorType === 'no_api_key' || errorType === 'api_key_error' ||
+                                  data.error.includes('API key') || data.error.includes('API_KEY');
+            const isNetworkError = data.error.includes('Network error') || data.error.includes('network');
+
+            let errorHtml = `<div class="error-message">`;
+            if (isApiKeyError) {
+                errorHtml += `
+                    <p><strong>API Key Required</strong></p>
                     <p>${data.error}</p>
-                    ${isApiKeyError ? `
-                        <p class="hint">
-                            <a href="https://openei.org/services/api/signup" target="_blank">Get a free API key</a>
-                            and add it to your config.py or set the OPENEI_API_KEY environment variable.
-                        </p>
-                        <p class="hint">Or use the <strong>Manual Entry</strong> tab to enter your rates directly.</p>
-                    ` : `
-                        <p class="hint">Please try again or use manual entry</p>
-                    `}
-                </div>
-            `;
+                    <p class="hint">
+                        <a href="https://openei.org/services/api/signup" target="_blank" rel="noopener">Get a free API key from OpenEI</a>,
+                        then add it using the API Key section above.
+                    </p>
+                    <p class="hint">Or use the <strong>Manual Entry</strong> tab to enter your rates directly.</p>
+                `;
+            } else if (isNetworkError) {
+                errorHtml += `
+                    <p><strong>Network Error</strong></p>
+                    <p>${data.error}</p>
+                    <p class="hint">Check your internet connection and try again. The OpenEI API may also be temporarily unavailable.</p>
+                `;
+            } else {
+                errorHtml += `
+                    <p>${data.error}</p>
+                    <p class="hint">Please try a different search term or use the <strong>Manual Entry</strong> tab.</p>
+                `;
+            }
+            errorHtml += `</div>`;
+            utilityList.innerHTML = errorHtml;
         } else {
             utilityList.innerHTML = `
                 <div class="no-results">
-                    <p>No utilities found for "${query}"</p>
-                    <p class="hint">Try searching by utility name, state, or city (e.g., "Xcel Energy", "Colorado", "Denver")</p>
+                    <p>No utilities found matching "${query}"</p>
+                    <p class="hint">Try searching by exact utility company name (e.g., "Pacific Gas", "Duke Energy", "Xcel Energy").</p>
+                    <p class="hint">You can also search by state name or city for address-based lookup.</p>
                 </div>
             `;
         }
@@ -2176,8 +2465,9 @@ async function searchUtilities() {
         console.error('Error searching utilities:', error);
         utilityList.innerHTML = `
             <div class="error-message">
-                <p>Error searching utilities: ${error.message}</p>
-                <p class="hint">Please try again or use the Manual Entry tab</p>
+                <p><strong>Connection Error</strong></p>
+                <p>Could not reach the server: ${error.message}</p>
+                <p class="hint">Check that DirtySats is running and try again, or use the <strong>Manual Entry</strong> tab.</p>
             </div>
         `;
     }
@@ -2430,32 +2720,96 @@ async function applyManualRates(e) {
             standard_rate: flatRate
         };
     } else {
-        // TOU rates - peak hours and off-peak for all other hours
-        const peakRate = parseFloat(document.getElementById('manual-peak-rate').value);
-        const peakStart = document.getElementById('manual-peak-start').value;
-        const peakEnd = document.getElementById('manual-peak-end').value;
-        const offPeakRate = parseFloat(document.getElementById('manual-offpeak-rate').value);
+        // Check if seasonal mode is enabled
+        const seasonalActive = document.querySelector('.seasonal-toggle .toggle-btn.active[data-seasonal="on"]');
 
-        // Validate inputs
-        if (isNaN(peakRate) || peakRate <= 0) {
-            showAlert('Please enter a valid peak rate', 'warning');
-            return;
-        }
-        if (isNaN(offPeakRate) || offPeakRate <= 0) {
-            showAlert('Please enter a valid off-peak rate', 'warning');
-            return;
-        }
-        if (!peakStart || !peakEnd) {
-            showAlert('Please enter peak hours', 'warning');
-            return;
-        }
+        if (seasonalActive) {
+            // Seasonal TOU rates - separate summer/winter rate schedules
+            const summerPeakRate = parseFloat(document.getElementById('summer-peak-rate').value);
+            const summerOffPeakRate = parseFloat(document.getElementById('summer-offpeak-rate').value);
+            const summerPeakStart = document.getElementById('summer-peak-start').value;
+            const summerPeakEnd = document.getElementById('summer-peak-end').value;
+            const summerStartDate = document.getElementById('summer-start-date').value;
 
-        ratesPayload = {
-            peak_rate: peakRate,
-            peak_start: peakStart,
-            peak_end: peakEnd,
-            off_peak_rate: offPeakRate
-        };
+            const winterPeakRate = parseFloat(document.getElementById('winter-peak-rate').value);
+            const winterOffPeakRate = parseFloat(document.getElementById('winter-offpeak-rate').value);
+            const winterPeakStart = document.getElementById('winter-peak-start').value;
+            const winterPeakEnd = document.getElementById('winter-peak-end').value;
+            const winterStartDate = document.getElementById('winter-start-date').value;
+
+            // Validate summer rates
+            if (isNaN(summerPeakRate) || summerPeakRate <= 0) {
+                showAlert('Please enter a valid summer peak rate', 'warning');
+                return;
+            }
+            if (isNaN(summerOffPeakRate) || summerOffPeakRate <= 0) {
+                showAlert('Please enter a valid summer off-peak rate', 'warning');
+                return;
+            }
+            if (!summerPeakStart || !summerPeakEnd) {
+                showAlert('Please enter summer peak hours', 'warning');
+                return;
+            }
+
+            // Validate winter rates
+            if (isNaN(winterPeakRate) || winterPeakRate <= 0) {
+                showAlert('Please enter a valid winter peak rate', 'warning');
+                return;
+            }
+            if (isNaN(winterOffPeakRate) || winterOffPeakRate <= 0) {
+                showAlert('Please enter a valid winter off-peak rate', 'warning');
+                return;
+            }
+            if (!winterPeakStart || !winterPeakEnd) {
+                showAlert('Please enter winter peak hours', 'warning');
+                return;
+            }
+
+            ratesPayload = {
+                seasonal: true,
+                summer: {
+                    peak_rate: summerPeakRate,
+                    off_peak_rate: summerOffPeakRate,
+                    peak_start: summerPeakStart,
+                    peak_end: summerPeakEnd,
+                    start_date: summerStartDate
+                },
+                winter: {
+                    peak_rate: winterPeakRate,
+                    off_peak_rate: winterOffPeakRate,
+                    peak_start: winterPeakStart,
+                    peak_end: winterPeakEnd,
+                    start_date: winterStartDate
+                }
+            };
+        } else {
+            // Standard TOU rates - peak hours and off-peak for all other hours
+            const peakRate = parseFloat(document.getElementById('manual-peak-rate').value);
+            const peakStart = document.getElementById('manual-peak-start').value;
+            const peakEnd = document.getElementById('manual-peak-end').value;
+            const offPeakRate = parseFloat(document.getElementById('manual-offpeak-rate').value);
+
+            // Validate inputs
+            if (isNaN(peakRate) || peakRate <= 0) {
+                showAlert('Please enter a valid peak rate', 'warning');
+                return;
+            }
+            if (isNaN(offPeakRate) || offPeakRate <= 0) {
+                showAlert('Please enter a valid off-peak rate', 'warning');
+                return;
+            }
+            if (!peakStart || !peakEnd) {
+                showAlert('Please enter peak hours', 'warning');
+                return;
+            }
+
+            ratesPayload = {
+                peak_rate: peakRate,
+                peak_start: peakStart,
+                peak_end: peakEnd,
+                off_peak_rate: offPeakRate
+            };
+        }
     }
 
     const submitBtn = document.querySelector('#manual-rate-form button[type="submit"]');
@@ -2655,198 +3009,137 @@ function displayProfitability(prof) {
     loadScheduleSimulations(prof);
 }
 
-// Load and display schedule simulations
+// Load and display strategy optimizer using real optimization algorithm
 async function loadScheduleSimulations(profitability) {
     try {
-        // Get rate schedule data
-        const ratesResponse = await fetch(`${API_BASE}/api/energy/rates`);
-        const ratesData = await ratesResponse.json();
+        const response = await fetch(`${API_BASE}/api/energy/strategies`);
+        const result = await response.json();
 
-        if (!ratesData.success || !ratesData.schedule) {
-            document.getElementById('simulation-strategies').innerHTML =
-                '<p class="loading">Unable to load rate schedule for simulations</p>';
+        if (!result.success || !result.strategies || result.strategies.length === 0) {
+            const el = document.getElementById('simulation-strategies');
+            if (el) el.textContent = 'Unable to generate strategies. Ensure miners are online and energy rates are configured.';
             return;
         }
 
-        const rates = ratesData.schedule;
-        const avgRate = rates.reduce((sum, r) => sum + r.rate_per_kwh, 0) / rates.length;
-        const minRate = Math.min(...rates.map(r => r.rate_per_kwh));
-        const maxRate = Math.max(...rates.map(r => r.rate_per_kwh));
-
-        // Calculate actual hours for each rate type by parsing time ranges
-        let offPeakHours = 0;
-        let peakHours = 0;
-        rates.forEach(r => {
-            // Parse time range (e.g., "00:00" to "17:00")
-            const startParts = (r.start_time || '00:00').split(':');
-            const endParts = (r.end_time || '23:59').split(':');
-            let startHour = parseInt(startParts[0]) + parseInt(startParts[1]) / 60;
-            let endHour = parseInt(endParts[0]) + parseInt(endParts[1]) / 60;
-            // Handle end time of 23:59 as 24:00
-            if (r.end_time === '23:59') endHour = 24;
-            const hours = endHour - startHour;
-            if (r.rate_per_kwh <= minRate || r.rate_type === 'off-peak') {
-                offPeakHours += hours;
-            } else {
-                peakHours += hours;
-            }
-        });
-        // Ensure we have valid totals
-        if (offPeakHours + peakHours === 0) {
-            offPeakHours = 12;
-            peakHours = 12;
-        }
-
-        // Define strategies
-        const strategies = [
-            {
-                name: "24/7 Maximum Mining",
-                description: "Mine at maximum frequency 24 hours a day, regardless of energy rates",
-                miningHours: 24,
-                avgFrequency: 1.0,
-                schedule: "All day: MAX frequency",
-                settings: { maxRate: 999, highRateFreq: 0, lowRateFreq: 0 }
-            },
-            {
-                name: "Off-Peak Only",
-                description: "Mine only during off-peak hours when electricity is cheapest",
-                miningHours: offPeakHours,
-                avgFrequency: 1.0,
-                schedule: `${Math.round(offPeakHours)} hours/day at MAX frequency during lowest rates`,
-                settings: { maxRate: avgRate, highRateFreq: 0, lowRateFreq: 0 }
-            },
-            {
-                name: "Smart Scheduling",
-                description: "Reduce frequency during peak rates, maximize during off-peak",
-                miningHours: 24,
-                avgFrequency: 0.7,
-                schedule: "Peak: 400 MHz underclock, Off-peak: MAX frequency",
-                settings: { maxRate: 999, highRateFreq: 400, lowRateFreq: 0 }
-            },
-            {
-                name: "Conservative",
-                description: "Turn off during highest rates, mine at reduced frequency otherwise",
-                miningHours: offPeakHours,
-                avgFrequency: 0.8,
-                schedule: `Turn OFF when rate > $${avgRate.toFixed(3)}/kWh, otherwise 450 MHz`,
-                settings: { maxRate: avgRate, highRateFreq: 0, lowRateFreq: 450 }
-            }
-        ];
-
-        // Calculate profitability for each strategy
-        const strategiesWithProfit = strategies.map(strategy => {
-            // Estimate revenue based on mining hours and frequency
-            const revenueMultiplier = (strategy.miningHours / 24) * strategy.avgFrequency;
-            const estimatedRevenue = profitability.revenue_per_day * revenueMultiplier;
-
-            // Estimate energy cost based on mining hours and frequency
-            const energyMultiplier = (strategy.miningHours / 24) * strategy.avgFrequency;
-            const avgRateForStrategy = strategy.miningHours === 24 ? avgRate : minRate;
-            const estimatedEnergyCost = (profitability.energy_cost_per_day / avgRate) * avgRateForStrategy * energyMultiplier;
-
-            const estimatedProfit = estimatedRevenue - estimatedEnergyCost;
-            const estimatedBtc = profitability.btc_per_day * revenueMultiplier;
-
-            return {
-                ...strategy,
-                estimatedRevenue,
-                estimatedEnergyCost,
-                estimatedProfit,
-                estimatedBtc
-            };
-        });
-
-        // Sort by profitability
-        strategiesWithProfit.sort((a, b) => b.estimatedProfit - a.estimatedProfit);
-
-        // Mark the most profitable strategy as recommended
-        if (strategiesWithProfit.length > 0) {
-            strategiesWithProfit[0].recommended = true;
-        }
-
-        // Display strategy cards
-        displayStrategyCards(strategiesWithProfit);
+        displayStrategyCards(result.strategies);
 
     } catch (error) {
-        console.error('Error loading schedule simulations:', error);
-        document.getElementById('simulation-strategies').innerHTML =
-            '<p class="loading">Error loading simulations</p>';
+        console.error('Error loading strategies:', error);
+        const el = document.getElementById('simulation-strategies');
+        if (el) el.textContent = 'Error loading strategies';
     }
 }
 
-// Display strategy cards
+// Display strategy cards with real data
 function displayStrategyCards(strategies) {
     const container = document.getElementById('simulation-strategies');
+    if (!container) return;
 
-    const html = strategies.map(strategy => {
-        const profitClass = strategy.estimatedProfit > 0 ? 'profit' : 'loss';
-        const recommendedClass = strategy.recommended ? 'recommended' : '';
+    // Clear safely
+    while (container.firstChild) container.removeChild(container.firstChild);
 
-        return `
-            <div class="strategy-card ${recommendedClass}">
-                <div class="strategy-header">
-                    <div class="strategy-name">${strategy.name}</div>
-                    <div class="strategy-description">${strategy.description}</div>
-                </div>
+    // Sort by daily profit descending; mark best as recommended
+    const sorted = [...strategies].sort((a, b) =>
+        (b.projections?.daily?.profit || 0) - (a.projections?.daily?.profit || 0)
+    );
 
-                <div class="strategy-metrics">
-                    <div class="strategy-metric">
-                        <span class="metric-label">Est. Daily Profit</span>
-                        <span class="metric-value ${profitClass}">$${strategy.estimatedProfit.toFixed(2)}</span>
-                    </div>
-                    <div class="strategy-metric">
-                        <span class="metric-label">Est. Daily Revenue</span>
-                        <span class="metric-value">$${strategy.estimatedRevenue.toFixed(2)}</span>
-                    </div>
-                    <div class="strategy-metric">
-                        <span class="metric-label">Est. Energy Cost</span>
-                        <span class="metric-value">$${strategy.estimatedEnergyCost.toFixed(2)}</span>
-                    </div>
-                    <div class="strategy-metric">
-                        <span class="metric-label">Est. BTC/Day</span>
-                        <span class="metric-value">${strategy.estimatedBtc.toFixed(8)}</span>
-                    </div>
-                </div>
+    sorted.forEach((strategy, index) => {
+        const proj = strategy.projections || {};
+        const daily = proj.daily || {};
+        const weekly = proj.weekly || {};
+        const monthly = proj.monthly || {};
+        const isRecommended = index === 0;
+        const profitClass = daily.profit >= 0 ? 'profit' : 'loss';
 
-                <div class="strategy-schedule-info">
-                    <strong>Schedule:</strong> ${strategy.schedule}
-                </div>
+        const card = document.createElement('div');
+        card.className = 'strategy-card' + (isRecommended ? ' recommended' : '');
 
-                <button class="apply-strategy-btn" onclick="applyStrategy(${JSON.stringify(strategy.settings).replace(/"/g, '&quot;')})">
-                    Apply This Schedule
-                </button>
-            </div>
-        `;
-    }).join('');
+        // Header
+        const header = document.createElement('div');
+        header.className = 'strategy-header';
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'strategy-name';
+        nameDiv.textContent = strategy.name + (isRecommended ? ' (Recommended)' : '');
+        const descDiv = document.createElement('div');
+        descDiv.className = 'strategy-description';
+        descDiv.textContent = `${strategy.mining_hours || 0}h mining per day`;
+        header.appendChild(nameDiv);
+        header.appendChild(descDiv);
+        card.appendChild(header);
 
-    container.innerHTML = html;
+        // Mini timeline
+        if (strategy.hourly_plan && strategy.hourly_plan.length === 24) {
+            const timeline = document.createElement('div');
+            timeline.className = 'strategy-mini-timeline';
+            strategy.hourly_plan.forEach(h => {
+                const block = document.createElement('div');
+                block.className = 'mini-timeline-block';
+                if (h.frequency === 0) block.classList.add('timeline-off');
+                else if (h.frequency >= 500) block.classList.add('timeline-full');
+                else block.classList.add('timeline-reduced');
+                block.title = `${h.hour}:00 - ${h.frequency === 0 ? 'OFF' : h.frequency + ' MHz'} ($${(h.rate || 0).toFixed(3)}/kWh)`;
+                timeline.appendChild(block);
+            });
+            card.appendChild(timeline);
+        }
+
+        // Earnings table
+        const table = document.createElement('div');
+        table.className = 'strategy-earnings-table';
+
+        const rows = [
+            ['', 'Daily', 'Weekly', 'Monthly'],
+            ['Revenue', `$${daily.revenue?.toFixed(4) || '0'}`, `$${weekly.revenue?.toFixed(4) || '0'}`, `$${monthly.revenue?.toFixed(2) || '0'}`],
+            ['Cost', `$${daily.cost?.toFixed(4) || '0'}`, `$${weekly.cost?.toFixed(4) || '0'}`, `$${monthly.cost?.toFixed(2) || '0'}`],
+            ['Profit', `$${daily.profit?.toFixed(4) || '0'}`, `$${weekly.profit?.toFixed(4) || '0'}`, `$${monthly.profit?.toFixed(2) || '0'}`],
+            ['BTC', `${daily.btc?.toFixed(8) || '0'}`, `${weekly.btc?.toFixed(8) || '0'}`, `${monthly.btc?.toFixed(8) || '0'}`],
+            ['Sats', `${(daily.sats || 0).toLocaleString()}`, `${(weekly.sats || 0).toLocaleString()}`, `${(monthly.sats || 0).toLocaleString()}`]
+        ];
+
+        rows.forEach((row, ri) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'earnings-row' + (ri === 0 ? ' earnings-header' : '');
+            if (ri === 3) rowDiv.classList.add(profitClass);
+            row.forEach(cell => {
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'earnings-cell';
+                cellDiv.textContent = cell;
+                rowDiv.appendChild(cellDiv);
+            });
+            table.appendChild(rowDiv);
+        });
+        card.appendChild(table);
+
+        // Apply button
+        const btn = document.createElement('button');
+        btn.className = 'apply-strategy-btn';
+        btn.textContent = 'Apply Strategy';
+        btn.addEventListener('click', () => applyStrategy(strategy.name, strategy.hourly_plan));
+        card.appendChild(btn);
+
+        container.appendChild(card);
+    });
 }
 
-// Apply a strategy
-async function applyStrategy(settings) {
+// Apply a strategy using the new endpoint
+async function applyStrategy(name, hourlyPlan) {
     try {
-        const response = await fetch(`${API_BASE}/api/energy/schedule`, {
+        const response = await fetch(`${API_BASE}/api/energy/strategies/apply`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                auto_from_rates: true,
-                max_rate_threshold: settings.maxRate,
-                low_frequency: settings.highRateFreq,
-                high_frequency: settings.lowRateFreq
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, hourly_plan: hourlyPlan })
         });
 
         const data = await response.json();
 
         if (data.success) {
-            showAlert('Mining schedule applied successfully! Your miners will now follow this strategy.', 'success');
+            showAlert(`Strategy "${name}" applied successfully!`, 'success');
+            loadMiningTimeline();
         } else {
             showAlert(`Error: ${data.error}`, 'error');
         }
     } catch (error) {
-        showAlert(`Error applying schedule: ${error.message}`, 'error');
+        showAlert(`Error applying strategy: ${error.message}`, 'error');
     }
 }
 
@@ -2997,6 +3290,85 @@ async function createMiningSchedule(e) {
     }
 }
 
+// Load mining timeline from API
+async function loadMiningTimeline() {
+    try {
+        const response = await fetch(`${API_BASE}/api/energy/schedule/timeline`);
+        const result = await response.json();
+        if (!result.success) return;
+
+        const container = document.getElementById('mining-timeline');
+        if (!container) return;
+
+        // Clear existing content safely
+        while (container.firstChild) container.removeChild(container.firstChild);
+
+        result.timeline.forEach(hour => {
+            const block = document.createElement('div');
+            block.className = 'timeline-block';
+            if (hour.status === 'full') block.classList.add('timeline-full');
+            else if (hour.status === 'reduced') block.classList.add('timeline-reduced');
+            else block.classList.add('timeline-off');
+            if (hour.is_current) block.classList.add('timeline-current');
+
+            const freqLabel = hour.target_frequency === 0 ? 'MAX' : `${hour.target_frequency} MHz`;
+            const rateLabel = `$${hour.rate.toFixed(3)}/kWh`;
+            block.title = `${hour.hour_label} | ${freqLabel} | ${rateLabel} | ${hour.rate_type}`;
+
+            const hourSpan = document.createElement('span');
+            hourSpan.className = 'timeline-hour';
+            hourSpan.textContent = hour.hour;
+            block.appendChild(hourSpan);
+            container.appendChild(block);
+        });
+    } catch (error) {
+        console.error('Error loading mining timeline:', error);
+    }
+}
+
+// Load auto-control settings
+async function loadMiningAutoControls() {
+    try {
+        const response = await fetch(`${API_BASE}/api/energy/auto-controls`);
+        const result = await response.json();
+        if (!result.success) return;
+
+        const c = result.controls;
+        const profToggle = document.getElementById('profitability-auto-pause');
+        const btcFloor = document.getElementById('btc-price-floor');
+        const diffThresh = document.getElementById('difficulty-alert-threshold');
+
+        if (profToggle) profToggle.checked = c.profitability_auto_pause;
+        if (btcFloor) btcFloor.value = c.btc_price_floor || 0;
+        if (diffThresh) diffThresh.value = c.difficulty_alert_threshold || 5;
+    } catch (error) {
+        console.error('Error loading auto-controls:', error);
+    }
+}
+
+// Save auto-control settings
+async function saveMiningAutoControls() {
+    try {
+        const response = await fetch(`${API_BASE}/api/energy/auto-controls`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                profitability_auto_pause: document.getElementById('profitability-auto-pause')?.checked || false,
+                btc_price_floor: parseFloat(document.getElementById('btc-price-floor')?.value) || 0,
+                difficulty_alert_threshold: parseFloat(document.getElementById('difficulty-alert-threshold')?.value) || 5
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showAlert('Auto-controls saved', 'success');
+        } else {
+            showAlert(`Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Error saving auto-controls: ${error.message}`, 'error');
+    }
+}
+
 // Show alert message
 function showAlert(message, type) {
     const alert = document.getElementById('alert-box');
@@ -3057,7 +3429,8 @@ async function loadFleetCombinedChart(hours = 6) {
         const BUCKET_SIZE = hours <= 1 ? 1 * 60 * 1000 :      // 1 min for 1 hour
                            hours <= 6 ? 5 * 60 * 1000 :       // 5 min for 6 hours
                            hours <= 24 ? 15 * 60 * 1000 :     // 15 min for 24 hours
-                           60 * 60 * 1000;                     // 1 hour for longer
+                           hours <= 168 ? 60 * 60 * 1000 :    // 1 hour for up to 1 week
+                           4 * 60 * 60 * 1000;                 // 4 hours for 30 days
 
         // Aggregate hashrate data by time bucket (sum all miners)
         const hashrateByTime = {};
@@ -3081,6 +3454,9 @@ async function loadFleetCombinedChart(hours = 6) {
         const totalHashrateData = Object.entries(hashrateByTime)
             .map(([time, bucket]) => ({ x: new Date(parseInt(time)), y: bucket.sum }))
             .sort((a, b) => a.x - b.x);
+
+        // No EMA smoothing — display actual data points.
+        // Visual smoothing is handled by Chart.js tension: 0.2 on the dataset.
 
         // Calculate average hashrate for the dashed reference line
         const avgHashrate = totalHashrateData.length > 0
@@ -3110,9 +3486,9 @@ async function loadFleetCombinedChart(hours = 6) {
         let minHashrate = totalHashrateData.length > 0 ? Math.min(...totalHashrateData.map(d => d.y)) : 0;
         if (maxHashrate === 0) maxHashrate = 10;
 
-        // Hashrate axis: adaptive range based on data to show fluctuations clearly
+        // Hashrate axis: adaptive range with generous padding to show variation clearly
         const hashrateRange = maxHashrate - minHashrate;
-        const hashratePadding = Math.max(hashrateRange * 0.15, maxHashrate * 0.02); // 15% of range or 2% of max
+        const hashratePadding = Math.max(hashrateRange * 0.3, maxHashrate * 0.05); // 30% of range or 5% of max
         const hashrateAxisMin = Math.max(0, minHashrate - hashratePadding);
         const hashrateAxisMax = maxHashrate + hashratePadding;
         const unitInfo = getHashrateUnitInfo(hashrateAxisMax);
@@ -3369,6 +3745,54 @@ const chartInstances = {
     energyConsumption: null
 };
 
+// Per-miner card share doughnut chart instances (keyed by IP)
+const minerCardShareCharts = {};
+
+// Initialize or update a miner card's share doughnut chart
+function initMinerCardShareChart(ip, accepted, rejected) {
+    const canvas = document.querySelector(`.miner-card-shares-canvas[data-ip="${ip}"]`);
+    if (!canvas) return;
+
+    const total = accepted + rejected;
+    const data = total > 0 ? [accepted, rejected] : [1, 0];
+
+    if (minerCardShareCharts[ip]) {
+        minerCardShareCharts[ip].data.datasets[0].data = data;
+        minerCardShareCharts[ip].update();
+    } else {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        minerCardShareCharts[ip] = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#22c55e', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: false,
+                cutout: '70%',
+                animation: false,
+                events: [],
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+    }
+}
+
+// Destroy a miner card share chart (when card is removed)
+function destroyMinerCardShareChart(ip) {
+    if (minerCardShareCharts[ip]) {
+        minerCardShareCharts[ip].destroy();
+        delete minerCardShareCharts[ip];
+    }
+}
+
 // Abort controllers for request cancellation on timeframe changes
 const chartAbortControllers = {
     fleetCombined: null,
@@ -3605,7 +4029,7 @@ async function loadCombinedChart(hours = 24) {
                     backgroundColor: color + '15',
                     borderWidth: 1,
                     fill: false,
-                    tension: 0.3,
+                    tension: 0.1,
                     yAxisID: 'y-hashrate',
                     order: 1,
                     pointRadius: 0,
@@ -3632,7 +4056,7 @@ async function loadCombinedChart(hours = 24) {
                     backgroundColor: 'transparent',
                     borderWidth: 1,
                     fill: false,
-                    tension: 0.3,
+                    tension: 0.1,
                     yAxisID: 'y-temperature',
                     order: 2,
                     pointRadius: 0,
@@ -3773,6 +4197,7 @@ async function loadCombinedChart(hours = 24) {
         }
         // Keep legacy reference in sync
         combinedChart = chartInstances.combined;
+        updateChartMeta('combined', hashrateResult.data_point_count || hashrateResult.data?.length || 0, hashrateResult.last_updated);
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading combined chart:', error);
@@ -3896,6 +4321,7 @@ async function loadPowerChart(hours = 24) {
         }
         // Keep legacy reference in sync
         powerChart = chartInstances.power;
+        updateChartMeta('power', result.data_point_count || result.data?.length || 0, result.last_updated);
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading power chart:', error);
@@ -4036,13 +4462,14 @@ async function loadProfitabilityChart(days = 7) {
         }
         // Keep legacy reference in sync
         profitabilityChart = chartInstances.profitability;
+        updateChartMeta('profitability', result.history?.length || 0, result.history?.length ? result.history[result.history.length - 1].timestamp : null);
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading profitability chart:', error);
     }
 }
 
-// Load Efficiency Chart
+// Load Efficiency Chart - uses server-side pre-computed J/TH endpoint
 async function loadEfficiencyChart(hours = 24) {
     // Skip updates when tab is hidden
     if (!chartsVisible) return;
@@ -4051,79 +4478,25 @@ async function loadEfficiencyChart(hours = 24) {
     const signal = cancelChartRequest('efficiency');
 
     try {
-        const response = await fetch(`${API_BASE}/api/history/hashrate?hours=${hours}`, { signal });
+        const response = await fetch(`${API_BASE}/api/history/efficiency?hours=${hours}`, { signal });
         const result = await response.json();
 
         if (!result.success) return;
 
-        // Use totals data for efficiency calculation (contains total_power)
-        const totalsData = result.totals || result.data;
-
-        // Calculate efficiency in J/TH (industry standard, lower is better)
-        // First pass: calculate all efficiency values
-        let rawEfficiencyData = totalsData
-            .filter(point => point.hashrate_ths > 0 && point.total_power > 0)
-            .map(point => {
-                const efficiency = point.total_power / point.hashrate_ths; // W/TH
-                return {
-                    x: new Date(point.timestamp),
-                    y: efficiency
-                };
-            });
-
-        // OUTLIER DETECTION: Multi-method approach for robust filtering
-        // Mining efficiency typically ranges 5-50 J/TH for most hardware
-        if (rawEfficiencyData.length > 2) {
-            const values = rawEfficiencyData.map(d => d.y).sort((a, b) => a - b);
-
-            // Calculate median (more robust than mean)
-            const mid = Math.floor(values.length / 2);
-            const median = values.length % 2 === 0
-                ? (values[mid - 1] + values[mid]) / 2
-                : values[mid];
-
-            // Method 1: IQR-based bounds (for datasets with enough points)
-            let upperBound = median * 3; // Default: 3x median
-            if (values.length >= 4) {
-                const q1 = values[Math.floor(values.length * 0.25)];
-                const q3 = values[Math.floor(values.length * 0.75)];
-                const iqr = q3 - q1;
-                // Use tighter 1.0x IQR for mining data (less variance expected)
-                upperBound = Math.min(q3 + 1.0 * iqr, median * 2.5);
-            }
-
-            // Method 2: Absolute bounds (physical constraints for mining hardware)
-            // BitAxe/NerdAxe typically 10-25 J/TH, max reasonable ~60 J/TH
-            const absoluteMax = 60;
-            upperBound = Math.min(upperBound, absoluteMax);
-            const lowerBound = Math.max(0, median * 0.3); // Allow 70% below median
-
-            // Filter outliers
-            rawEfficiencyData = rawEfficiencyData.filter(d =>
-                d.y >= lowerBound && d.y <= upperBound && d.y > 0
-            );
-
-            // Method 3: Exponential Moving Average (EMA) smoothing
-            // This eliminates spikes while preserving trends - standard data science technique
-            if (rawEfficiencyData.length > 1) {
-                const alpha = 0.3; // Smoothing factor (0.1-0.3 = heavy smoothing)
-                let ema = rawEfficiencyData[0].y;
-                for (let i = 0; i < rawEfficiencyData.length; i++) {
-                    ema = alpha * rawEfficiencyData[i].y + (1 - alpha) * ema;
-                    rawEfficiencyData[i].y = ema;
-                }
-            }
-        }
-
-        const efficiencyData = rawEfficiencyData;
+        // Data is pre-computed server-side with proper J/TH values
+        const efficiencyData = (result.data || [])
+            .filter(point => point.efficiency_jth > 0)
+            .map(point => ({
+                x: new Date(point.timestamp),
+                y: point.efficiency_jth
+            }));
 
         // Calculate adaptive efficiency axis using percentile-based scaling
-        let efficiencyAxisMax = 50; // Sensible default for mining efficiency
+        let efficiencyAxisMax = 50;
         if (efficiencyData.length > 0) {
             const sortedValues = efficiencyData.map(d => d.y).sort((a, b) => a - b);
-            // Use 95th percentile instead of max to avoid outlier influence
             const p95 = sortedValues[Math.floor(sortedValues.length * 0.95)] || sortedValues[sortedValues.length - 1];
-            efficiencyAxisMax = getAdaptiveAxisMax(Math.max(p95 * 1.1, 10)); // 10% headroom, minimum 10
+            efficiencyAxisMax = getAdaptiveAxisMax(Math.max(p95 * 1.1, 10));
         }
 
         // Chart data and options
@@ -4134,26 +4507,26 @@ async function loadEfficiencyChart(hours = 24) {
                 borderColor: CHART_COLORS.efficiency.line,
                 backgroundColor: CHART_COLORS.efficiency.fill,
                 fill: true,
-                tension: 0.35,
+                tension: 0.1,
                 borderWidth: 1,
                 pointRadius: 0,
                 pointHoverRadius: 3,
                 pointBackgroundColor: CHART_COLORS.efficiency.line,
                 pointBorderColor: CHART_COLORS.efficiency.line,
                 pointBorderWidth: 0,
-                spanGaps: true  // Connect across data gaps for visual continuity
+                spanGaps: true
             }]
         };
         const chartOptions = {
             ...CHART_DEFAULTS,
-            animation: false,  // Smooth transitions for scale changes
+            animation: false,
             plugins: {
                 ...CHART_DEFAULTS.plugins,
                 tooltip: {
                     ...CHART_DEFAULTS.plugins.tooltip,
                     callbacks: {
                         label: function(context) {
-                            return `Efficiency: ${context.parsed.y.toFixed(1)} J/TH`;
+                            return `Efficiency: ${formatMetric(context.parsed.y, 'efficiency')} J/TH`;
                         }
                     }
                 }
@@ -4162,7 +4535,6 @@ async function loadEfficiencyChart(hours = 24) {
                 x: {
                     type: 'time',
                     time: { unit: hours <= 24 ? 'hour' : 'day' },
-                    // Auto-scale to fit data
                     ticks: { color: CHART_COLORS.text, font: { size: 11 } },
                     grid: { color: CHART_COLORS.grid }
                 },
@@ -4179,7 +4551,7 @@ async function loadEfficiencyChart(hours = 24) {
                         color: CHART_COLORS.efficiency.line,
                         font: { size: 11 },
                         callback: function(value) {
-                            return value.toFixed(1);
+                            return formatMetric(value, 'efficiency');
                         }
                     },
                     grid: { color: CHART_COLORS.grid }
@@ -4204,6 +4576,7 @@ async function loadEfficiencyChart(hours = 24) {
         }
         // Keep legacy reference in sync
         efficiencyChart = chartInstances.efficiency;
+        updateChartMeta('efficiency', result.data_point_count || 0, result.last_updated);
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading efficiency chart:', error);
@@ -4244,12 +4617,61 @@ async function loadSharesMetrics(hours = 24) {
         // Update metrics
         // Calculate efficiency in J/TH: power in W / (hashrate in H/s / 1e12) = J/TH (industry standard, lower is better)
         const hashrateThs = stats.total_hashrate / 1e12;
-        const efficiency = hashrateThs > 0 ? (stats.total_power / hashrateThs).toFixed(1) : 0;
-        document.getElementById('fleet-efficiency').textContent = `${efficiency} J/TH`;
-        document.getElementById('total-accepted-shares').textContent = formatNumber(totalShares);
-        document.getElementById('total-rejected-shares').textContent = formatNumber(totalRejected);
-        document.getElementById('accept-rate').textContent = `${acceptRate}%`;
-        document.getElementById('charts-avg-temp').textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
+        const totalPower = stats.total_power || 0;
+        const hasValidEfficiency = hashrateThs > 0 && totalPower > 0;
+        const efficiency = hasValidEfficiency ? (totalPower / hashrateThs).toFixed(1) : null;
+
+        // Update BOTH fleet efficiency elements (homescreen and charts tab have separate IDs)
+        const homeEffEl = document.getElementById('fleet-efficiency');
+        const chartsEffEl = document.getElementById('charts-fleet-efficiency');
+        const effText = efficiency !== null ? `${efficiency} J/TH` : '-- J/TH';
+        if (homeEffEl) homeEffEl.textContent = effText;
+        if (chartsEffEl) {
+            chartsEffEl.textContent = effText;
+            // Add benchmark comparison
+            const benchEl = document.getElementById('charts-efficiency-benchmark');
+            if (benchEl && efficiency !== null) {
+                const eff = parseFloat(efficiency);
+                if (eff <= 15) benchEl.textContent = 'Excellent (S21 Pro tier)';
+                else if (eff <= 25) benchEl.textContent = 'Good (modern ASIC tier)';
+                else if (eff <= 50) benchEl.textContent = 'Average (home miner tier)';
+                else if (eff <= 100) benchEl.textContent = 'Below average';
+                else benchEl.textContent = 'High consumption';
+            }
+        }
+
+        // Additional performance metrics
+        const totalHashrateEl = document.getElementById('fleet-total-hashrate');
+        const totalPowerEl = document.getElementById('fleet-total-power');
+        const dailyEnergyEl = document.getElementById('fleet-daily-energy');
+        if (totalHashrateEl) {
+            if (hashrateThs >= 1000) {
+                totalHashrateEl.textContent = `${(hashrateThs / 1000).toFixed(2)} PH/s`;
+            } else {
+                totalHashrateEl.textContent = `${hashrateThs.toFixed(2)} TH/s`;
+            }
+        }
+        if (totalPowerEl) {
+            totalPowerEl.textContent = `${totalPower.toFixed(1)} W`;
+        }
+        if (dailyEnergyEl) {
+            const kwhPerDay = (totalPower / 1000) * 24;
+            dailyEnergyEl.textContent = `${kwhPerDay.toFixed(2)} kWh`;
+            // Show daily cost if energy rate is configured
+            const costEl = document.getElementById('fleet-daily-cost');
+            if (costEl && window._energyRate) {
+                const dailyCost = kwhPerDay * window._energyRate;
+                costEl.textContent = `~$${dailyCost.toFixed(2)}/day`;
+            }
+        }
+        const chartsAccepted = document.getElementById('charts-accepted-shares');
+        const chartsRejected = document.getElementById('charts-rejected-shares');
+        const chartsAcceptRate = document.getElementById('charts-accept-rate');
+        if (chartsAccepted) chartsAccepted.textContent = formatNumber(totalShares);
+        if (chartsRejected) chartsRejected.textContent = formatNumber(totalRejected);
+        if (chartsAcceptRate) chartsAcceptRate.textContent = `${acceptRate}%`;
+        const chartsAvgTemp = document.getElementById('charts-avg-temp');
+        if (chartsAvgTemp) chartsAvgTemp.textContent = `${(stats.avg_temperature ?? 0).toFixed(1)}°C`;
 
         // Chart data and options
         const chartData = {
@@ -4314,6 +4736,28 @@ async function loadSharesMetrics(hours = 24) {
             }
         };
 
+        // Center text plugin for doughnut chart
+        const centerTextPlugin = {
+            id: 'sharesCenterText',
+            afterDraw(chart) {
+                const { ctx: drawCtx, width, height } = chart;
+                drawCtx.save();
+                const centerX = width / 2;
+                const centerY = height / 2 - 10;
+                // Total shares count
+                drawCtx.font = "bold 20px 'JetBrains Mono', monospace";
+                drawCtx.fillStyle = '#e2e8f0';
+                drawCtx.textAlign = 'center';
+                drawCtx.textBaseline = 'middle';
+                drawCtx.fillText(formatNumber(totalAttempts), centerX, centerY - 8);
+                // Accept rate
+                drawCtx.font = "13px 'Outfit', sans-serif";
+                drawCtx.fillStyle = '#9ca3af';
+                drawCtx.fillText(`${acceptRate}% accepted`, centerX, centerY + 14);
+                drawCtx.restore();
+            }
+        };
+
         // Update existing chart or create new one (prevents flickering)
         if (chartInstances.shares) {
             updateChartData(chartInstances.shares, chartData, chartOptions);
@@ -4326,11 +4770,13 @@ async function loadSharesMetrics(hours = 24) {
             chartInstances.shares = new Chart(ctx, {
                 type: 'doughnut',
                 data: chartData,
-                options: chartOptions
+                options: chartOptions,
+                plugins: [centerTextPlugin]
             });
         }
         // Keep legacy reference in sync
         sharesChart = chartInstances.shares;
+        updateChartMeta('shares', totalAttempts, null);
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading shares metrics:', error);
@@ -4339,7 +4785,126 @@ async function loadSharesMetrics(hours = 24) {
 
 // Load Alerts Tab
 async function loadAlertsTab() {
-    await loadAlertHistory();
+    await Promise.all([loadAlertHistory(), loadAlertConfig()]);
+}
+
+// Load alert config and populate UI
+async function loadAlertConfig() {
+    try {
+        const response = await fetch(`${API_BASE}/api/alerts/config`);
+        const result = await response.json();
+        if (!result.success) return;
+
+        const config = result.config;
+
+        // Populate alert type toggles
+        const typesGrid = document.getElementById('alert-types-grid');
+        if (typesGrid && config.enabled_alert_types) {
+            while (typesGrid.firstChild) typesGrid.removeChild(typesGrid.firstChild);
+
+            const typeLabels = {
+                miner_offline: 'Miner Offline',
+                high_temperature: 'High Temperature',
+                critical_temperature: 'Critical Temperature',
+                low_hashrate: 'Low Hashrate',
+                unprofitable: 'Unprofitable Mining',
+                emergency_shutdown: 'Emergency Shutdown',
+                miner_online: 'Miner Back Online',
+                weather_warning: 'Weather Warning',
+                overheat_recovery: 'Overheat Recovery'
+            };
+
+            Object.entries(config.enabled_alert_types).forEach(([type, enabled]) => {
+                const card = document.createElement('div');
+                card.className = 'alert-type-card';
+
+                const label = document.createElement('span');
+                label.textContent = typeLabels[type] || type;
+
+                const toggle = document.createElement('label');
+                toggle.className = 'toggle-switch';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = enabled;
+                input.dataset.alertType = type;
+                const slider = document.createElement('span');
+                slider.className = 'toggle-slider';
+                toggle.appendChild(input);
+                toggle.appendChild(slider);
+
+                card.appendChild(label);
+                card.appendChild(toggle);
+                typesGrid.appendChild(card);
+            });
+        }
+
+        // Quiet hours
+        const qhEnabled = document.getElementById('quiet-hours-enabled');
+        const qhStart = document.getElementById('quiet-hours-start');
+        const qhEnd = document.getElementById('quiet-hours-end');
+        if (qhEnabled && config.quiet_hours) {
+            qhEnabled.checked = config.quiet_hours.enabled;
+            if (qhStart) qhStart.value = config.quiet_hours.start || '22:00';
+            if (qhEnd) qhEnd.value = config.quiet_hours.end || '07:00';
+        }
+
+        // Daily report
+        const drEnabled = document.getElementById('daily-report-enabled');
+        const drTime = document.getElementById('daily-report-time');
+        if (drEnabled && config.daily_report) {
+            drEnabled.checked = config.daily_report.enabled;
+            if (drTime) drTime.value = config.daily_report.time || '08:00';
+        }
+    } catch (error) {
+        console.error('Error loading alert config:', error);
+    }
+}
+
+// Save all alert settings
+async function saveAlertConfig() {
+    try {
+        // Gather alert type toggles
+        const enabledTypes = {};
+        document.querySelectorAll('#alert-types-grid input[data-alert-type]').forEach(input => {
+            enabledTypes[input.dataset.alertType] = input.checked;
+        });
+
+        const response = await fetch(`${API_BASE}/api/alerts/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                enabled_alert_types: enabledTypes,
+                quiet_hours_enabled: document.getElementById('quiet-hours-enabled')?.checked || false,
+                quiet_hours_start: document.getElementById('quiet-hours-start')?.value || '22:00',
+                quiet_hours_end: document.getElementById('quiet-hours-end')?.value || '07:00',
+                daily_report_enabled: document.getElementById('daily-report-enabled')?.checked || false,
+                daily_report_time: document.getElementById('daily-report-time')?.value || '08:00'
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showAlert('Alert settings saved', 'success');
+        } else {
+            showAlert(`Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Error saving alert config: ${error.message}`, 'error');
+    }
+}
+
+// Trigger daily report manually
+async function triggerDailyReport() {
+    try {
+        const response = await fetch(`${API_BASE}/api/alerts/daily-report`, { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+            showAlert('Daily report sent', 'success');
+        } else {
+            showAlert(`Error: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, 'error');
+    }
 }
 
 // Format relative time (e.g., "5 minutes ago")
@@ -4740,8 +5305,297 @@ startAutoRefresh = function() {
 // ============================================================================
 
 // Load Pools Tab
+let poolDirectoryData = null;
+let selectedPoolsForCompare = new Set();
+
 async function loadPoolsTab() {
-    await loadAllPools();
+    await Promise.all([loadAllPools(), loadPoolDirectory()]);
+}
+
+// Load pool directory from API
+async function loadPoolDirectory() {
+    try {
+        const response = await fetch(`${API_BASE}/api/pool-directory`);
+        const result = await response.json();
+        if (!result.success || !result.data || !result.data.pools) return;
+
+        poolDirectoryData = result.data.pools;
+        renderPoolDirectory(poolDirectoryData);
+        initPoolDirectoryFilters();
+    } catch (error) {
+        console.error('Error loading pool directory:', error);
+    }
+}
+
+// Render pool directory cards
+function renderPoolDirectory(pools) {
+    const grid = document.getElementById('pool-directory-grid');
+    const countEl = document.getElementById('pool-directory-count');
+    if (!grid) return;
+
+    while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+    if (countEl) countEl.textContent = `Showing ${pools.length} pools`;
+
+    pools.forEach(pool => {
+        const card = document.createElement('div');
+        card.className = 'pool-dir-card';
+        card.dataset.poolId = pool.id;
+
+        // Header with initial circle and name
+        const header = document.createElement('div');
+        header.className = 'pool-dir-header';
+        const initial = document.createElement('div');
+        initial.className = 'pool-dir-initial';
+        initial.textContent = (pool.name || '?')[0].toUpperCase();
+        initial.style.background = `hsl(${(pool.name || '').length * 37 % 360}, 60%, 45%)`;
+        const nameWrap = document.createElement('div');
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pool-dir-name';
+        nameEl.textContent = pool.name;
+        nameWrap.appendChild(nameEl);
+        header.appendChild(initial);
+        header.appendChild(nameWrap);
+
+        // Badges
+        const badges = document.createElement('div');
+        badges.className = 'pool-dir-badges';
+
+        // Fee badge
+        const feeStr = pool.fee_structure?.standard || '?';
+        const feeNum = parseFloat(feeStr);
+        const feeBadge = document.createElement('span');
+        feeBadge.className = 'pool-badge';
+        feeBadge.classList.add(feeNum < 1 ? 'badge-green' : feeNum <= 2 ? 'badge-yellow' : 'badge-red');
+        feeBadge.textContent = feeStr.includes('%') ? feeStr : feeStr + '%';
+        badges.appendChild(feeBadge);
+
+        // Payout method badge
+        const payoutBadge = document.createElement('span');
+        payoutBadge.className = 'pool-badge badge-neutral';
+        payoutBadge.textContent = (pool.payout_method || '').split('(')[0].trim().substring(0, 12);
+        badges.appendChild(payoutBadge);
+
+        // Icon badges
+        if (pool.supports_lightning) {
+            const ltBadge = document.createElement('span');
+            ltBadge.className = 'pool-badge badge-yellow';
+            ltBadge.textContent = 'Lightning';
+            badges.appendChild(ltBadge);
+        }
+        if (!pool.requires_kyc) {
+            const kycBadge = document.createElement('span');
+            kycBadge.className = 'pool-badge badge-green';
+            kycBadge.textContent = 'No KYC';
+            badges.appendChild(kycBadge);
+        }
+        if (pool.supports_solo_mining) {
+            const soloBadge = document.createElement('span');
+            soloBadge.className = 'pool-badge badge-neutral';
+            soloBadge.textContent = 'Solo';
+            badges.appendChild(soloBadge);
+        }
+        if (pool.good_for_home_miners) {
+            const hmBadge = document.createElement('span');
+            hmBadge.className = 'pool-badge badge-green';
+            hmBadge.textContent = 'Home Miner';
+            badges.appendChild(hmBadge);
+        }
+
+        // Description (collapsed by default)
+        const desc = document.createElement('div');
+        desc.className = 'pool-dir-desc';
+        desc.textContent = pool.unique_description || '';
+
+        // Details (expandable)
+        const details = document.createElement('div');
+        details.className = 'pool-dir-details';
+        details.style.display = 'none';
+        const detailsText = [];
+        if (pool.minimum_payout) {
+            detailsText.push(`Min Payout: ${pool.minimum_payout.onchain || 'N/A'}`);
+            if (pool.minimum_payout.lightning && pool.minimum_payout.lightning !== 'Not supported') {
+                detailsText.push(`Lightning Min: ${pool.minimum_payout.lightning}`);
+            }
+        }
+        if (pool.stratum_urls && pool.stratum_urls.length > 0) {
+            detailsText.push(`Stratum: ${pool.stratum_urls[0]}`);
+        }
+        if (pool.home_miner_notes) {
+            detailsText.push(pool.home_miner_notes);
+        }
+        details.textContent = detailsText.join(' | ');
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'pool-dir-actions';
+
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'btn btn-secondary btn-xs';
+        expandBtn.textContent = 'Details';
+        expandBtn.addEventListener('click', () => {
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        });
+        actions.appendChild(expandBtn);
+
+        if (pool.website) {
+            const linkBtn = document.createElement('a');
+            linkBtn.className = 'btn btn-primary btn-xs';
+            linkBtn.textContent = 'Sign Up';
+            linkBtn.href = pool.website;
+            linkBtn.target = '_blank';
+            linkBtn.rel = 'noopener noreferrer';
+            actions.appendChild(linkBtn);
+        }
+
+        const compareChk = document.createElement('label');
+        compareChk.className = 'pool-compare-check';
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.addEventListener('change', () => togglePoolCompare(pool.id, chk.checked));
+        const chkLabel = document.createElement('span');
+        chkLabel.textContent = 'Compare';
+        compareChk.appendChild(chk);
+        compareChk.appendChild(chkLabel);
+        actions.appendChild(compareChk);
+
+        card.appendChild(header);
+        card.appendChild(badges);
+        card.appendChild(desc);
+        card.appendChild(details);
+        card.appendChild(actions);
+        grid.appendChild(card);
+    });
+}
+
+// Initialize pool directory filters and search
+function initPoolDirectoryFilters() {
+    // Search
+    const searchInput = document.getElementById('pool-directory-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => filterPoolDirectory());
+    }
+
+    // Filter buttons
+    document.querySelectorAll('.pool-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.pool-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            filterPoolDirectory();
+        });
+    });
+}
+
+function filterPoolDirectory() {
+    if (!poolDirectoryData) return;
+    const search = (document.getElementById('pool-directory-search')?.value || '').toLowerCase();
+    const filter = document.querySelector('.pool-filter-btn.active')?.dataset?.filter || 'all';
+
+    let filtered = poolDirectoryData;
+
+    // Text search
+    if (search) {
+        filtered = filtered.filter(p =>
+            (p.name || '').toLowerCase().includes(search) ||
+            (p.payout_method || '').toLowerCase().includes(search) ||
+            (p.unique_description || '').toLowerCase().includes(search) ||
+            (p.stratum_urls || []).some(u => u.toLowerCase().includes(search))
+        );
+    }
+
+    // Category filter
+    if (filter !== 'all') {
+        filtered = filtered.filter(p => {
+            switch (filter) {
+                case 'home-miner': return p.good_for_home_miners;
+                case 'no-kyc': return !p.requires_kyc;
+                case 'lightning': return p.supports_lightning;
+                case 'low-fee': return parseFloat(p.fee_structure?.standard || '99') < 2;
+                case 'solo': return p.supports_solo_mining;
+                case 'fpps': return (p.payout_method || '').toLowerCase().match(/fpps|pps/);
+                case 'pplns': return (p.payout_method || '').toLowerCase().includes('pplns');
+                default: return true;
+            }
+        });
+    }
+
+    renderPoolDirectory(filtered);
+}
+
+function togglePoolCompare(poolId, checked) {
+    if (checked) {
+        if (selectedPoolsForCompare.size >= 4) {
+            showAlert('Maximum 4 pools for comparison', 'warning');
+            return;
+        }
+        selectedPoolsForCompare.add(poolId);
+    } else {
+        selectedPoolsForCompare.delete(poolId);
+    }
+    const btn = document.getElementById('compare-pools-btn');
+    if (btn) {
+        btn.textContent = `Compare Selected (${selectedPoolsForCompare.size})`;
+        btn.disabled = selectedPoolsForCompare.size < 2;
+    }
+}
+
+async function showPoolComparison() {
+    if (selectedPoolsForCompare.size < 2) return;
+
+    const modal = document.getElementById('pool-comparison-modal');
+    if (modal) modal.style.display = 'flex';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/pool-directory/compare`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pool_ids: [...selectedPoolsForCompare] })
+        });
+        const result = await response.json();
+        if (!result.success) return;
+
+        const content = document.getElementById('pool-comparison-content');
+        if (!content) return;
+        while (content.firstChild) content.removeChild(content.firstChild);
+
+        // Build comparison table
+        const table = document.createElement('table');
+        table.className = 'comparison-table';
+
+        const fields = [
+            ['Name', p => p.name],
+            ['Fee', p => p.fee_structure?.standard || '?'],
+            ['Payout Method', p => (p.payout_method || '').split('(')[0].trim()],
+            ['Min Payout (On-chain)', p => p.minimum_payout?.onchain || 'N/A'],
+            ['Lightning', p => p.supports_lightning ? 'Yes' : 'No'],
+            ['KYC Required', p => p.requires_kyc ? 'Yes' : 'No'],
+            ['Solo Mining', p => p.supports_solo_mining ? 'Yes' : 'No'],
+            ['Home Miner Friendly', p => p.good_for_home_miners ? 'Yes' : 'No'],
+            ['Hashrate Share', p => p.approximate_hashrate_share || '?']
+        ];
+
+        fields.forEach(([label, getter]) => {
+            const tr = document.createElement('tr');
+            const th = document.createElement('th');
+            th.textContent = label;
+            tr.appendChild(th);
+            result.pools.forEach(pool => {
+                const td = document.createElement('td');
+                td.textContent = getter(pool);
+                tr.appendChild(td);
+            });
+            table.appendChild(tr);
+        });
+
+        content.appendChild(table);
+    } catch (error) {
+        console.error('Error comparing pools:', error);
+    }
+}
+
+function closePoolComparison() {
+    const modal = document.getElementById('pool-comparison-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 // Load All Pools
@@ -4888,8 +5742,9 @@ let currentMinerIP = null;
 let minerDetailUpdateInterval = null;
 
 // Open the miner detail modal
-function openMinerDetail(ip) {
+async function openMinerDetail(ip) {
     currentMinerIP = ip;
+    isUserEditingFrequency = false;
     const modal = document.getElementById('miner-detail-modal');
     if (!modal) return;
 
@@ -4898,6 +5753,9 @@ function openMinerDetail(ip) {
 
     // Reset voltage controls (require acknowledgment each time)
     resetVoltageControls();
+
+    // Load device specs if not yet cached
+    await loadDeviceSpecs();
 
     // Populate the modal with miner data
     populateMinerDetail(ip);
@@ -5072,16 +5930,45 @@ function populateMinerDetail(ip) {
     const totalShares = (status.shares_accepted || 0) + (status.shares_rejected || 0);
     const acceptRate = totalShares > 0 ? (status.shares_accepted / totalShares) * 100 : 100;
 
-    // Update acceptance rate gauge
-    const gaugeArc = document.getElementById('acceptance-gauge-arc');
+    // Update acceptance rate pie chart (actual pie showing accepted vs rejected proportions)
+    const doughnutCanvas = document.getElementById('acceptance-pie-chart');
     const gaugePercent = document.getElementById('acceptance-rate-percent');
-    if (gaugeArc && gaugePercent) {
-        // Circumference = 2 * π * r = 2 * π * 42 ≈ 264
-        const circumference = 264;
-        const offset = circumference - (acceptRate / 100) * circumference;
-        gaugeArc.style.strokeDashoffset = offset;
-        gaugeArc.style.transition = 'stroke-dashoffset 0.5s ease';
+    if (doughnutCanvas && gaugePercent) {
         gaugePercent.textContent = `${acceptRate.toFixed(1)}%`;
+        const accepted = status.shares_accepted || 0;
+        const rejected = status.shares_rejected || 0;
+        // Ensure rejected slice is always visible (min 1.5% visual) when there are rejected shares
+        const visualRejected = rejected > 0 ? Math.max(rejected, (accepted + rejected) * 0.015) : 0;
+        const visualAccepted = rejected > 0 ? (accepted + rejected) - visualRejected : accepted;
+        const pieData = {
+            datasets: [{
+                data: [visualAccepted, visualRejected],
+                backgroundColor: ['#22c55e', '#ef4444'],
+                borderWidth: rejected > 0 ? 2 : 0,
+                borderColor: ['rgba(34, 197, 94, 0.3)', 'rgba(239, 68, 68, 0.6)']
+            }]
+        };
+        if (window._acceptanceDoughnutChart) {
+            window._acceptanceDoughnutChart.data = pieData;
+            window._acceptanceDoughnutChart.update();
+        } else {
+            const ctx = doughnutCanvas.getContext('2d');
+            if (ctx) {
+                window._acceptanceDoughnutChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: pieData,
+                    options: {
+                        responsive: false,
+                        cutout: '55%',
+                        animation: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        }
+                    }
+                });
+            }
+        }
     }
 
     // Legacy share bar (if still present)
@@ -5093,18 +5980,58 @@ function populateMinerDetail(ip) {
     const coreVoltage = status.raw?.coreVoltage || status.core_voltage || 1150;
     const voltageInMv = Math.round(coreVoltage * (coreVoltage < 100 ? 1000 : 1));
 
+    // Live frequency display (always updates)
     document.getElementById('modal-frequency').textContent = `${frequency} MHz`;
     document.getElementById('modal-voltage').textContent = `${voltageInMv} mV`;
 
-    // Set voltage input to current value
+    // Target frequency display - show what was last set (or current if not tracking)
+    const targetFreq = lastSetTargetFrequency[ip] || frequency;
+    const targetFreqEl = document.getElementById('modal-target-frequency');
+    if (targetFreqEl) targetFreqEl.textContent = `${targetFreq} MHz`;
+
+    // Device info bar
+    const deviceInfo = getDeviceDisplayInfo(miner);
+    const deviceTypeEl = document.getElementById('tuning-device-type');
+    if (deviceTypeEl) deviceTypeEl.textContent = deviceInfo.name;
+    const asicChipEl = document.getElementById('tuning-asic-chip');
+    if (asicChipEl) {
+        const chipText = deviceInfo.numChips > 1 ? `${deviceInfo.numChips}x ${deviceInfo.chip}` : deviceInfo.chip;
+        asicChipEl.textContent = chipText;
+    }
+    const liveTempEl = document.getElementById('tuning-live-temp');
+    if (liveTempEl) {
+        liveTempEl.textContent = `${temp.toFixed(1)}°C`;
+        liveTempEl.className = 'device-info-value';
+        if (temp >= 75) liveTempEl.classList.add('temp-danger');
+        else if (temp >= 65) liveTempEl.classList.add('temp-warning');
+        else if (temp >= 40) liveTempEl.classList.add('temp-normal');
+    }
+
+    // Set voltage input to current value (only if user is NOT actively editing)
     const voltageInput = document.getElementById('voltage-input');
-    if (voltageInput) {
+    if (voltageInput && !isUserEditingVoltage) {
         voltageInput.value = voltageInMv;
         updateVoltageWarning(voltageInMv);
     }
 
-    // Update OC profile UI for this miner type
+    // Update OC profile UI and device-specific frequency bounds
     updateOCProfileUI();
+    updateFrequencyBoundsFromSpecs(miner, frequency);
+
+    // Handle auto-tune vs manual frequency conflict
+    updateAutoTuneFrequencyConflict(miner);
+
+    // Only update frequency input/slider if user is NOT actively editing
+    if (!isUserEditingFrequency) {
+        const freqInput = document.getElementById('frequency-input');
+        const freqSlider = document.getElementById('frequency-slider');
+        if (freqInput) freqInput.value = frequency;
+        if (freqSlider) {
+            freqSlider.value = frequency;
+            updateFrequencySliderDisplay(frequency);
+        }
+        syncPresetButtonsWithFrequency(frequency);
+    }
 
     // Update auto-optimization UI
     updateMinerOptimizeUI();
@@ -5900,6 +6827,35 @@ function updateOCProfileUI() {
     }
 }
 
+// Update frequency slider/input bounds from device specs
+function updateFrequencyBoundsFromSpecs(miner, currentFrequency) {
+    const profile = getMinerOCProfile();
+    const slider = document.getElementById('frequency-slider');
+    const input = document.getElementById('frequency-input');
+    const minLabel = document.getElementById('freq-slider-min');
+    const maxLabel = document.getElementById('freq-slider-max');
+    const min = profile?.frequency?.min || 50;
+    const max = profile?.frequency?.max || 900;
+    const step = profile?.frequency?.step || 25;
+    if (slider) { slider.min = min; slider.max = max; slider.step = step; }
+    if (input) { input.min = min; input.max = max; input.step = step; }
+    if (minLabel) minLabel.textContent = min;
+    if (maxLabel) maxLabel.textContent = max;
+}
+
+// Update the frequency slider's current value display
+function updateFrequencySliderDisplay(frequency) {
+    const currentDisplay = document.getElementById('freq-slider-current');
+    if (currentDisplay) currentDisplay.textContent = `${frequency} MHz`;
+}
+
+// Check for auto-tune vs manual frequency conflict
+function updateAutoTuneFrequencyConflict(miner) {
+    // No-op if elements don't exist - prevents console errors
+    const notice = document.getElementById('auto-tune-freq-notice');
+    if (!notice) return;
+}
+
 // Set overclock preset - FREQUENCY ONLY, never auto-adjust voltage
 function setOCPreset(preset) {
     const profile = getMinerOCProfile();
@@ -5913,8 +6869,9 @@ function setOCPreset(preset) {
     // Get frequency from profile
     const frequency = profile.frequency[preset] || profile.frequency.stock;
 
-    // Sync all frequency displays
-    document.getElementById('modal-frequency').textContent = `${frequency} MHz`;
+    // Update target frequency display (not live frequency, which reflects actual miner state)
+    const targetFreqEl = document.getElementById('modal-target-frequency');
+    if (targetFreqEl) targetFreqEl.textContent = `${frequency} MHz`;
 
     // Sync custom frequency input field
     const freqInput = document.getElementById('frequency-input');
@@ -5942,6 +6899,10 @@ function toggleVoltageControls() {
 
 // Adjust voltage by increment (uses miner-specific bounds)
 function adjustVoltage(delta) {
+    isUserEditingVoltage = true;
+    clearTimeout(window._voltageEditTimeout);
+    window._voltageEditTimeout = setTimeout(() => { isUserEditingVoltage = false; }, 3000);
+
     const input = document.getElementById('voltage-input');
     if (!input) return;
 
@@ -6337,6 +7298,39 @@ function adjustFrequency(delta) {
     syncPresetButtonsWithFrequency(value);
 }
 
+// Handle frequency slider input (called from HTML oninput)
+function onFrequencySliderInput() {
+    isUserEditingFrequency = true;
+    const slider = document.getElementById('frequency-slider');
+    const input = document.getElementById('frequency-input');
+    const currentDisplay = document.getElementById('freq-slider-current');
+    if (!slider) return;
+    const value = parseInt(slider.value);
+    if (input) input.value = value;
+    if (currentDisplay) currentDisplay.textContent = `${value} MHz`;
+    syncPresetButtonsWithFrequency(value);
+    clearTimeout(window._freqEditTimeout);
+    window._freqEditTimeout = setTimeout(() => { isUserEditingFrequency = false; }, 3000);
+}
+
+// Handle frequency number input change (called from HTML oninput)
+function onFrequencyInputChange() {
+    isUserEditingFrequency = true;
+    const input = document.getElementById('frequency-input');
+    const slider = document.getElementById('frequency-slider');
+    if (!input) return;
+    let value = parseInt(input.value) || 0;
+    const minVal = parseInt(slider?.min) || 50;
+    const maxVal = parseInt(slider?.max) || 900;
+    value = Math.max(minVal, Math.min(maxVal, value));
+    if (slider) slider.value = value;
+    const currentDisplay = document.getElementById('freq-slider-current');
+    if (currentDisplay) currentDisplay.textContent = `${value} MHz`;
+    syncPresetButtonsWithFrequency(value);
+    clearTimeout(window._freqEditTimeout);
+    window._freqEditTimeout = setTimeout(() => { isUserEditingFrequency = false; }, 3000);
+}
+
 // Apply custom frequency to miner
 async function applyFrequency() {
     const input = document.getElementById('frequency-input');
@@ -6381,6 +7375,9 @@ async function applyFrequency() {
 
         if (result.success) {
             showAlert(`Frequency set to ${frequency} MHz. Miner may restart.`, 'success');
+
+            // Track the target frequency we just applied
+            lastSetTargetFrequency[currentMinerIP] = frequency;
 
             // Update modal display
             document.getElementById('modal-frequency').textContent = `${frequency} MHz`;
@@ -6570,6 +7567,10 @@ function updateMinerCardData(ip) {
             if (statsContainer) statsContainer.remove();
             if (overheatedContainer) overheatedContainer.remove();
             if (offlineContainer) offlineContainer.remove();
+            // Remove shares section and destroy its chart
+            const oldSharesSection = card.querySelector('.miner-card-shares');
+            if (oldSharesSection) oldSharesSection.remove();
+            destroyMinerCardShareChart(ip);
 
             // Create new content based on status
             let newContent;
@@ -6584,6 +7585,15 @@ function updateMinerCardData(ip) {
                     <div style="color: #888; font-size: 0.9em; margin-top: 5px;">Cooling down...</div>
                 `;
             } else if (shouldShowStats) {
+                // Destroy old chart for this IP if it exists (card is being rebuilt)
+                destroyMinerCardShareChart(ip);
+
+                const accepted = status.shares_accepted || 0;
+                const rejected = status.shares_rejected || 0;
+                const total = accepted + rejected;
+                const pct = total > 0 ? ((accepted / total) * 100).toFixed(1) + '%' : '100%';
+
+                // Build stats grid
                 newContent = document.createElement('div');
                 newContent.className = 'miner-stats';
                 newContent.innerHTML = `
@@ -6608,14 +7618,38 @@ function updateMinerCardData(ip) {
                         <span class="miner-stat-value">${formatFanSpeed(status.fan_speed)}</span>
                     </div>
                     <div class="miner-stat">
-                        <span class="miner-stat-label">Shares Found</span>
-                        <span class="miner-stat-value">${formatNumber(status.shares_accepted || 0)}</span>
-                    </div>
-                    <div class="miner-stat">
                         <span class="miner-stat-label">Best Difficulty</span>
                         <span class="miner-stat-value">${formatDifficulty(status.best_difficulty || 0)}</span>
                     </div>
                 `;
+                card.insertBefore(newContent, actions);
+
+                // Build shares doughnut section
+                const sharesSection = document.createElement('div');
+                sharesSection.className = 'miner-card-shares';
+                sharesSection.innerHTML = `
+                    <div class="miner-card-shares-chart">
+                        <canvas class="miner-card-shares-canvas" data-ip="${ip}" width="80" height="80"></canvas>
+                        <div class="miner-card-shares-center">
+                            <span class="miner-card-shares-pct">${pct}</span>
+                        </div>
+                    </div>
+                    <div class="miner-card-shares-details">
+                        <div class="miner-card-shares-row accepted">
+                            <span class="miner-card-shares-dot accepted"></span>
+                            <span class="miner-card-shares-label">Accepted</span>
+                            <span class="miner-card-shares-val">${formatNumber(accepted)}</span>
+                        </div>
+                        <div class="miner-card-shares-row rejected">
+                            <span class="miner-card-shares-dot rejected"></span>
+                            <span class="miner-card-shares-label">Rejected</span>
+                            <span class="miner-card-shares-val">${formatNumber(rejected)}</span>
+                        </div>
+                    </div>
+                `;
+                card.insertBefore(sharesSection, actions);
+                initMinerCardShareChart(ip, accepted, rejected);
+                newContent = null;
             } else {
                 newContent = document.createElement('div');
                 newContent.className = 'status-offline';
@@ -6624,11 +7658,13 @@ function updateMinerCardData(ip) {
                 newContent.textContent = '⚠️ Offline';
             }
 
-            // Insert before actions
-            card.insertBefore(newContent, actions);
+            // Insert before actions (null when shouldShowStats already handled above)
+            if (newContent) {
+                card.insertBefore(newContent, actions);
+            }
         }
     } else if (shouldShowStats && statsContainer) {
-        // Just update stats in place (order: Hashrate, Temp, Power, Efficiency, Fan, Shares, Difficulty)
+        // Just update stats in place (order: Hashrate, Temp, Power, Efficiency, Fan, Difficulty)
         const hashrateEl = statsContainer.querySelector('.miner-stat:nth-child(1) .miner-stat-value');
         if (hashrateEl) hashrateEl.textContent = formatHashrate(status.hashrate || 0);
 
@@ -6647,11 +7683,25 @@ function updateMinerCardData(ip) {
         const fanEl = statsContainer.querySelector('.miner-stat:nth-child(5) .miner-stat-value');
         if (fanEl) fanEl.textContent = formatFanSpeed(status.fan_speed);
 
-        const sharesEl = statsContainer.querySelector('.miner-stat:nth-child(6) .miner-stat-value');
-        if (sharesEl) sharesEl.textContent = formatNumber(status.shares_accepted || 0);
-
-        const diffEl = statsContainer.querySelector('.miner-stat:nth-child(7) .miner-stat-value');
+        const diffEl = statsContainer.querySelector('.miner-stat:nth-child(6) .miner-stat-value');
         if (diffEl) diffEl.textContent = formatDifficulty(status.best_difficulty || 0);
+
+        // Update share doughnut chart and text
+        const accepted = status.shares_accepted || 0;
+        const rejected = status.shares_rejected || 0;
+        const total = accepted + rejected;
+        const pct = total > 0 ? ((accepted / total) * 100).toFixed(1) + '%' : '100%';
+
+        initMinerCardShareChart(ip, accepted, rejected);
+
+        const pctEl = card.querySelector('.miner-card-shares-pct');
+        if (pctEl) pctEl.textContent = pct;
+
+        const acceptedValEl = card.querySelector('.miner-card-shares-row.accepted .miner-card-shares-val');
+        if (acceptedValEl) acceptedValEl.textContent = formatNumber(accepted);
+
+        const rejectedValEl = card.querySelector('.miner-card-shares-row.rejected .miner-card-shares-val');
+        if (rejectedValEl) rejectedValEl.textContent = formatNumber(rejected);
     }
 }
 
@@ -6690,4 +7740,28 @@ document.addEventListener('DOMContentLoaded', function() {
 // Open overclock settings - scrolls to tuning tab
 function openOCSettings() {
     switchMinerTab('tuning');
+}
+
+// Seasonal rate configuration toggle
+function toggleSeasonalConfig() {
+    const config = document.getElementById('seasonal-config');
+    if (config) {
+        config.classList.toggle('open');
+    }
+}
+
+function setSeasonalMode(mode) {
+    const buttons = document.querySelectorAll('.seasonal-toggle .toggle-btn');
+    buttons.forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.seasonal === mode);
+    });
+
+    const seasonBlocks = document.getElementById('season-blocks');
+    if (seasonBlocks) {
+        if (mode === 'on') {
+            seasonBlocks.classList.add('visible');
+        } else {
+            seasonBlocks.classList.remove('visible');
+        }
+    }
 }

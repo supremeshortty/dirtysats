@@ -1,0 +1,2795 @@
+{
+  "_metadata": {
+    "description": "Comprehensive specifications for Bitcoin home mining devices",
+    "last_updated": "2026-02-03",
+    "version": "2.0",
+    "dashboard": "DirtySats - Mining Fleet Management",
+    "notes": [
+      "Temperatures marked as 'chip_temp' refer to ASIC die/junction temperatures, not ambient.",
+      "Temperatures marked as 'ambient_operating' refer to recommended room/environment temperatures.",
+      "Hashrate values are at default/stock settings unless noted as overclocked.",
+      "Power consumption is wall power unless noted otherwise.",
+      "All devices mine SHA-256 algorithm (Bitcoin, Bitcoin Cash, etc.)."
+    ]
+  },
+
+  "devices": {
+
+    "bitaxe_original": {
+      "name": "BitAxe (Original)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1387",
+      "asic_chip_source": "Antminer S9",
+      "process_node": "16nm",
+      "num_chips": 2,
+      "default_hashrate_ghs": 200,
+      "hashrate_unit": "GH/s",
+      "power_watts": 10,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "40mm 5V PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Noctua NF-A4x10 5V recommended upgrade"
+      },
+      "frequency": {
+        "default_mhz": 400,
+        "min_mhz": 50,
+        "max_mhz": 500,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1400,
+        "min_mv": 1200,
+        "max_mv": 1800,
+        "notes": "Adjustable via DS4432U+ current DAC"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "power_input": "5V DC barrel jack (5.5x2.1mm center-positive)",
+      "noise_db": 35,
+      "price_usd_min": null,
+      "price_usd_max": null,
+      "open_source": true,
+      "status": "Discontinued (prototype/early revision)",
+      "notes": "First open-source Bitcoin ASIC miner. Used two BM1387 chips in series. Superseded by BitAxe Max."
+    },
+
+    "bitaxe_max": {
+      "name": "BitAxe Max (100 Series)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1397",
+      "asic_chip_source": "Antminer S17",
+      "process_node": "7nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 400,
+      "hashrate_range_ghs": "250-450",
+      "hashrate_unit": "GH/s",
+      "power_watts": 15,
+      "efficiency_j_per_th": 30,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "40mm 5V PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Noctua NF-A4x10 5V recommended upgrade"
+      },
+      "frequency": {
+        "default_mhz": 425,
+        "min_mhz": 50,
+        "max_mhz": 500,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1400,
+        "min_mv": 1200,
+        "max_mv": 1800,
+        "notes": "Adjustable via DS4432U+ current DAC"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "0.91in SSD1306 OLED I2C",
+      "power_input": "5V DC barrel jack (5.5x2.1mm center-positive)",
+      "noise_db": 35,
+      "price_usd_min": 50,
+      "price_usd_max": 100,
+      "open_source": true,
+      "status": "Available (legacy)",
+      "notes": "World's first open-source single-chip Bitcoin ASIC miner. Uses BM1397 from Antminer S17. EMC2101 measures chip internal diode temperature and controls fan PWM."
+    },
+
+    "bitaxe_ultra": {
+      "name": "BitAxe Ultra (200 Series)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1366",
+      "asic_chip_source": "Antminer S19 XP",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 500,
+      "hashrate_range_ghs": "425-500",
+      "hashrate_unit": "GH/s",
+      "power_watts": 12,
+      "power_range_watts": "11-15",
+      "efficiency_j_per_th": 21,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "40mm 5V PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Noctua NF-A4x20 5V 4-Pin recommended upgrade"
+      },
+      "frequency": {
+        "default_mhz": 485,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "Adjustable via Maxim DS4432U+ current DAC (0.04V to 2.4V range)"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3-WROOM-1)",
+      "display": "0.91in SSD1306 OLED I2C",
+      "power_input": "5V DC barrel jack (5.5x2.1mm center-positive)",
+      "noise_db": 35,
+      "price_usd_min": 60,
+      "price_usd_max": 120,
+      "open_source": true,
+      "status": "Available",
+      "notes": "3rd major BitAxe revision. BM1366 rolls more than just the nonce on-chip. EMC2101 temp sensor placed close to ASIC (BM1366 does not support die temp directly). Found multiple solo blocks in 2024-2025."
+    },
+
+    "bitaxe_supra": {
+      "name": "BitAxe Supra (400 Series)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1368",
+      "asic_chip_source": "Antminer S21",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 600,
+      "hashrate_range_ghs": "580-733",
+      "hashrate_overclocked_ghs": "700-900",
+      "hashrate_unit": "GH/s",
+      "power_watts": 13,
+      "power_range_watts": "12-15",
+      "power_overclocked_watts": "30-40",
+      "efficiency_j_per_th": 17.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "40mm 5V PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Noctua NF-A4x20 5V 4-Pin recommended upgrade. With Argon THRML cooler: up to 900 GH/s at 55C max."
+      },
+      "frequency": {
+        "default_mhz": 490,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "Adjustable via Maxim DS4432U+ current DAC (0.04V to 2.4V range)"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3-WROOM-1)",
+      "display": "0.91in SSD1306 OLED I2C",
+      "power_input": "5V DC, 5.5x2.1mm barrel jack. UL-certified 5V/6A (30W) PSU included.",
+      "noise_db": 35,
+      "price_usd_min": 80,
+      "price_usd_max": 150,
+      "open_source": true,
+      "status": "Available",
+      "notes": "4th major BitAxe revision. Uses BM1368 from Antminer S21. 4-layer PCB design."
+    },
+
+    "bitaxe_gamma": {
+      "name": "BitAxe Gamma (600 Series)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1370",
+      "asic_chip_variants": ["BM1370BC", "BM1370AA", "BM1370PA", "BM1370PB"],
+      "asic_chip_source": "Antminer S21 Pro",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ths": 1.2,
+      "hashrate_range_ths": "1.0-1.2",
+      "hashrate_overclocked_ths": "1.2-1.84",
+      "hashrate_unit": "TH/s",
+      "power_watts": 18,
+      "power_range_watts": "18-20",
+      "efficiency_j_per_th": 15,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 70,
+        "max_safe_chip_c": 75,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "Keep below 65C for 24/7 operation. VR and MOSFETs can exceed safe temps quickly during overclocking."
+      },
+      "fan": {
+        "type": "40mm 5V dual ball bearing PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 900,
+        "step_mhz": 25,
+        "notes": "OC from 525MHz to 900MHz yields 1.07-1.84 TH/s. Increase in 25-50MHz steps with 25-50mV voltage bumps."
+      },
+      "voltage": {
+        "default_mv": 1150,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "Stock: 525 MHz at 1150 mV. Adjustable via DS4432U+ current DAC."
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "0.91in SSD1306 OLED I2C",
+      "power_input": "5V DC only, 5V/6A adapter included",
+      "usb_c": true,
+      "noise_db": 38,
+      "price_usd_min": 100,
+      "price_usd_max": 200,
+      "open_source": true,
+      "status": "Available (current flagship single-chip)",
+      "notes": "5th major BitAxe revision. BM1370 from Antminer S21 Pro. Most efficient single-chip open-source miner available. USB-C for firmware updates."
+    },
+
+    "bitaxe_hex_ultra": {
+      "name": "BitAxe Hex Ultra (300 Series)",
+      "manufacturer": "Open Source (D-Central / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1366",
+      "asic_chip_source": "Antminer S19 XP",
+      "process_node": "5nm",
+      "num_chips": 6,
+      "default_hashrate_ths": 3.0,
+      "hashrate_unit": "TH/s",
+      "power_watts": 90,
+      "power_range_watts": "80-100",
+      "efficiency_j_per_th": 22,
+      "temperature": {
+        "normal_operating_chip_min_c": 45,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "80mm Arctic P8 PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 485,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1800
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone enclosed unit",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "power_input": "12V DC",
+      "noise_db": 45,
+      "price_usd_min": 400,
+      "price_usd_max": 700,
+      "open_source": true,
+      "status": "Available",
+      "notes": "6-chip chain design. Arctic P8 fan with minimalist frame. Quiet enough for home mining."
+    },
+
+    "bitaxe_hex_supra": {
+      "name": "BitAxe Supra Hex (700 Series)",
+      "manufacturer": "Open Source (D-Central / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1368",
+      "asic_chip_source": "Antminer S21",
+      "process_node": "5nm",
+      "num_chips": 6,
+      "default_hashrate_ths": 4.2,
+      "hashrate_range_ths": "3.5-4.2",
+      "hashrate_unit": "TH/s",
+      "power_watts": 90,
+      "power_range_watts": "80-110",
+      "efficiency_j_per_th": 21,
+      "temperature": {
+        "normal_operating_chip_min_c": 45,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "80mm high-speed dual ball bearing PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 550,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25,
+        "notes": "Typical setting: 550MHz at 1250mV"
+      },
+      "voltage": {
+        "default_mv": 1250,
+        "min_mv": 1100,
+        "max_mv": 1800
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone enclosed unit",
+      "connectivity": "WiFi 2.4GHz",
+      "display": "HD LED display for real-time monitoring",
+      "power_input": "12V DC",
+      "noise_db": 48,
+      "price_usd_min": 500,
+      "price_usd_max": 900,
+      "open_source": true,
+      "status": "Available",
+      "notes": "6-chip BM1368 chain. Upgraded 80mm dual ball bearing fan. ~4.2 TH/s at 550MHz/1250mV draws ~90W."
+    },
+
+    "nerdaxe": {
+      "name": "NerdAxe",
+      "manufacturer": "Open Source (BitMaker-hub)",
+      "family": "NerdAxe",
+      "asic_chip": "BM1366",
+      "asic_chip_variants": ["BM1366AL", "BM1366AG"],
+      "asic_chip_source": "Antminer S19 XP",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 500,
+      "hashrate_unit": "GH/s",
+      "power_watts": 12,
+      "efficiency_j_per_th": 20,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "40mm 5V PWM",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 485,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "Adjustable via Maxim DS4432U+ current DAC"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB with TTGO-TDisplay",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "TTGO-TDisplay ESP32-S3 built-in color LCD",
+      "power_input": "5V DC, 5V/4A PSU recommended",
+      "noise_db": 35,
+      "price_usd_min": 70,
+      "price_usd_max": 130,
+      "open_source": true,
+      "status": "Available",
+      "notes": "Upgrade from NerdMiner project. Transforms NerdMiners from 56 KH/s to 500 GH/s. Uses TPS40305 buck regulator, DS4432U+ DAC, INA260 power meter, EMC2101 fan control. Available as upgrade kit or full kit."
+    },
+
+    "nerdaxe_gamma": {
+      "name": "NerdAxe Gamma",
+      "manufacturer": "Open Source (BitMaker-hub)",
+      "family": "NerdAxe",
+      "asic_chip": "BM1370",
+      "asic_chip_source": "Antminer S21 Pro",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ths": 1.2,
+      "hashrate_unit": "TH/s",
+      "power_watts": 17,
+      "efficiency_j_per_th": 17,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 70,
+        "max_safe_chip_c": 75,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "High-efficiency 40mm fan",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 800,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1150,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "TPS546D buck regulator"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB with TTGO-TDisplay",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "1.9in full-color IPS LCD display",
+      "power_input": "5V DC via 2.1/5.5mm barrel jack",
+      "noise_db": 35,
+      "price_usd_min": 100,
+      "price_usd_max": 200,
+      "open_source": true,
+      "status": "Available",
+      "notes": "NerdAxe platform upgraded to BM1370 chip. Same 1.2 TH/s as BitAxe Gamma 601 but with NerdAxe form factor and 1.9in color display. Uses TPS546D buck regulator, DS4432U+ DAC, EMC2101 fan controller."
+    },
+
+    "nerdqaxe_plus": {
+      "name": "NerdQAxe+",
+      "manufacturer": "Open Source (BitMaker-hub / Bitronics)",
+      "family": "NerdAxe",
+      "asic_chip": "BM1368",
+      "asic_chip_source": "Antminer S21",
+      "process_node": "5nm",
+      "num_chips": 4,
+      "default_hashrate_ths": 2.4,
+      "hashrate_range_ths": "1.8-2.4",
+      "hashrate_unit": "TH/s",
+      "power_watts": 55,
+      "efficiency_j_per_th": 17.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 45,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "Dual fan cooling system",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1800
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone enclosed unit",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "LILYGO T-Display S3 color LCD",
+      "power_input": "12V DC",
+      "noise_db": 40,
+      "price_usd_min": 200,
+      "price_usd_max": 400,
+      "open_source": true,
+      "status": "Available",
+      "notes": "Quad-chip BM1368 design. Original QAxe used BM1366 (4 chips), NerdQAxe+ upgraded to BM1368. Supports dual-pool mining with hashrate splitting."
+    },
+
+    "nerdqaxe_plusplus": {
+      "name": "NerdQAxe++",
+      "manufacturer": "Open Source (BitMaker-hub / Bitronics)",
+      "family": "NerdAxe",
+      "asic_chip": "BM1370",
+      "asic_chip_source": "Antminer S21 Pro",
+      "process_node": "5nm",
+      "num_chips": 4,
+      "default_hashrate_ths": 4.8,
+      "hashrate_range_ths": "4.8-5.2",
+      "hashrate_overclocked_ths": "6.0-6.5",
+      "hashrate_unit": "TH/s",
+      "power_watts": 72,
+      "power_range_watts": "70-103",
+      "efficiency_j_per_th": 15,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40,
+        "notes": "Remastered edition stabilizes at 65C after 72hr continuous run at 25C ambient. Rev 6.1 improved copper traces lower board temps by 21.4%."
+      },
+      "fan": {
+        "type": "High-efficiency cooling fan",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 700,
+        "step_mhz": 25,
+        "notes": "Danger Zone OC can push to ~700MHz for 6.2-6.5 TH/s at 110-115W"
+      },
+      "voltage": {
+        "default_mv": 1150,
+        "min_mv": 1100,
+        "max_mv": 1800
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone enclosed unit with metal stand",
+      "connectivity": "WiFi 2.4GHz + Ethernet",
+      "display": "1.9in LCD color screen with 2 programmable buttons",
+      "power_input": "12V DC (XT30 connector on Rev 6.1)",
+      "noise_db": 40,
+      "noise_notes": "~45 dB remastered edition",
+      "price_usd_min": 300,
+      "price_usd_max": 600,
+      "open_source": true,
+      "status": "Available (Rev 6.1 current)",
+      "notes": "World's first open-source quad-chip BM1370 miner. Rev 6.1: no fuse, XT30 connector, thicker copper traces, 1oz copper layout, spring-mounted heatsink, relocated temp sensors. Supports dual-pool mining. Beast Mode firmware for ~6 TH/s. Weight: 0.4 kg."
+    },
+
+    "nerdoctaxe": {
+      "name": "NerdOctaxe Gamma",
+      "manufacturer": "Open Source (Patsch91 / Community)",
+      "family": "NerdAxe",
+      "asic_chip": "BM1370",
+      "asic_chip_source": "Antminer S21 Pro / S21+ / S21+ Hydro",
+      "process_node": "5nm",
+      "num_chips": 8,
+      "default_hashrate_ths": 9.6,
+      "hashrate_unit": "TH/s",
+      "power_watts": 160,
+      "power_range_watts": "150-160",
+      "efficiency_j_per_th": 16.67,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "Dual Thermalright AXP90 X53 Black Low Profile coolers",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Intel LGA115x and AMD AM4 mounting pattern"
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 700,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1150,
+        "min_mv": 1100,
+        "max_mv": 1800
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone enclosed unit",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "LILYGO T-Display S3, 1.9in LCD color screen with 2 programmable buttons",
+      "power_input": "12V 18A PSU included",
+      "noise_db": 40,
+      "price_usd_min": 600,
+      "price_usd_max": 1200,
+      "open_source": true,
+      "status": "Available",
+      "notes": "8-chip BM1370 design, based on NerdQAxe architecture. Most powerful Nerd-series miner. ~$26/month electricity at $0.20/kWh. Supports dual-pool mining."
+    },
+
+    "luckyminer_lv06": {
+      "name": "LuckyMiner LV06",
+      "manufacturer": "LuckyMiner",
+      "family": "LuckyMiner",
+      "asic_chip": "BM1366",
+      "asic_chip_source": "Antminer S19 XP",
+      "process_node": "5nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 500,
+      "hashrate_unit": "GH/s",
+      "power_watts": 13,
+      "efficiency_j_per_th": 26,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 30
+      },
+      "fan": {
+        "type": "Built-in small fan",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 485,
+        "min_mhz": 200,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1500
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Compact standalone unit",
+      "connectivity": "WiFi 2.4GHz",
+      "power_input": "100-240V AC 50/60Hz (built-in PSU)",
+      "dimensions_mm": "105 x 60 x 33",
+      "weight_g": 136,
+      "noise_db": 38,
+      "price_usd_min": 60,
+      "price_usd_max": 120,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Plug-and-play BM1366 miner. Hardware encryption for mining data. Supports 42 SHA-256 coins. Merged mining BTC+Fractal Bitcoin. Real-time monitoring via WiFi device."
+    },
+
+    "luckyminer_lv07": {
+      "name": "LuckyMiner LV07",
+      "manufacturer": "LuckyMiner",
+      "family": "LuckyMiner",
+      "asic_chip": "Dual 5nm chips",
+      "asic_chip_source": "Bitmain (specific model unspecified)",
+      "process_node": "5nm",
+      "num_chips": 2,
+      "default_hashrate_ths": 1.0,
+      "hashrate_unit": "TH/s",
+      "power_watts": 25,
+      "power_range_watts": "25-29",
+      "efficiency_j_per_th": 25,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 45
+      },
+      "fan": {
+        "type": "Built-in cooling fan",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "Fan can reach ~58 dB at high RPM"
+      },
+      "frequency": {
+        "default_mhz": 500,
+        "min_mhz": 200,
+        "max_mhz": 600,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1500
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Compact standalone unit",
+      "connectivity": "WiFi 2.4GHz, 12V input",
+      "power_input": "100-240V AC (adapter included)",
+      "dimensions_mm": "109 x 99 x 45",
+      "weight_g": 400,
+      "noise_db": 38,
+      "noise_notes": "Can reach ~58 dB at high RPM",
+      "price_usd_min": 100,
+      "price_usd_max": 180,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Dual-chip design. Supports BTC+Fractal Bitcoin merged mining. Various pool mining modes (SOLO, PPLNS, PPS, PROP)."
+    },
+
+    "luckyminer_lv08": {
+      "name": "LuckyMiner LV08",
+      "manufacturer": "LuckyMiner",
+      "family": "LuckyMiner",
+      "asic_chip": "5nm ASIC chips",
+      "asic_chip_source": "Bitmain (specific model unspecified)",
+      "process_node": "5nm",
+      "num_chips": 4,
+      "default_hashrate_ths": 4.5,
+      "hashrate_unit": "TH/s",
+      "power_watts": 120,
+      "efficiency_j_per_th": 26.67,
+      "temperature": {
+        "normal_operating_chip_min_c": 45,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": 75,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 45
+      },
+      "fan": {
+        "type": "Built-in cooling fan",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 200,
+        "max_mhz": 650,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1200,
+        "min_mv": 1100,
+        "max_mv": 1500
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Compact standalone unit",
+      "connectivity": "WiFi 2.4GHz",
+      "power_input": "100-240V AC",
+      "dimensions_mm": "200 x 128 x 70",
+      "weight_g": 1100,
+      "noise_db": 38,
+      "price_usd_min": 250,
+      "price_usd_max": 350,
+      "open_source": false,
+      "status": "Available (launched December 2024)",
+      "notes": "4.5x hashrate of LV07 in a still-compact form factor."
+    },
+
+    "gekkoscience_compac_f": {
+      "name": "GekkoScience Compac F",
+      "manufacturer": "GekkoScience (USA)",
+      "family": "GekkoScience",
+      "asic_chip": "BM1397",
+      "asic_chip_source": "Antminer S17",
+      "process_node": "7nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 250,
+      "hashrate_range_ghs": "200-400",
+      "hashrate_overclocked_ghs": "350-500",
+      "hashrate_unit": "GH/s",
+      "power_watts": 10,
+      "power_range_watts": "5-15",
+      "efficiency_j_per_th": 37,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": null,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "NO built-in temperature sensor. Rule of thumb: if heatsink is not too hot to touch, chip is OK. Aim for under 80C when overclocking."
+      },
+      "fan": {
+        "type": "No built-in fan (passive heatsink only)",
+        "default_speed_pct_min": null,
+        "default_speed_pct_max": null,
+        "notes": "External active cooling REQUIRED. IglooPac fan shroud upgrade recommended."
+      },
+      "frequency": {
+        "default_mhz": 400,
+        "min_mhz": 300,
+        "max_mhz": 800,
+        "step_mhz": 25,
+        "notes": "Not stable below 300 MHz. Start at 400, increase 25 MHz at a time. CGMiner flag: --gekko-compacf-freq"
+      },
+      "voltage": {
+        "type": "Manual potentiometer (v-pot)",
+        "default_position": "3-6 o'clock",
+        "notes": "Small Phillips-head screw. 1 o'clock = lowest, 11 o'clock = highest, 12 o'clock = reset. Turn clockwise ~30 degrees if frequency won't reach target."
+      },
+      "interface": "CGMiner API (via USB to host computer)",
+      "form_factor": "USB stick",
+      "connectivity": "USB (requires host computer running CGMiner)",
+      "power_input": "USB 5V (requires 2-3.5A from powered USB hub)",
+      "noise_db": 0,
+      "noise_notes": "Silent (no fan), but external fan needed for active cooling",
+      "price_usd_min": 40,
+      "price_usd_max": 80,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Designed and assembled in USA. Requires powered USB hub (2-5A per port recommended). Loves overclocking - built for it. No temperature sensor in device."
+    },
+
+    "gekkoscience_compac_a1": {
+      "name": "GekkoScience Compac A1",
+      "manufacturer": "GekkoScience (USA)",
+      "family": "GekkoScience",
+      "asic_chip": "BM1362",
+      "asic_chip_source": "Antminer S19j Pro",
+      "process_node": "7nm",
+      "num_chips": 2,
+      "default_hashrate_ghs": 300,
+      "hashrate_range_ghs": "300-500",
+      "hashrate_overclocked_ghs": "400-568",
+      "hashrate_unit": "GH/s",
+      "power_watts": 15,
+      "power_range_watts": "5-20",
+      "efficiency_j_per_th": 30,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 70,
+        "throttle_temp_c": null,
+        "max_safe_chip_c": 80,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "HAS integrated temperature sensor (unlike Compac F). Telemetry data available in CGMiner terminal."
+      },
+      "fan": {
+        "type": "No built-in fan (passive heatsink with integrated 2-pin fan header)",
+        "default_speed_pct_min": null,
+        "default_speed_pct_max": null,
+        "notes": "Integrated 2-pin fan socket, compatible with IcePac snap-on cooler. Active cooling strongly recommended for overclocking."
+      },
+      "frequency": {
+        "default_mhz": 400,
+        "min_mhz": 300,
+        "max_mhz": 800,
+        "step_mhz": 25,
+        "notes": "Software-controlled clock rate and core voltage adjustment during operation via console parameters or Java API. --gekko-compaca1-freq flag in CGMiner."
+      },
+      "voltage": {
+        "type": "Software-controlled in-built voltage regulator",
+        "notes": "First GekkoScience USB miner with software-controlled voltage (no manual potentiometer). Adjustable via CGMiner console parameters or Java API."
+      },
+      "interface": "CGMiner API (via USB to host computer)",
+      "form_factor": "USB stick",
+      "connectivity": "USB (requires host computer running CGMiner)",
+      "power_input": "USB 5V (requires 2-5A from powered USB hub)",
+      "noise_db": 0,
+      "noise_notes": "Silent (no built-in fan), but external cooling needed",
+      "price_usd_min": 80,
+      "price_usd_max": 250,
+      "open_source": false,
+      "status": "Available (released May 2024)",
+      "notes": "Successor to Compac F. Dual BM1362 ASICs with 70% less power consumption than Compac F at equivalent hashrate. First GekkoScience USB miner with integrated temperature sensor and software voltage control. Designed and assembled in USA. First product in new A-series line."
+    },
+
+    "gekkoscience_terminus_r909": {
+      "name": "GekkoScience Terminus R909",
+      "manufacturer": "GekkoScience (USA)",
+      "family": "GekkoScience",
+      "asic_chip": "BM1397",
+      "asic_chip_source": "Antminer S17",
+      "process_node": "7nm",
+      "num_chips": 6,
+      "default_hashrate_ths": 1.6,
+      "hashrate_range_ths": "1.5-1.6",
+      "hashrate_overclocked_ths": "2.0-2.4",
+      "hashrate_unit": "TH/s",
+      "power_watts": 90,
+      "power_range_watts": "70-120",
+      "efficiency_j_per_th": 30,
+      "temperature": {
+        "normal_operating_chip_min_c": 45,
+        "normal_operating_chip_max_c": 75,
+        "throttle_temp_c": null,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "NO built-in temperature sensor - chip temp not displayed in CGMiner. 40% larger heatsink area vs previous models."
+      },
+      "fan": {
+        "type": "Arctic Cooling F8 80mm (built-in)",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "default_mhz": 550,
+        "min_mhz": 50,
+        "max_mhz": 900,
+        "step_mhz": 25,
+        "notes": "Conservatively set at 400 MHz default for 1.5-1.6 TH/s. Safe OC to 550 MHz (~2.0 TH/s) without hardware mods."
+      },
+      "voltage": {
+        "core_voltage_range_v": "1.4-1.6",
+        "notes": "Adjustable per chip, similar to Compac F"
+      },
+      "interface": "CGMiner API (via USB to host computer)",
+      "form_factor": "Pod Miner (enclosed aluminum shell)",
+      "connectivity": "USB (requires host computer running CGMiner)",
+      "power_input": "12V DC via 2.1/5.5mm barrel plug (8A rated) or 6-pin PCIe",
+      "noise_db": 35,
+      "noise_notes": "Near-silent with enclosed shell and 80mm fan",
+      "price_usd_min": 200,
+      "price_usd_max": 400,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Designed and assembled in USA. Released Dec 2022. Requires external controller (Raspberry Pi 4 handles 2 units, 12th gen i5 handles 9 units). Compatible with Windows, Mac OS, Linux, Ubuntu, Raspberry Pi. Improved thermal management with redesigned layout."
+    },
+
+    "futurebit_apollo_btc": {
+      "name": "FutureBit Apollo BTC",
+      "manufacturer": "FutureBit (USA)",
+      "family": "FutureBit Apollo",
+      "asic_chip": "Custom ASIC (44 hash cores)",
+      "asic_chip_source": "Proprietary",
+      "process_node": "Unknown",
+      "num_chips": 44,
+      "default_hashrate_ths": 3.0,
+      "hashrate_range_ths": "2.0-3.8",
+      "hashrate_unit": "TH/s",
+      "power_watts": 125,
+      "power_range_watts": "125-200",
+      "power_modes": {
+        "eco": {"watts": 125, "hashrate_ths": 2.0},
+        "turbo": {"watts": 200, "hashrate_ths": 3.0}
+      },
+      "efficiency_j_per_th": 42,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "25mm custom fan with cold-forged aluminum heatsink",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100,
+        "notes": "Nearly silent operation"
+      },
+      "frequency": {
+        "notes": "Managed by internal firmware, user-selectable via Eco/Turbo modes"
+      },
+      "voltage": {
+        "notes": "Internal regulation, not user-adjustable"
+      },
+      "interface": "Web UI (custom Linux-based OS)",
+      "form_factor": "Desktop (small form factor PC)",
+      "connectivity": "Ethernet + WiFi",
+      "full_node": true,
+      "full_node_storage": "1TB NVMe SSD",
+      "processor": "6-core ARM CPU, 4GB RAM",
+      "power_input": "200W PSU (proprietary FutureBit PSU limited to ~3 TH/s; external 300W+ needed for 3.8 TH/s)",
+      "noise_db": 35,
+      "price_usd_min": 400,
+      "price_usd_max": 700,
+      "open_source": false,
+      "status": "Discontinued (replaced by Apollo II)",
+      "notes": "Made in USA. Runs full non-pruned Bitcoin node. 44 ASIC hash cores under custom cold-forged aluminum induction heatsink. World's first vertically integrated Bitcoin full node + miner in desktop form factor."
+    },
+
+    "futurebit_apollo_ii": {
+      "name": "FutureBit Apollo II",
+      "manufacturer": "FutureBit (USA)",
+      "family": "FutureBit Apollo",
+      "asic_chip": "Custom 5nm ASIC",
+      "asic_chip_source": "Proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "default_hashrate_ths": 10,
+      "hashrate_unit": "TH/s",
+      "power_watts": 225,
+      "power_range_watts": "225-400",
+      "power_modes": {
+        "eco": {"watts": 225, "hashrate_ths": 6},
+        "turbo": {"watts": 400, "hashrate_ths": 10}
+      },
+      "efficiency_j_per_th": 28,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "1K-7K RPM low noise dual ball bearing fan with custom vapor chamber heatsink",
+        "default_speed_pct_min": 15,
+        "default_speed_pct_max": 100,
+        "notes": "Vapor chamber dissipates 2x the output of Gen 1"
+      },
+      "frequency": {
+        "notes": "Managed by internal firmware, user-selectable via Eco/Turbo modes"
+      },
+      "voltage": {
+        "notes": "Internal regulation via integrated 450W PSU"
+      },
+      "interface": "Web UI (custom Linux-based OS)",
+      "form_factor": "Desktop (6.5in x 6.5in x 5.5in)",
+      "connectivity": "Ethernet + WiFi",
+      "full_node": true,
+      "full_node_storage": "Up to 2TB NVMe",
+      "processor": "ARM processor",
+      "power_input": "Integrated 450W PSU",
+      "noise_db": 40,
+      "price_usd_min": 600,
+      "price_usd_max": 1200,
+      "open_source": false,
+      "status": "Available (current generation)",
+      "notes": "4x hashrate, 2x efficiency, 3x hashrate-per-dollar vs Gen 1. Built-in stratum solo pool toggle. Can connect external miners to increase solo block chances. Made in USA."
+    },
+
+    "bitmain_antrouter_r1": {
+      "name": "Bitmain AntRouter R1-BTC",
+      "manufacturer": "Bitmain",
+      "family": "AntRouter",
+      "asic_chip": "BM1385 (or early SHA-256 ASIC)",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "28nm",
+      "num_chips": 1,
+      "default_hashrate_ghs": 5.5,
+      "hashrate_unit": "GH/s",
+      "power_watts": 10,
+      "temperature": {
+        "normal_operating_chip_min_c": 35,
+        "normal_operating_chip_max_c": 50,
+        "max_safe_chip_c": 70,
+        "danger_temp_c": 85,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "Surface temperature ~40C at 25C ambient"
+      },
+      "fan": {
+        "type": "No fan (passive cooling)",
+        "default_speed_pct_min": null,
+        "default_speed_pct_max": null
+      },
+      "frequency": {
+        "notes": "Fixed, not user-adjustable"
+      },
+      "voltage": {
+        "input": "110-220V AC",
+        "notes": "Built-in PSU"
+      },
+      "interface": "Web UI (built-in)",
+      "form_factor": "WiFi Router + Miner",
+      "connectivity": "WiFi 802.11 g/n 2.4GHz + Ethernet WAN",
+      "power_input": "110-220V AC, 0.2A",
+      "dimensions_mm": "84.5 x 56.5 x 29",
+      "noise_db": 0,
+      "price_usd_min": 20,
+      "price_usd_max": 50,
+      "open_source": false,
+      "status": "Discontinued / Obsolete",
+      "notes": "Dual-function: WiFi router + Bitcoin miner. Forces AntPool Solo mode. 5.5 GH/s is negligible for modern mining. Also functions as USB charger (5V/2A). Can connect U3 miners via USB hub. WiFi: 150Mbps transmission rate."
+    },
+
+    "antminer_s9": {
+      "name": "Bitmain Antminer S9",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1387",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "16nm",
+      "num_chips": 189,
+      "chips_per_board": 63,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 13.5,
+      "hashrate_range_ths": "11.5-14",
+      "hashrate_unit": "TH/s",
+      "power_watts": 1323,
+      "efficiency_j_per_th": 98,
+      "space_heater_mode": {
+        "hashrate_ths": 9,
+        "power_watts": 700,
+        "efficiency_j_per_th": 77,
+        "noise_db": 32,
+        "fan_speed_pct": 30,
+        "braiins_max_board_temp_s9j_c": 95,
+        "braiins_max_board_temp_s9_c": 90,
+        "braiins_max_board_temp_s9i_c": 85,
+        "braiins_max_chip_temp_c": 135,
+        "braiins_power_target_w": 700,
+        "notes": "With Braiins OS in space heater configuration. ~9 TH/s at 700W, 32 dB. Increase power target by ~80W for +1 TH/s."
+      },
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 90,
+        "pcb_normal_max_c": 55,
+        "pcb_max_safe_c": 85,
+        "chip_cool_c": 85,
+        "chip_normal_range_min_c": 85,
+        "chip_normal_range_max_c": 100,
+        "max_safe_chip_c": 105,
+        "danger_temp_c": 110,
+        "auto_shutdown_c": 115,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "IMPORTANT: BM1387 chip temps of 85-100C are NORMAL operating range per Bitmain specs. Below 85C = cool. 85-100C = normal. 100-110C = monitor carefully. 115C = auto-cutoff. At 25C ambient, chips sit ~70C with boards ~45C. At 40C ambient, chips reach ~90C."
+      },
+      "fan": {
+        "type": "2x 12038 (120mm) fans",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "70% fan speed sufficient even at 40C ambient. 50% fan speed (3000-3400 RPM) sufficient at 25C ambient."
+      },
+      "frequency": {
+        "default_mhz": 650,
+        "min_mhz": 100,
+        "max_mhz": 750,
+        "notes": "Each BM1387 provides ~74 GH/s at 650 MHz"
+      },
+      "voltage": {
+        "rated_v_min": 11.60,
+        "rated_v_max": 13.00,
+        "notes": "Requires APW3/APW7 PSU or equivalent"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028)",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "10x 6-pin PCIe connectors for 12V DC (3 per hashboard + 1 controller)",
+      "dimensions_mm": "350 x 135 x 158",
+      "weight_g": 4200,
+      "noise_db": 85,
+      "price_usd_min": 30,
+      "price_usd_max": 150,
+      "open_source": false,
+      "status": "Discontinued (legacy, widely available used)",
+      "notes": "Released July 2017. Most iconic Bitcoin ASIC miner ever. Can be immersion cooled or modified for home use with aftermarket mods. BM1387 chips available for $1-2 each. Popular for running custom firmware (Braiins OS). Can function as space heater at 700W/32 dB with Braiins OS. NOT suitable for home at stock settings without noise/heat management."
+    },
+
+    "antminer_s19": {
+      "name": "Bitmain Antminer S19",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1398",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "7nm",
+      "num_chips": 228,
+      "chips_per_board": 76,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 95,
+      "hashrate_range_ths": "84-95",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3250,
+      "efficiency_j_per_th": 34.2,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 85,
+        "pcb_max_safe_c": 80,
+        "max_safe_chip_c": 90,
+        "firmware_max_chip_c": 95,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40,
+        "notes": "CRITICAL: Temperature impacts efficiency far more on S19 than older gens. Power consumption rises from 2.5kW at 20C to 3.55kW at 75C chip temp. Efficiency: 24 J/TH at 20C to 34 J/TH at 75C. PCB max temp: 75-80C (varies by sub-model). Firmware chip max: 95C (auto-shutdown). Ideal hashing: 70-85C chip, 3000-6500 RPM fan."
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, adjustable via web UI"
+      },
+      "voltage": {
+        "notes": "Built-in APW12 PSU, 220-240V AC input"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, C14 inlet",
+      "noise_db": 75,
+      "price_usd_min": 200,
+      "price_usd_max": 800,
+      "open_source": false,
+      "status": "Discontinued (available used/refurbished)",
+      "notes": "Released May 2020. NOT suitable for home without significant noise/heat mitigation. Requires dedicated 240V circuit. Can run Braiins OS for autotuning."
+    },
+
+    "antminer_s19_pro": {
+      "name": "Bitmain Antminer S19 Pro",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1398",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "7nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 110,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3250,
+      "efficiency_j_per_th": 29.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, built-in APW12 PSU",
+      "noise_db": 75,
+      "price_usd_min": 300,
+      "price_usd_max": 1000,
+      "open_source": false,
+      "status": "Discontinued (available used/refurbished)",
+      "notes": "NOT suitable for home without noise/heat mitigation. Requires dedicated 240V circuit."
+    },
+
+    "antminer_s19_xp": {
+      "name": "Bitmain Antminer S19 XP",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1366",
+      "asic_chip_variants": ["BM1366AL", "BM1366AG"],
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "5nm",
+      "num_chips": 330,
+      "chips_per_board": 110,
+      "domains_per_board": 11,
+      "chips_per_domain": 10,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 140,
+      "hashrate_range_ths": "134-141",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3010,
+      "efficiency_j_per_th": 21.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 45,
+        "notes": "Domain voltage ~1.35V. CLK signal 0.6-0.7V range."
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, built-in APW12 PSU",
+      "dimensions_mm": "400 x 195 x 290",
+      "weight_g": 14500,
+      "noise_db": 75,
+      "noise_notes": "75-85 dB under load",
+      "price_usd_min": 1000,
+      "price_usd_max": 3000,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released July 2022. Most efficient S19 variant. Same BM1366 chip used in BitAxe Ultra. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "antminer_s21": {
+      "name": "Bitmain Antminer S21",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1368",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "5nm",
+      "num_chips": 324,
+      "chips_per_board": 108,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 200,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3500,
+      "efficiency_j_per_th": 17.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x fans (dual aluminum heat sinks, front + rear fans)",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, C19 connector",
+      "dimensions_mm": "400 x 195 x 290",
+      "weight_g": 15400,
+      "noise_db": 75,
+      "price_usd_min": 2000,
+      "price_usd_max": 5000,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Announced 2023, shipped 2024. Same BM1368 chip used in BitAxe Supra. NOT suitable for home without noise/heat mitigation. Requires dedicated 240V circuit."
+    },
+
+    "antminer_s21_pro": {
+      "name": "Bitmain Antminer S21 Pro",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1370",
+      "asic_chip_variants": ["BM1370BC"],
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "5nm",
+      "num_chips": 195,
+      "chips_per_board": 65,
+      "domains_per_board": 13,
+      "chips_per_domain": 5,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 234,
+      "hashrate_unit": "TH/s",
+      "per_chip_hashrate_ths": 1.2,
+      "power_watts": 3510,
+      "efficiency_j_per_th": 15,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "Slight hashrate decrease to ~225 TH/s at 45-50C ambient. Domain voltage ~1.04V."
+      },
+      "fan": {
+        "type": "4x 140mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, C19 connector (20A rated)",
+      "dimensions_mm": "450 x 219 x 293",
+      "weight_g": 20000,
+      "noise_db": 76,
+      "price_usd_min": 4000,
+      "price_usd_max": 8000,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Released March 2024, shipped July 2024. Same BM1370 chip used in BitAxe Gamma and NerdQAxe++. Each chip does ~1.2 TH/s. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "antminer_s21_plus": {
+      "name": "Bitmain Antminer S21+",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1370",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 216,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3564,
+      "efficiency_j_per_th": 16.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, C19 connector",
+      "noise_db": 76,
+      "price_usd_min": 3000,
+      "price_usd_max": 6000,
+      "open_source": false,
+      "status": "Available",
+      "notes": "NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m30s": {
+      "name": "MicroBT Whatsminer M30S",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 8nm custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "8nm",
+      "num_chips": 444,
+      "chips_per_board": 148,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 86,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3268,
+      "efficiency_j_per_th": 38,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 40,
+        "notes": "Power board temp 71-72C. Air inlet 25.6C -> outlet 60.4C."
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, PSU integrated",
+      "dimensions_mm": "390 x 225 x 150",
+      "weight_g": 10500,
+      "noise_db": 72,
+      "price_usd_min": 100,
+      "price_usd_max": 500,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released April 2020. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m50s": {
+      "name": "MicroBT Whatsminer M50S",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 5nm custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "5nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 126,
+      "hashrate_range_ths": "120-144",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3276,
+      "efficiency_j_per_th": 26,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 45
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, PSU integrated",
+      "dimensions_mm": "425 x 225 x 125",
+      "noise_db": 75,
+      "price_usd_min": 400,
+      "price_usd_max": 1500,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released July 2022. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m60s": {
+      "name": "MicroBT Whatsminer M60S",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 3nm GAA custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "3nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 186,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3441,
+      "efficiency_j_per_th": 18.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 35
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, P221B/P222B PSU, IEC C19 cable rated 16A+",
+      "dimensions_mm": "430 x 155 x 226",
+      "weight_g": 13500,
+      "noise_db": 72,
+      "price_usd_min": 2000,
+      "price_usd_max": 5000,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Released October 2023. Samsung 3nm GAA process confirmed by TechInsights (July 2023). NOT suitable for home without noise/heat mitigation."
+    },
+
+    "avalon_nano_3": {
+      "name": "Canaan Avalon Nano 3",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon",
+      "asic_chip": "Canaan proprietary (A-series)",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "7nm",
+      "num_chips": 8,
+      "default_hashrate_ths": 4,
+      "hashrate_unit": "TH/s",
+      "power_watts": 140,
+      "efficiency_j_per_th": 35,
+      "temperature": {
+        "normal_operating_chip_min_c": 70,
+        "normal_operating_chip_max_c": 90,
+        "max_safe_chip_c": 95,
+        "danger_temp_c": 105,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 35,
+        "exhaust_air_temp_c": "40-60",
+        "notes": "IMPORTANT: Canaan chips are designed for high-temperature operation. Chip temps of 70-90C are NORMAL and by design. Mining mode targets ~75C, heater mode targets ~90C. These chips perform BETTER at higher temperatures. Same high-temp-resistant chips as Avalon Miner A15 series."
+      },
+      "fan": {
+        "type": "Internal air cooling",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled based on operating mode"
+      },
+      "voltage": {
+        "input": "110-240V AC",
+        "notes": "Built-in PSU"
+      },
+      "interface": "Canaan Web UI + Avalon Family App",
+      "form_factor": "Compact standalone heater/miner",
+      "connectivity": "WiFi + Ethernet",
+      "power_input": "110-240V AC, C13 connector",
+      "weight_g": 700,
+      "noise_db": 35,
+      "noise_range_db": "33-40",
+      "price_usd_min": 150,
+      "price_usd_max": 300,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Designed as dual-purpose miner/heater. Quiet enough for 24/7 home operation. Generates ~477 BTU/h of heat. Multiple operating modes with different chip temperature targets."
+    },
+
+    "avalon_nano_3s": {
+      "name": "Canaan Avalon Nano 3S",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon",
+      "asic_chip": "Canaan proprietary (A-series, same family as A15 chips)",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "7nm",
+      "num_chips": 12,
+      "default_hashrate_ths": 6,
+      "hashrate_unit": "TH/s",
+      "power_watts": 140,
+      "power_modes": {
+        "high": {"watts": 140, "hashrate_ths": 6},
+        "medium": {"watts": 100, "hashrate_ths": 4.5},
+        "low": {"watts": 65, "hashrate_ths": 3}
+      },
+      "efficiency_j_per_th": 23.33,
+      "temperature": {
+        "normal_operating_chip_min_c": 75,
+        "normal_operating_chip_max_c": 95,
+        "mining_mode_target_c": 75,
+        "night_mode_target_c": 80,
+        "heater_mode_target_c": 90,
+        "max_safe_chip_c": 100,
+        "danger_temp_c": 110,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 35,
+        "exhaust_air_temp_c": "40-60",
+        "notes": "CRITICAL: Chip temps of 75-95C are NORMAL and by design. This is NOT overheating. Canaan's high-temperature-resistant chips (same as A15 series) actually perform BETTER at higher temperatures. Mining mode: 75C target. Night mode: 80C target. Heater mode: 90C target. Do NOT treat these temps as alarm conditions."
+      },
+      "fan": {
+        "type": "Internal air cooling with variable speed",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled based on operating mode and power mode (high/medium/low)"
+      },
+      "voltage": {
+        "input": "110-240V AC",
+        "internal_dc": "28V",
+        "notes": "Built-in PSU. Can operate on smaller PSUs in low power mode."
+      },
+      "interface": "Canaan Web UI + Avalon Family App",
+      "form_factor": "Compact standalone heater/miner",
+      "connectivity": "WiFi + Ethernet",
+      "power_input": "110-240V AC, C13 connector",
+      "dimensions_mm": "205 x 115 x 58",
+      "weight_g": 860,
+      "noise_db": 35,
+      "noise_range_db": "33-50",
+      "noise_notes": "33-40 dB typical, up to 50 dB in high fan modes",
+      "price_usd_min": 225,
+      "price_usd_max": 339,
+      "open_source": false,
+      "status": "Available (current model)",
+      "notes": "50% more hashrate than Nano 3 at same 140W. Generates ~477 BTU/h heat. Three power modes (140W/100W/65W). Designed as heater/miner for winter use. Altitude: decrease max operating temp by 1C per 300m above 900m."
+    },
+
+    "avalon_mini_3": {
+      "name": "Canaan Avalon Mini 3",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon",
+      "asic_chip": "Canaan proprietary 4nm ASIC (A15-series)",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "4nm",
+      "num_chips": 66,
+      "default_hashrate_ths": 37.5,
+      "hashrate_unit": "TH/s",
+      "power_watts": 800,
+      "efficiency_j_per_th": 21.3,
+      "temperature": {
+        "mining_mode_target_c": 75,
+        "night_mode_target_c": 80,
+        "heater_mode_target_c": 90,
+        "normal_operating_chip_min_c": 70,
+        "normal_operating_chip_max_c": 95,
+        "max_safe_chip_c": 100,
+        "danger_temp_c": 110,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 40,
+        "notes": "CRITICAL: Same high-temp-resistant chips as A15 industrial miners. Chip temps of 75-90C are NORMAL by design. Mining Mode: 75C, Night Mode: 80C, Heater Mode: 90C."
+      },
+      "fan": {
+        "type": "Internal air cooling",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "operating_modes": {
+        "mining": {
+          "chip_target_c": 75,
+          "description": "Maximum hashrate and efficiency, fans louder",
+          "heating": false
+        },
+        "heater_eco": {
+          "chip_target_c": 90,
+          "description": "Heating priority with mining, eco sub-mode",
+          "heating": true,
+          "target_room_temp_adjustable": true
+        },
+        "heater_super": {
+          "chip_target_c": 90,
+          "description": "Maximum heating with mining, super sub-mode",
+          "heating": true,
+          "target_room_temp_adjustable": true
+        },
+        "night": {
+          "chip_target_c": 80,
+          "description": "Quiet heating, reduced fan noise",
+          "heating": true
+        }
+      },
+      "interface": "Canaan Web UI + Avalon Family App",
+      "form_factor": "Baseboard heater form factor",
+      "connectivity": "Ethernet",
+      "power_input": "110-240V AC, C19 connector (20A)",
+      "dimensions_mm": "760 x 104 x 214",
+      "weight_g": 8350,
+      "noise_db": 55,
+      "price_usd_min": 800,
+      "price_usd_max": 1500,
+      "open_source": false,
+      "status": "Available (launched March 2025)",
+      "notes": "Baseboard heater + Bitcoin miner hybrid. 800W heat output. Mining mode used year-round, heater mode for winter. Double-click switch button to toggle heater eco/super. Idle mode when room reaches target temperature."
+    },
+
+    "avalon_q": {
+      "name": "Canaan Avalon Q",
+      "manufacturer": "Canaan Inc. (NASDAQ: CAN)",
+      "family": "Avalon",
+      "asic_chip": "Canaan proprietary",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "default_hashrate_ths": 90,
+      "hashrate_unit": "TH/s",
+      "power_watts": 1674,
+      "power_modes": {
+        "eco": {"watts": 800, "noise_db": "45-50"},
+        "standard": {"watts": 1300, "noise_db": "50-55"},
+        "turbo": {"watts": 1600, "noise_db": "60-65"}
+      },
+      "efficiency_j_per_th": 18.6,
+      "temperature": {
+        "normal_operating_chip_min_c": 60,
+        "normal_operating_chip_max_c": 85,
+        "max_safe_chip_c": 95,
+        "danger_temp_c": 105,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 35
+      },
+      "fan": {
+        "type": "Internal air cooling with variable speed",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "Canaan Web UI + Avalon Family App",
+      "form_factor": "Compact standalone unit",
+      "connectivity": "Ethernet + USB WiFi dongle",
+      "power_input": "110-240V AC (first pro-grade miner to support 110V worldwide)",
+      "dimensions_mm": "455 x 130.5 x 440",
+      "weight_g": 10500,
+      "noise_db": 50,
+      "noise_range_db": "45-65",
+      "price_usd_min": 2000,
+      "price_usd_max": 4000,
+      "open_source": false,
+      "status": "Available (launched February 2025)",
+      "notes": "First professional-grade Bitcoin miner to support 110V home power worldwide. Three power modes (800W-1600W). Significantly quieter than S19/M30S (45-65 dB vs 75-85 dB). Adjustable power consumption 800-1600W. 360-day warranty. Approx $3.36/day income, ~$28.99/month profit at current conditions."
+    },
+
+    "antminer_s21_xp_hyd": {
+      "name": "Bitmain Antminer S21 XP Hyd",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1370 (advanced variant)",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "default_hashrate_ths": 473,
+      "hashrate_unit": "TH/s",
+      "power_watts": 5676,
+      "efficiency_j_per_th": 12,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "max_safe_chip_c": 75,
+        "danger_temp_c": 85,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 45,
+        "notes": "Hydro-cooled: much lower operating temps than air-cooled"
+      },
+      "fan": {
+        "type": "Hydro cooling (no fans)",
+        "notes": "Requires external water cooling loop"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone hydro-cooled ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC",
+      "noise_db": 50,
+      "noise_notes": "Much quieter than air-cooled due to hydro cooling",
+      "price_usd_min": 8000,
+      "price_usd_max": 15000,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Most advanced S21 variant. Hydro cooling enables extreme efficiency (12 J/TH). Requires water cooling infrastructure. NOT practical for typical home use."
+    },
+
+    "bitaxe_gamma_turbo_gt": {
+      "name": "BitAxe Gamma Turbo GT (800 Series)",
+      "manufacturer": "Open Source (Skot9000 / OSMU Community)",
+      "family": "BitAxe",
+      "asic_chip": "BM1370",
+      "asic_chip_source": "Antminer S21 Pro",
+      "process_node": "5nm",
+      "num_chips": 2,
+      "default_hashrate_ths": 2.15,
+      "hashrate_range_ths": "2.0-2.2",
+      "hashrate_overclocked_ths": "2.4-4.0",
+      "hashrate_unit": "TH/s",
+      "power_watts": 36,
+      "power_range_watts": "36-43",
+      "efficiency_j_per_th": 17,
+      "temperature": {
+        "normal_operating_chip_min_c": 40,
+        "normal_operating_chip_max_c": 65,
+        "throttle_temp_c": 70,
+        "max_safe_chip_c": 75,
+        "danger_temp_c": 90,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "60mm Noctua NF-A6x25 PWM + anodized aluminum heatsink",
+        "default_speed_pct_min": 30,
+        "default_speed_pct_max": 100,
+        "notes": "3000-3500 RPM, ~35 dB"
+      },
+      "frequency": {
+        "default_mhz": 525,
+        "min_mhz": 50,
+        "max_mhz": 900,
+        "step_mhz": 25
+      },
+      "voltage": {
+        "default_mv": 1150,
+        "min_mv": 1100,
+        "max_mv": 1800,
+        "notes": "12V input, DS4432U+ current DAC"
+      },
+      "interface": "ESP-Miner (AxeOS) REST API",
+      "form_factor": "Standalone PCB with steel base",
+      "connectivity": "WiFi 2.4GHz (ESP32-S3)",
+      "display": "0.91in SSD1306 OLED I2C (removable)",
+      "power_input": "12V DC (adapter included)",
+      "usb_c": true,
+      "noise_db": 35,
+      "price_usd_min": 350,
+      "price_usd_max": 500,
+      "open_source": true,
+      "status": "Available (current flagship dual-chip)",
+      "notes": "Final and most powerful BitAxe revision. Dual BM1370 chips on one board. Assembled in USA. USB-C for firmware updates. Same per-chip efficiency as Antminer S21 Pro."
+    },
+
+    "antminer_s17": {
+      "name": "Bitmain Antminer S17",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1397",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "7nm",
+      "num_chips": 144,
+      "chips_per_board": 48,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 56,
+      "hashrate_unit": "TH/s",
+      "power_watts": 2520,
+      "efficiency_j_per_th": 45,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, adjustable via web UI"
+      },
+      "voltage": {
+        "notes": "Built-in PSU attached to chassis"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, built-in PSU",
+      "dimensions_mm": "298 x 178 x 297",
+      "weight_g": 9500,
+      "noise_db": 82,
+      "price_usd_min": 50,
+      "price_usd_max": 300,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released April 2019. First miner to use BM1397 7nm chip. Same chip used in BitAxe Max and GekkoScience Compac F. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "antminer_s17_pro": {
+      "name": "Bitmain Antminer S17 Pro",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1397",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "7nm",
+      "num_chips": 144,
+      "chips_per_board": 48,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 53,
+      "hashrate_range_ths": "36-62",
+      "hashrate_unit": "TH/s",
+      "power_watts": 2094,
+      "power_modes": {
+        "low_power": {"watts": 1296, "hashrate_ths": 36},
+        "normal": {"watts": 2094, "hashrate_ths": 53},
+        "high_performance": {"watts": 2385, "hashrate_ths": 62}
+      },
+      "efficiency_j_per_th": 39.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, three operating modes (Low Power, Normal, High Performance)"
+      },
+      "voltage": {
+        "notes": "Built-in PSU attached to chassis"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, built-in PSU",
+      "dimensions_mm": "178 x 296 x 298",
+      "weight_g": 9500,
+      "noise_db": 82,
+      "price_usd_min": 50,
+      "price_usd_max": 350,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released April 2019. Three power modes for different efficiency/performance trade-offs. Same BM1397 chip used in BitAxe Max. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "antminer_s19j_pro": {
+      "name": "Bitmain Antminer S19j Pro",
+      "manufacturer": "Bitmain",
+      "family": "Antminer S-series",
+      "asic_chip": "BM1398",
+      "asic_chip_source": "Bitmain proprietary",
+      "process_node": "7nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 104,
+      "hashrate_range_ths": "92-104",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3068,
+      "efficiency_j_per_th": 29.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "4x 120mm fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, adjustable via web UI"
+      },
+      "voltage": {
+        "notes": "Built-in APW12 PSU, 220-240V AC input"
+      },
+      "interface": "CGMiner/BMMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, C14 inlet",
+      "noise_db": 75,
+      "price_usd_min": 200,
+      "price_usd_max": 800,
+      "open_source": false,
+      "status": "Discontinued (available used/refurbished)",
+      "notes": "Released June 2021. Most popular S19 variant. Available in 92/96/100/104 TH/s bins. Supports Braiins OS for autotuning. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m30s_plus": {
+      "name": "MicroBT Whatsminer M30S+",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 8nm custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "8nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 100,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3400,
+      "efficiency_j_per_th": 34,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, PSU integrated",
+      "dimensions_mm": "430 x 155 x 226",
+      "weight_g": 12500,
+      "noise_db": 72,
+      "price_usd_min": 150,
+      "price_usd_max": 600,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Mid-range M30S variant. 17% more hashrate than M30S at similar power draw. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m30s_plusplus": {
+      "name": "MicroBT Whatsminer M30S++",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 8nm custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "8nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 112,
+      "hashrate_range_ths": "104-112",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3472,
+      "efficiency_j_per_th": 31,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, PSU integrated",
+      "dimensions_mm": "430 x 155 x 226",
+      "weight_g": 13500,
+      "noise_db": 72,
+      "price_usd_min": 200,
+      "price_usd_max": 800,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released October 2020. Top-tier M30S variant. 31 J/TH makes it one of the most efficient 8nm miners. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "whatsminer_m50": {
+      "name": "MicroBT Whatsminer M50",
+      "manufacturer": "MicroBT",
+      "family": "Whatsminer M-series",
+      "asic_chip": "Samsung 5nm custom ASIC",
+      "asic_chip_source": "MicroBT / Samsung foundry",
+      "process_node": "5nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 114,
+      "hashrate_range_ths": "114-126",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3306,
+      "efficiency_j_per_th": 29,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 75,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": -5,
+        "ambient_operating_max_c": 35
+      },
+      "fan": {
+        "type": "2x fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "interface": "CGMiner API (port 4028) + Web UI",
+      "form_factor": "Standalone ASIC miner",
+      "connectivity": "Ethernet",
+      "power_input": "220-240V AC, P221B/P222B PSU, IEC C19 cable rated 16A+",
+      "dimensions_mm": "430 x 155 x 226",
+      "weight_g": 11700,
+      "noise_db": 72,
+      "price_usd_min": 300,
+      "price_usd_max": 1200,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released April 2022. First M-series with Samsung 5nm process. Advanced thermal architecture. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "heatbit_original": {
+      "name": "Heatbit (Original)",
+      "manufacturer": "Heatbit Inc.",
+      "family": "Heatbit",
+      "asic_chip": "BM1387 (reworked Antminer S9 ASIC)",
+      "asic_chip_source": "Bitmain (S9 repurposed)",
+      "process_node": "16nm",
+      "num_chips": null,
+      "default_hashrate_ths": 14,
+      "hashrate_unit": "TH/s",
+      "power_watts": 1400,
+      "efficiency_j_per_th": 100,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "Built-in overheat protection and automatic shutdown. Designed for safe home operation."
+      },
+      "fan": {
+        "type": "Internal silent cooling system",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100,
+        "notes": "Redesigned for silent home operation"
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, not user-adjustable"
+      },
+      "voltage": {
+        "input": "110-240V AC",
+        "notes": "Built-in PSU"
+      },
+      "interface": "Heatbit App + Web UI",
+      "form_factor": "Freestanding space heater",
+      "connectivity": "WiFi",
+      "power_input": "110-240V AC",
+      "dimensions_mm": "870 x 319 x 259",
+      "weight_g": 14000,
+      "noise_db": 42,
+      "noise_notes": "Below 42 dB at full power",
+      "heating_area_sqft": 170,
+      "heating_btu_per_h": 4778,
+      "price_usd_min": 800,
+      "price_usd_max": 1200,
+      "open_source": false,
+      "status": "Discontinued",
+      "notes": "First-generation mining heater. Reworked Antminer S9 ASIC redesigned for silent, safe home operation. Heats ~170 sq ft. Replaced by Heatbit Trio."
+    },
+
+    "heatbit_trio": {
+      "name": "Heatbit Trio",
+      "manufacturer": "Heatbit Inc.",
+      "family": "Heatbit",
+      "asic_chip": "Custom ASIC (SHA-256)",
+      "asic_chip_source": "Proprietary",
+      "process_node": "Unknown",
+      "num_chips": null,
+      "default_hashrate_ths": 10,
+      "hashrate_unit": "TH/s",
+      "power_watts": 400,
+      "power_modes": {
+        "mining_only": {"watts": 400, "hashrate_ths": 10},
+        "heating_boost": {"watts": 1400, "hashrate_ths": 10, "notes": "Additional 1000W heating element"},
+        "air_purifier_only": {"watts": 50, "hashrate_ths": 0}
+      },
+      "efficiency_j_per_th": 40,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 0,
+        "ambient_operating_max_c": 40,
+        "notes": "Built-in overheat protection and automatic shutdown. Built-in thermostat for room temperature regulation."
+      },
+      "fan": {
+        "type": "Internal silent cooling system with HEPA air filter",
+        "default_speed_pct_min": 10,
+        "default_speed_pct_max": 100,
+        "notes": "Triple function: miner cooling, space heating, air purification"
+      },
+      "frequency": {
+        "notes": "Firmware-controlled, not user-adjustable"
+      },
+      "voltage": {
+        "input": "110-240V AC",
+        "notes": "Built-in PSU, compatible with North American (110-120V) and European (220-240V) standards"
+      },
+      "interface": "Heatbit App + Web UI",
+      "form_factor": "Freestanding space heater / air purifier",
+      "connectivity": "WiFi",
+      "power_input": "110-240V AC",
+      "heating_area_sqft": 400,
+      "heating_btu_per_h": 4778,
+      "noise_db": 40,
+      "price_usd_min": 600,
+      "price_usd_max": 1000,
+      "open_source": false,
+      "status": "Available (current generation)",
+      "notes": "Triple-function device: Bitcoin miner, space heater, and HEPA air purifier. Heats up to 400 sq ft. Mining at 400W with optional 1000W heating boost. Built-in thermostat saves up to 30% running costs. Ships to US and Canada."
+    },
+
+    "bitchimney": {
+      "name": "BitChimney Space Heater",
+      "manufacturer": "AltairTech / D-Central Technologies",
+      "family": "BitChimney",
+      "asic_chip": "BM1366 or BM1362 (depends on S19 hashboard variant used)",
+      "asic_chip_source": "Repurposed single Antminer S19/S19j/S19k Pro/S21 hashboard",
+      "process_node": "5-7nm (depends on hashboard)",
+      "num_chips": null,
+      "num_hashboards": 1,
+      "default_hashrate_ths": 23,
+      "hashrate_range_ths": "23-53",
+      "hashrate_unit": "TH/s",
+      "power_watts": 750,
+      "power_range_watts": "750-1200",
+      "power_modes": {
+        "normal": {"watts": 750, "hashrate_ths": 23},
+        "high": {"watts": 1000, "hashrate_ths": 30, "notes": "With Loki Kit"},
+        "s21_high": {"watts": 1000, "hashrate_ths": 53, "noise_db": 56}
+      },
+      "efficiency_j_per_th": 18.75,
+      "temperature": {
+        "normal_operating_chip_min_c": 50,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 85,
+        "danger_temp_c": 95,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40,
+        "notes": "Temperature range depends on which hashboard variant is installed. S19-based boards follow Antminer S19 thermal profiles."
+      },
+      "fan": {
+        "type": "Internal fans in enclosed heater shell",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100,
+        "notes": "Designed for quiet home operation. Stock noise ~49-53 dB. S21 version ~56 dB in high mode."
+      },
+      "frequency": {
+        "notes": "Managed by aftermarket firmware (BraiinsOS, Vnish, or LuxOS). Underclocked for 120V operation."
+      },
+      "voltage": {
+        "notes": "APW3++ PSU modified to output 13.6V. At 120V input, limited to ~1200W. At 240V, up to 1500W.",
+        "input": "110-240V AC"
+      },
+      "interface": "BraiinsOS / Vnish / LuxOS Web UI + API",
+      "form_factor": "Enclosed space heater (3D printable design, open source)",
+      "connectivity": "WiFi (Vonets VAP11G-300 WiFi Bridge) + Ethernet",
+      "power_input": "110-240V AC (standard household outlet)",
+      "noise_db": 49,
+      "noise_range_db": "49-60",
+      "heating_btu_per_h": 2560,
+      "price_usd_min": 500,
+      "price_usd_max": 900,
+      "open_source": true,
+      "open_source_license": "Creative Commons Non-Commercial",
+      "status": "Available",
+      "notes": "DIY space heater miner. Uses single S19/S21 hashboard. Design files are open source (CC-NC). LuxOS firmware has 2.8% dev fee but waives Luxor Pool fees. Compatible hashboards: S19j, S19j Pro, S19j Pro+, S19k Pro, S21 (NOT 88-chip S19 boards). Manufactured in Canada by D-Central, shipped from St. Louis, MO."
+    },
+
+    "canaan_avalon_a1266": {
+      "name": "Canaan Avalon Made A1266",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon Made",
+      "asic_chip": "Canaan proprietary A-series",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 100,
+      "hashrate_range_ths": "96-100",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3500,
+      "efficiency_j_per_th": 35,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "2x high-speed fans (12000 RPM)",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled"
+      },
+      "voltage": {
+        "notes": "Built-in PSU"
+      },
+      "interface": "Canaan Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "200-300V AC",
+      "dimensions_mm": "301 x 195 x 292",
+      "weight_g": 12800,
+      "noise_db": 75,
+      "price_usd_min": 200,
+      "price_usd_max": 800,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Released November 2022. Industrial Canaan miner. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "canaan_avalon_a1346": {
+      "name": "Canaan Avalon Made A1346",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon Made",
+      "asic_chip": "Canaan proprietary A-series",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "5nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 110,
+      "hashrate_range_ths": "104-126",
+      "hashrate_unit": "TH/s",
+      "power_watts": 3300,
+      "efficiency_j_per_th": 30,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 35
+      },
+      "fan": {
+        "type": "4x high-speed fans",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled"
+      },
+      "voltage": {
+        "notes": "Built-in PSU"
+      },
+      "interface": "Canaan Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "200-300V AC",
+      "weight_g": 13000,
+      "noise_db": 75,
+      "price_usd_min": 300,
+      "price_usd_max": 1200,
+      "open_source": false,
+      "status": "Discontinued (available used)",
+      "notes": "Available in multiple hashrate bins (104T-126T). Improved efficiency over A1266. NOT suitable for home without noise/heat mitigation."
+    },
+
+    "canaan_avalon_a1466": {
+      "name": "Canaan Avalon Made A1466",
+      "manufacturer": "Canaan Inc.",
+      "family": "Avalon Made",
+      "asic_chip": "Canaan proprietary A15-series",
+      "asic_chip_source": "Canaan proprietary",
+      "process_node": "4nm",
+      "num_chips": null,
+      "num_hashboards": 3,
+      "default_hashrate_ths": 150,
+      "hashrate_unit": "TH/s",
+      "power_watts": 3230,
+      "efficiency_j_per_th": 21.5,
+      "temperature": {
+        "normal_operating_chip_min_c": 55,
+        "normal_operating_chip_max_c": 80,
+        "max_safe_chip_c": 90,
+        "danger_temp_c": 100,
+        "ambient_operating_min_c": 5,
+        "ambient_operating_max_c": 40
+      },
+      "fan": {
+        "type": "2x 12050 Martech front fans (8A 12VDC each)",
+        "default_speed_pct_min": 20,
+        "default_speed_pct_max": 100
+      },
+      "frequency": {
+        "notes": "Firmware-controlled"
+      },
+      "voltage": {
+        "notes": "Built-in PSU, 200-300V AC input"
+      },
+      "interface": "Canaan Web UI",
+      "form_factor": "Standalone ASIC miner (rack-mountable)",
+      "connectivity": "Ethernet",
+      "power_input": "200-300V AC",
+      "dimensions_mm": "271 x 192 x 292",
+      "weight_g": 13000,
+      "noise_db": 75,
+      "price_usd_min": 1000,
+      "price_usd_max": 3500,
+      "open_source": false,
+      "status": "Available",
+      "notes": "Released September 2023. Canaan's most efficient industrial miner. 50% more hashrate than A1266 at lower power. Immersion variant A1466I offers 170 TH/s at 19.5 J/TH. NOT suitable for home without noise/heat mitigation."
+    }
+  },
+
+  "chip_reference": {
+    "BM1387": {
+      "manufacturer": "Bitmain",
+      "process_node": "16nm",
+      "efficiency_j_per_gh": 0.098,
+      "used_in_miners": ["Antminer S9", "Antminer S9i", "Antminer T9+", "Antminer R4", "BitAxe Original"],
+      "typical_frequency_mhz": 650,
+      "availability": "Widely available, $1-2 each",
+      "notes": "Most produced Bitcoin ASIC chip in history"
+    },
+    "BM1397": {
+      "manufacturer": "Bitmain",
+      "process_node": "7nm",
+      "efficiency_j_per_gh": 0.03,
+      "used_in_miners": ["Antminer S17", "Antminer S17 Pro", "Antminer T17", "BitAxe Max", "GekkoScience Compac F", "GekkoScience Terminus R909"],
+      "typical_frequency_mhz": 425,
+      "availability": "Available, ~$5-10 each",
+      "safe_temp_max_c": 80,
+      "danger_temp_c": 90
+    },
+    "BM1366": {
+      "manufacturer": "Bitmain",
+      "process_node": "5nm",
+      "efficiency_j_per_gh": 0.021,
+      "used_in_miners": ["Antminer S19 XP", "Antminer S19k Pro", "BitAxe Ultra", "NerdAxe", "LuckyMiner LV06"],
+      "typical_frequency_mhz": 485,
+      "availability": "Available, ~$15 each",
+      "safe_temp_max_c": 80,
+      "danger_temp_c": 90,
+      "notes": "Rolls more than just the nonce on-chip, allowing longer serial chains. Different footprint/pinout from BM1397/BM1387."
+    },
+    "BM1368": {
+      "manufacturer": "Bitmain",
+      "process_node": "5nm",
+      "efficiency_j_per_th": 17.5,
+      "used_in_miners": ["Antminer S21", "BitAxe Supra", "NerdQAxe+", "BitAxe Supra Hex"],
+      "typical_frequency_mhz": 490,
+      "safe_temp_max_c": 80,
+      "danger_temp_c": 90,
+      "notes": "Improved heat dissipation structure vs BM1366. Higher power per chip but better thermal stability."
+    },
+    "BM1370": {
+      "manufacturer": "Bitmain",
+      "process_node": "5nm",
+      "efficiency_j_per_th": 15,
+      "per_chip_hashrate_ths": 1.2,
+      "chip_size_mm": "6x8 (LGA package)",
+      "used_in_miners": ["Antminer S21 Pro", "Antminer S21+", "Antminer S21 XP Hyd", "BitAxe Gamma", "BitAxe GT 800", "NerdAxe Gamma", "NerdQAxe++", "NerdOctaxe Gamma"],
+      "variants": ["BM1370BC", "BM1370AA", "BM1370PA", "BM1370PB", "BM1370PF"],
+      "typical_frequency_mhz": 525,
+      "safe_temp_max_c": 75,
+      "danger_temp_c": 90,
+      "notes": "Most efficient current-gen Bitmain chip. At 1 TH/s: consumes 15W (vs 19W for BM1366). Same chip in $8000 Antminer S21 Pro and $100 BitAxe Gamma."
+    },
+    "BM1398": {
+      "manufacturer": "Bitmain",
+      "process_node": "7nm",
+      "efficiency_j_per_th": 30,
+      "used_in_miners": ["Antminer S19", "Antminer S19 Pro", "Antminer S19j Pro", "Antminer S19j Pro+"],
+      "typical_frequency_mhz": 500,
+      "safe_temp_max_c": 90,
+      "danger_temp_c": 95,
+      "notes": "S19-series chip. Not to be confused with BM1362. 76 chips per hashboard, 3 boards per miner. Temperature dramatically impacts efficiency."
+    },
+    "BM1362": {
+      "manufacturer": "Bitmain",
+      "process_node": "7nm",
+      "efficiency_j_per_th": 30,
+      "used_in_miners": ["Antminer S19j Pro (some variants)", "GekkoScience Compac A1"],
+      "typical_frequency_mhz": 500,
+      "safe_temp_max_c": 85,
+      "danger_temp_c": 95,
+      "notes": "Used in GekkoScience Compac A1 USB miner. 70% more power efficient than BM1397."
+    }
+  },
+
+  "interface_reference": {
+    "esp_miner_axeos": {
+      "name": "ESP-Miner / AxeOS REST API",
+      "port": 80,
+      "protocol": "HTTP REST",
+      "endpoints": {
+        "get_info": "GET /api/system/info",
+        "patch_settings": "PATCH /api/system",
+        "restart": "POST /api/system/restart",
+        "get_swarm": "GET /api/swarm/info"
+      },
+      "key_fields": {
+        "hashRate": "GH/s",
+        "temp": "Celsius (chip temperature)",
+        "vrTemp": "Celsius (voltage regulator temperature)",
+        "power": "Watts",
+        "fanspeed": "Percentage (0-100)",
+        "frequency": "MHz",
+        "coreVoltage": "mV",
+        "ASICModel": "Chip model string",
+        "ASICCount": "Number of ASIC chips",
+        "sharesAccepted": "Total accepted shares",
+        "sharesRejected": "Total rejected shares",
+        "bestDiff": "Best difficulty share found (all time)",
+        "bestSessionDiff": "Best difficulty share found (this session)",
+        "uptimeSeconds": "Seconds since last reboot",
+        "hostname": "Device hostname",
+        "version": "Firmware version string",
+        "boardVersion": "Hardware board version",
+        "deviceModel": "Device model identifier",
+        "stratumURL": "Primary pool URL",
+        "stratumPort": "Primary pool port",
+        "stratumUser": "Primary pool worker name",
+        "overheat_mode": "Boolean - ASIC thermal protection active",
+        "overheat_temp": "Temperature threshold for thermal protection"
+      },
+      "used_by": ["BitAxe (all models)", "NerdAxe", "NerdAxe Gamma", "NerdQAxe+", "NerdQAxe++", "NerdOctaxe", "LuckyMiner (all models)"]
+    },
+    "cgminer_api": {
+      "name": "CGMiner / BMMiner API",
+      "port": 4028,
+      "protocol": "TCP JSON-RPC",
+      "key_commands": {
+        "summary": "Get overall mining summary",
+        "stats": "Get detailed statistics",
+        "pools": "Get pool information",
+        "devs": "Get device information",
+        "config": "Get configuration"
+      },
+      "used_by": ["Antminer S9", "Antminer S19 (all variants)", "Antminer S21 (all variants)", "Whatsminer M30S", "Whatsminer M50S", "Whatsminer M60S", "GekkoScience Compac F", "GekkoScience Compac A1", "GekkoScience Terminus R909"],
+      "notes": "Antminers use BMMiner (CGMiner fork). GekkoScience uses cgminer-gekko fork. Whatsminer uses their own CGMiner variant."
+    },
+    "canaan_web_ui": {
+      "name": "Canaan Web UI + Avalon Family App",
+      "port": 80,
+      "protocol": "HTTP Web Interface",
+      "used_by": ["Avalon Nano 3", "Avalon Nano 3S", "Avalon Mini 3", "Avalon Q"],
+      "notes": "Canaan devices use proprietary web interface. Avalon Family App for mobile control. Some models support CGMiner API via AUC (Avalon USB Converter) for older Avalon miners."
+    },
+    "futurebit_web_ui": {
+      "name": "FutureBit Web UI",
+      "port": 80,
+      "protocol": "HTTP Web Interface",
+      "used_by": ["FutureBit Apollo BTC", "FutureBit Apollo II"],
+      "notes": "Custom Linux-based OS with web dashboard. Built-in stratum solo pool server."
+    }
+  },
+
+  "thermal_profiles": {
+    "_description": "Thermal profiles for fleet management software. Maps device families to their normal operating ranges. Temperatures OUTSIDE these ranges should trigger alerts.",
+    "BitAxe": {
+      "normal_min_c": 35,
+      "normal_max_c": 65,
+      "warning_temp_c": 68,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["BitAxe Original", "BitAxe Max", "BitAxe Ultra", "BitAxe Supra", "BitAxe Gamma"]
+    },
+    "BitAxeHex": {
+      "normal_min_c": 40,
+      "normal_max_c": 70,
+      "warning_temp_c": 72,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["BitAxe Hex Ultra", "BitAxe Supra Hex"]
+    },
+    "NerdAxe": {
+      "normal_min_c": 35,
+      "normal_max_c": 65,
+      "warning_temp_c": 68,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["NerdAxe"]
+    },
+    "NerdQAxe": {
+      "normal_min_c": 40,
+      "normal_max_c": 70,
+      "warning_temp_c": 72,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["NerdQAxe+"]
+    },
+    "NerdQAxePP": {
+      "normal_min_c": 45,
+      "normal_max_c": 70,
+      "warning_temp_c": 72,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["NerdQAxe++"]
+    },
+    "NerdOctaxe": {
+      "normal_min_c": 45,
+      "normal_max_c": 70,
+      "warning_temp_c": 72,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["NerdOctaxe Gamma"]
+    },
+    "LuckyMiner": {
+      "normal_min_c": 35,
+      "normal_max_c": 65,
+      "warning_temp_c": 68,
+      "critical_temp_c": 75,
+      "shutdown_temp_c": 80,
+      "applies_to": ["LuckyMiner LV06", "LuckyMiner LV07", "LuckyMiner LV08"]
+    },
+    "GekkoScience": {
+      "normal_min_c": 40,
+      "normal_max_c": 75,
+      "warning_temp_c": 78,
+      "critical_temp_c": 85,
+      "shutdown_temp_c": 90,
+      "has_temp_sensor": false,
+      "applies_to": ["GekkoScience Compac F", "GekkoScience Terminus R909"],
+      "notes": "No built-in temp sensor. These thresholds are for external monitoring only."
+    },
+    "AvalonNano3s": {
+      "normal_min_c": 70,
+      "normal_max_c": 95,
+      "warning_temp_c": 98,
+      "critical_temp_c": 100,
+      "shutdown_temp_c": 105,
+      "applies_to": ["Avalon Nano 3", "Avalon Nano 3S"],
+      "notes": "CRITICAL: These Canaan chips are designed for high-temp operation (75-95C is NORMAL). Do NOT alert at 85-95C. Mining mode: 75C, Night mode: 80C, Heater mode: 90C. Chips perform better at higher temps."
+    },
+    "AvalonMini3": {
+      "normal_min_c": 70,
+      "normal_max_c": 95,
+      "warning_temp_c": 98,
+      "critical_temp_c": 100,
+      "shutdown_temp_c": 105,
+      "applies_to": ["Avalon Mini 3"],
+      "notes": "Same A15-series high-temp chips as Nano 3S. 75-90C is normal across all modes."
+    },
+    "AvalonQ": {
+      "normal_min_c": 55,
+      "normal_max_c": 85,
+      "warning_temp_c": 88,
+      "critical_temp_c": 95,
+      "shutdown_temp_c": 100,
+      "applies_to": ["Avalon Q"]
+    },
+    "AntminerS9": {
+      "normal_min_c": 55,
+      "normal_max_c": 100,
+      "warning_temp_c": 105,
+      "critical_temp_c": 110,
+      "shutdown_temp_c": 115,
+      "applies_to": ["Antminer S9"],
+      "notes": "BM1387 chips run 85-100C NORMALLY. Do NOT alert at these temps. Below 85C = cool. 85-100C = normal. 105C+ = warning. 115C = firmware auto-cutoff."
+    },
+    "AntminerS19": {
+      "normal_min_c": 50,
+      "normal_max_c": 85,
+      "warning_temp_c": 88,
+      "critical_temp_c": 92,
+      "shutdown_temp_c": 95,
+      "applies_to": ["Antminer S19", "Antminer S19 Pro", "Antminer S19j Pro", "Antminer S19 XP"],
+      "notes": "BM1398/BM1366 chips. PCB max ~75-80C. Chip max 95C firmware shutdown. Temperature dramatically impacts efficiency on this generation."
+    },
+    "AntminerS21": {
+      "normal_min_c": 50,
+      "normal_max_c": 80,
+      "warning_temp_c": 82,
+      "critical_temp_c": 85,
+      "shutdown_temp_c": 90,
+      "applies_to": ["Antminer S21", "Antminer S21 Pro", "Antminer S21+"]
+    },
+    "BitChimney": {
+      "normal_min_c": 50,
+      "normal_max_c": 85,
+      "warning_temp_c": 88,
+      "critical_temp_c": 92,
+      "shutdown_temp_c": 95,
+      "applies_to": ["BitChimney Space Heater"],
+      "notes": "Thermal profile depends on installed hashboard (S19 or S21). Follows same profile as parent miner type."
+    },
+    "Whatsminer": {
+      "normal_min_c": 50,
+      "normal_max_c": 80,
+      "warning_temp_c": 82,
+      "critical_temp_c": 85,
+      "shutdown_temp_c": 90,
+      "applies_to": ["Whatsminer M30S", "Whatsminer M50S", "Whatsminer M60S"]
+    },
+    "FutureBit": {
+      "normal_min_c": 45,
+      "normal_max_c": 80,
+      "warning_temp_c": 82,
+      "critical_temp_c": 85,
+      "shutdown_temp_c": 95,
+      "applies_to": ["FutureBit Apollo BTC", "FutureBit Apollo II"]
+    }
+  },
+
+  "home_suitability_ratings": {
+    "_description": "Quick reference for which devices are practical for home use without modifications",
+    "excellent": {
+      "description": "Designed specifically for home use. Quiet, low power, plug-and-play.",
+      "devices": [
+        "BitAxe Max", "BitAxe Ultra", "BitAxe Supra", "BitAxe Gamma", "BitAxe Gamma Turbo GT",
+        "NerdAxe", "NerdAxe Gamma",
+        "LuckyMiner LV06", "LuckyMiner LV07",
+        "Avalon Nano 3", "Avalon Nano 3S",
+        "Bitmain AntRouter R1-BTC",
+        "GekkoScience Compac F", "GekkoScience Compac A1"
+      ]
+    },
+    "good": {
+      "description": "Suitable for home with some considerations (noise, power, heat).",
+      "devices": [
+        "BitAxe Hex Ultra", "BitAxe Supra Hex",
+        "NerdQAxe+", "NerdQAxe++", "NerdOctaxe Gamma",
+        "LuckyMiner LV08",
+        "GekkoScience Terminus R909",
+        "FutureBit Apollo BTC", "FutureBit Apollo II",
+        "Avalon Mini 3",
+        "Heatbit Trio",
+        "BitChimney Space Heater"
+      ]
+    },
+    "marginal": {
+      "description": "Possible at home with significant modifications (noise insulation, dedicated circuit, ventilation).",
+      "devices": [
+        "Avalon Q",
+        "Antminer S9 (with Braiins OS space heater mode)",
+        "Heatbit (Original)"
+      ]
+    },
+    "not_recommended": {
+      "description": "Industrial miners. Require dedicated space, 240V circuit, serious noise/heat management.",
+      "devices": [
+        "Antminer S19", "Antminer S19 Pro", "Antminer S19 XP",
+        "Antminer S21", "Antminer S21 Pro", "Antminer S21+", "Antminer S21 XP Hyd",
+        "Whatsminer M30S", "Whatsminer M50S", "Whatsminer M60S"
+      ]
+    }
+  }
+}

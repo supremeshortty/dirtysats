@@ -113,6 +113,26 @@ class Database:
                     end_time TEXT NOT NULL,
                     rate_per_kwh REAL NOT NULL,
                     rate_type TEXT DEFAULT 'standard',
+                    season TEXT DEFAULT 'all',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Migration: Add season column if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE energy_rates ADD COLUMN season TEXT DEFAULT 'all'")
+            except Exception:
+                pass  # Column already exists
+
+            # Seasonal date configuration table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS seasonal_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    season_name TEXT NOT NULL,
+                    start_month INTEGER NOT NULL,
+                    start_day INTEGER NOT NULL,
+                    end_month INTEGER NOT NULL,
+                    end_day INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -520,14 +540,40 @@ class Database:
             return dict(row) if row else None
 
     def add_energy_rate(self, start_time: str, end_time: str, rate_per_kwh: float,
-                        day_of_week: str = None, rate_type: str = "standard"):
+                        day_of_week: str = None, rate_type: str = "standard",
+                        season: str = "all"):
         """Add energy rate for time period"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO energy_rates (day_of_week, start_time, end_time, rate_per_kwh, rate_type)
+                INSERT INTO energy_rates (day_of_week, start_time, end_time, rate_per_kwh, rate_type, season)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (day_of_week, start_time, end_time, rate_per_kwh, rate_type, season))
+
+    def set_seasonal_config(self, season_name: str, start_month: int, start_day: int,
+                            end_month: int, end_day: int):
+        """Set or update seasonal date configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM seasonal_config WHERE season_name = ?", (season_name,))
+            cursor.execute("""
+                INSERT INTO seasonal_config (season_name, start_month, start_day, end_month, end_day)
                 VALUES (?, ?, ?, ?, ?)
-            """, (day_of_week, start_time, end_time, rate_per_kwh, rate_type))
+            """, (season_name, start_month, start_day, end_month, end_day))
+
+    def get_seasonal_config(self) -> List[Dict]:
+        """Get seasonal date configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM seasonal_config ORDER BY season_name")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def delete_all_seasonal_config(self):
+        """Clear all seasonal configuration"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM seasonal_config")
 
     def get_energy_rates(self) -> List[Dict]:
         """Get all energy rates"""
@@ -1206,5 +1252,45 @@ class Database:
             query += " ORDER BY effective_date DESC"
 
             cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_efficiency_history(self, hours: int = 24) -> List[Dict]:
+        """Get pre-computed efficiency (J/TH) history by joining power and hashrate from stats table.
+        Groups by ~5min intervals and computes efficiency server-side to avoid timestamp mismatch bugs."""
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+
+        # For 7d+ ranges, use hourly buckets; otherwise 5-minute buckets
+        bucket_seconds = 3600 if hours > 48 else 300
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT
+                    MIN(timestamp) as timestamp,
+                    ROUND(AVG(total_power), 1) as avg_power,
+                    ROUND(AVG(total_hashrate), 2) as avg_hashrate,
+                    CASE
+                        WHEN AVG(total_hashrate) > 0
+                        THEN ROUND(AVG(total_power) / (AVG(total_hashrate) / 1e12), 1)
+                        ELSE 0
+                    END as efficiency_jth,
+                    COUNT(*) as readings
+                FROM (
+                    SELECT
+                        timestamp,
+                        (strftime('%s', timestamp) / {bucket_seconds}) as time_bucket,
+                        SUM(power) as total_power,
+                        SUM(hashrate) as total_hashrate
+                    FROM stats
+                    WHERE timestamp > ?
+                    AND status IN ('online', 'overheating')
+                    AND power > 0
+                    AND hashrate > 0
+                    GROUP BY timestamp
+                ) grouped
+                GROUP BY time_bucket
+                ORDER BY timestamp ASC
+            """, (cutoff,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]

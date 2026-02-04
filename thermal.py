@@ -292,62 +292,6 @@ MINER_PROFILES = {
         temp_hysteresis=2.0,
         freq_step=10
     ),
-    # Traditional ASIC miners
-    'Antminer': FrequencyProfile(
-        min_freq=400,
-        max_freq=650,      # Conservative for S9/S17 series
-        stock_freq=550,
-        optimal_temp=65.0,
-        warning_temp=75.0,
-        critical_temp=80.0, # S9i max board temp is 85°C, be conservative
-        max_chip_temp=85.0,
-        temp_hysteresis=3.0,
-        freq_step=25
-    ),
-    'Whatsminer': FrequencyProfile(
-        min_freq=400,
-        max_freq=650,
-        stock_freq=550,
-        optimal_temp=65.0,
-        warning_temp=75.0,
-        critical_temp=80.0,
-        max_chip_temp=85.0,
-        temp_hysteresis=3.0,
-        freq_step=25
-    ),
-    'Avalon': FrequencyProfile(
-        min_freq=400,
-        max_freq=650,
-        stock_freq=550,
-        optimal_temp=65.0,
-        warning_temp=75.0,
-        critical_temp=80.0,
-        max_chip_temp=85.0,
-        temp_hysteresis=3.0,
-        freq_step=25
-    ),
-    'AvalonNano3s': FrequencyProfile(
-        min_freq=400,
-        max_freq=550,
-        stock_freq=435,
-        optimal_temp=75.0,
-        warning_temp=85.0,
-        critical_temp=92.0,
-        max_chip_temp=97.0,
-        temp_hysteresis=3.0,
-        freq_step=20
-    ),
-    'Unknown': FrequencyProfile(
-        min_freq=400,
-        max_freq=500,  # Very conservative for unknown miners
-        stock_freq=450,
-        optimal_temp=60.0,
-        warning_temp=65.0,
-        critical_temp=70.0,
-        max_chip_temp=75.0,
-        temp_hysteresis=2.0,
-        freq_step=10
-    )
 }
 
 

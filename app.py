@@ -1,6 +1,7 @@
 """
 DirtySats - Bitcoin Mining Fleet Manager
 """
+import os
 import logging
 import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,6 +18,7 @@ from energy import (
     ProfitabilityCalculator,
     EnergyRateManager,
     MiningScheduler,
+    StrategyOptimizer,
     UtilityRateService,
     ENERGY_COMPANY_PRESETS
 )
@@ -69,7 +71,7 @@ class FleetManager:
         # Energy management components
         self.btc_fetcher = BitcoinDataFetcher()
         self.energy_rate_mgr = EnergyRateManager(self.db)
-        self.mining_scheduler = MiningScheduler(self.db, self.energy_rate_mgr)
+        self.mining_scheduler = MiningScheduler(self.db, self.energy_rate_mgr, btc_fetcher=self.btc_fetcher)
         self.utility_rate_service = UtilityRateService(db=self.db)
 
         self.last_energy_log_time = None
@@ -117,6 +119,11 @@ class FleetManager:
 
         # Initialize components that need pool_manager
         self.profitability_calc = ProfitabilityCalculator(self.btc_fetcher, self.pool_manager)
+        self.mining_scheduler.profitability_calc = self.profitability_calc
+        self.strategy_optimizer = StrategyOptimizer(
+            self.db, self.btc_fetcher, self.profitability_calc,
+            self.energy_rate_mgr, self.mining_scheduler
+        )
         self.sats_tracker = SatsEarnedTracker(self.db, self.pool_manager)
         self.revenue_model = PredictiveRevenueModel(self.db, self.btc_fetcher)
 
@@ -430,15 +437,37 @@ class FleetManager:
             logger.error(f"Failed to apply stock settings to {miner.ip}: {e}")
 
     def _apply_mining_schedule(self):
-        """Apply mining schedule (frequency control based on time/rates)"""
+        """Apply mining schedule (frequency control based on time/rates/profitability)"""
         try:
-            should_mine, target_frequency = self.mining_scheduler.should_mine_now()
+            # Gather fleet totals for profitability gate
+            total_hashrate = 0
+            total_power = 0
+            with self.lock:
+                for miner in self.miners.values():
+                    if miner.last_status and miner.last_status.get('status') in ('online', 'overheating'):
+                        total_hashrate += miner.last_status.get('hashrate', 0) or 0
+                        total_power += miner.last_status.get('power', 0) or 0
 
-            if target_frequency > 0:  # 0 means no change
-                logger.info(f"Applying schedule: target_frequency={target_frequency}")
+            should_mine, target_frequency, reason = self.mining_scheduler.should_mine_now(
+                total_hashrate_hs=total_hashrate,
+                total_power_watts=total_power
+            )
+
+            if not should_mine:
+                logger.info(f"Mining paused: {reason}")
+                # Set frequency to minimum or stop miners
                 with self.lock:
                     for miner in self.miners.values():
-                        # Only apply to ESP-Miner devices (BitAxe, NerdQAxe, etc.)
+                        if config.is_esp_miner(miner.type) and miner.last_status:
+                            try:
+                                miner.apply_settings({'frequency': 100})  # Minimum safe frequency
+                                logger.info(f"Reduced {miner.ip} to minimum: {reason}")
+                            except Exception as e:
+                                logger.error(f"Failed to reduce frequency on {miner.ip}: {e}")
+            elif target_frequency > 0:
+                logger.info(f"Applying schedule: target_frequency={target_frequency} ({reason})")
+                with self.lock:
+                    for miner in self.miners.values():
                         if config.is_esp_miner(miner.type) and miner.last_status:
                             try:
                                 miner.apply_settings({'frequency': target_frequency})
@@ -2054,6 +2083,15 @@ def search_utilities():
         }), 400
 
     try:
+        # Check if API key is configured before searching
+        if not fleet.utility_rate_service.api_key:
+            return jsonify({
+                'success': False,
+                'error': 'OpenEI API key not configured. Get a free key at https://openei.org/services/api/signup and add it via the API Key section above.',
+                'error_type': 'no_api_key',
+                'query': query
+            }), 400
+
         logger.info(f"Searching utilities for query: '{query}'")
         utilities = fleet.utility_rate_service.search_utilities(query, limit)
         logger.info(f"Search returned {len(utilities)} results")
@@ -2063,11 +2101,22 @@ def search_utilities():
             'count': len(utilities),
             'query': query
         })
+    except ValueError as e:
+        error_msg = str(e)
+        logger.warning(f"Utility search ValueError for '{query}': {error_msg}")
+        error_type = 'api_key_error' if 'API key' in error_msg else 'validation_error'
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'error_type': error_type,
+            'query': query
+        }), 400
     except Exception as e:
         logger.error(f"Error searching utilities for '{query}': {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'Unexpected error searching utilities. Please try again.',
+            'error_type': 'server_error',
             'query': query
         }), 500
 
@@ -2203,6 +2252,76 @@ def set_manual_rates():
             }), 400
 
         utility_name = data.get('utility_name', 'Custom Rates')
+
+        # Check if seasonal rates are provided
+        if data.get('seasonal'):
+            summer = data.get('summer', {})
+            winter = data.get('winter', {})
+
+            rates = []
+
+            # Build summer rates with season label
+            s_peak_start = summer.get('peak_start', '14:00')
+            s_peak_end = summer.get('peak_end', '19:00')
+            s_peak_rate = summer.get('peak_rate')
+            s_off_peak_rate = summer.get('off_peak_rate')
+
+            if s_peak_rate and s_off_peak_rate:
+                rates.append({'start_time': '00:00', 'end_time': s_peak_start, 'rate_per_kwh': s_off_peak_rate, 'rate_type': 'off-peak', 'season': 'summer'})
+                rates.append({'start_time': s_peak_start, 'end_time': s_peak_end, 'rate_per_kwh': s_peak_rate, 'rate_type': 'peak', 'season': 'summer'})
+                rates.append({'start_time': s_peak_end, 'end_time': '23:59', 'rate_per_kwh': s_off_peak_rate, 'rate_type': 'off-peak', 'season': 'summer'})
+
+            # Build winter rates with season label
+            w_peak_start = winter.get('peak_start', '06:00')
+            w_peak_end = winter.get('peak_end', '10:00')
+            w_peak_rate = winter.get('peak_rate')
+            w_off_peak_rate = winter.get('off_peak_rate')
+
+            if w_peak_rate and w_off_peak_rate:
+                rates.append({'start_time': '00:00', 'end_time': w_peak_start, 'rate_per_kwh': w_off_peak_rate, 'rate_type': 'off-peak', 'season': 'winter'})
+                rates.append({'start_time': w_peak_start, 'end_time': w_peak_end, 'rate_per_kwh': w_peak_rate, 'rate_type': 'peak', 'season': 'winter'})
+                rates.append({'start_time': w_peak_end, 'end_time': '23:59', 'rate_per_kwh': w_off_peak_rate, 'rate_type': 'off-peak', 'season': 'winter'})
+
+            if not rates:
+                return jsonify({
+                    'success': False,
+                    'error': 'Seasonal rates require peak and off-peak rates for at least one season'
+                }), 400
+
+            # Store seasonal date configuration
+            summer_start_date = summer.get('start_date', '')
+            winter_start_date = winter.get('start_date', '')
+
+            if summer_start_date:
+                try:
+                    from datetime import datetime as dt
+                    s_date = dt.strptime(summer_start_date, '%Y-%m-%d')
+                    # Summer runs from its start date to winter start date
+                    if winter_start_date:
+                        w_date = dt.strptime(winter_start_date, '%Y-%m-%d')
+                        fleet.db.set_seasonal_config('summer', s_date.month, s_date.day, w_date.month, w_date.day)
+                        fleet.db.set_seasonal_config('winter', w_date.month, w_date.day, s_date.month, s_date.day)
+                except (ValueError, Exception) as e:
+                    logger.warning(f"Could not parse seasonal dates: {e}")
+
+            # Apply the rates
+            fleet.energy_rate_mgr.set_tou_rates(rates)
+
+            # Update config with average rate
+            avg_rate = sum(r['rate_per_kwh'] for r in rates) / len(rates)
+            fleet.db.set_energy_config(
+                location='Custom',
+                energy_company=utility_name,
+                default_rate=avg_rate
+            )
+
+            return jsonify({
+                'success': True,
+                'message': f"Applied seasonal rates for {utility_name}",
+                'rates_applied': len(rates),
+                'seasonal': True,
+                'source': 'manual'
+            })
 
         # Check if full rates array is provided
         if 'rates' in data:
@@ -2645,6 +2764,115 @@ def mining_schedule():
             }), 400
 
 
+@app.route('/api/energy/schedule/timeline', methods=['GET'])
+def get_schedule_timeline():
+    """Get 24h visual schedule data for timeline rendering"""
+    try:
+        day = request.args.get('day')
+        timeline = fleet.mining_scheduler.get_24h_visual_schedule(day)
+        return jsonify({
+            'success': True,
+            'timeline': timeline
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/energy/auto-controls', methods=['GET', 'POST'])
+def auto_controls():
+    """Get or set auto-control settings (profitability gate, BTC price floor, difficulty threshold)"""
+    if request.method == 'GET':
+        return jsonify({
+            'success': True,
+            'controls': {
+                'profitability_auto_pause': fleet.db.get_setting('profitability_auto_pause') == 'true',
+                'btc_price_floor': float(fleet.db.get_setting('btc_price_floor') or 0),
+                'difficulty_alert_threshold': float(fleet.db.get_setting('difficulty_alert_threshold') or 5),
+            }
+        })
+
+    data = request.get_json()
+    try:
+        if 'profitability_auto_pause' in data:
+            fleet.db.set_setting('profitability_auto_pause', 'true' if data['profitability_auto_pause'] else 'false')
+        if 'btc_price_floor' in data:
+            fleet.db.set_setting('btc_price_floor', str(float(data['btc_price_floor'])))
+        if 'difficulty_alert_threshold' in data:
+            fleet.db.set_setting('difficulty_alert_threshold', str(float(data['difficulty_alert_threshold'])))
+        return jsonify({'success': True, 'message': 'Auto-controls updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/energy/strategies', methods=['GET'])
+def get_strategies():
+    """Generate 3 personalized mining strategies based on fleet data"""
+    try:
+        # Aggregate fleet data
+        total_hashrate = 0
+        total_power = 0
+        min_freq = 600
+        max_freq = 100
+
+        with fleet.lock:
+            for miner in fleet.miners.values():
+                if miner.last_status and miner.last_status.get('status') in ('online', 'overheating'):
+                    total_hashrate += miner.last_status.get('hashrate', 0) or 0
+                    total_power += miner.last_status.get('power', 0) or 0
+                    # Track frequency range from miner settings
+                    freq = miner.last_status.get('frequency', 0) or 0
+                    if freq > 0:
+                        if freq > max_freq:
+                            max_freq = freq
+                        if freq < min_freq:
+                            min_freq = freq
+
+        # Defaults if no miners report frequency
+        if min_freq >= max_freq:
+            min_freq = 100
+            max_freq = 600
+
+        strategies = fleet.strategy_optimizer.generate_strategies(
+            fleet_hashrate_hs=total_hashrate,
+            fleet_power_watts=total_power,
+            min_frequency=min_freq,
+            max_frequency=max_freq
+        )
+
+        return jsonify({
+            'success': True,
+            'strategies': strategies,
+            'fleet_info': {
+                'total_hashrate_ths': round(total_hashrate / 1e12, 2),
+                'total_power_watts': round(total_power, 1),
+                'min_frequency': min_freq,
+                'max_frequency': max_freq
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/energy/strategies/apply', methods=['POST'])
+def apply_strategy():
+    """Apply a strategy as a mining schedule"""
+    data = request.get_json()
+    try:
+        name = data.get('name', 'Custom')
+        hourly_plan = data.get('hourly_plan', [])
+
+        if not hourly_plan:
+            return jsonify({'success': False, 'error': 'No hourly plan provided'}), 400
+
+        fleet.strategy_optimizer.apply_strategy(name, hourly_plan)
+        return jsonify({'success': True, 'message': f'Strategy "{name}" applied successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # Thermal Management Routes
 
 @app.route('/api/thermal/status', methods=['GET'])
@@ -2782,11 +3010,10 @@ def get_temperature_history():
                 }), 404
 
             history = fleet.db.get_stats_history(miner_data['id'], hours)
-            # Only include temperature data from online/overheating miners
             data_points = [
                 {
                     'timestamp': h['timestamp'],
-                    'temperature': h['temperature'],
+                    'temperature': round(h['temperature'], 1),
                     'miner_ip': miner_ip
                 }
                 for h in history if h.get('temperature') and h.get('status') in ('online', 'overheating')
@@ -2799,17 +3026,19 @@ def get_temperature_history():
                 if miner_data:
                     history = fleet.db.get_stats_history(miner_data['id'], hours)
                     for h in history:
-                        # Only include temperature data from online/overheating miners
                         if h.get('temperature') and h.get('status') in ('online', 'overheating'):
                             data_points.append({
                                 'timestamp': h['timestamp'],
-                                'temperature': h['temperature'],
+                                'temperature': round(h['temperature'], 1),
                                 'miner_ip': miner.ip
                             })
 
+        last_updated = data_points[-1]['timestamp'] if data_points else None
         return jsonify({
             'success': True,
-            'data': data_points
+            'data': data_points,
+            'data_point_count': len(data_points),
+            'last_updated': last_updated
         })
     except Exception as e:
         return jsonify({
@@ -2852,14 +3081,15 @@ def get_hashrate_history():
 
             data_points = []
             aggregated = defaultdict(float)
-            aggregated_count = defaultdict(int)  # Track count for averaging
-            total_power_by_timestamp = defaultdict(float)
+            # Track per-miner readings per bucket for accurate aggregation
+            # {bucket_ts: {miner_ip: {'hashrate': val, 'power': val}}}
+            bucket_miner_data = defaultdict(dict)
+            last_known = {}  # {miner_ip: {'hashrate': val, 'power': val}} for forward-fill
 
             def round_timestamp(ts_str, bucket_seconds=30):
                 """Round timestamp to nearest bucket for aggregation"""
                 try:
                     ts = dt.fromisoformat(ts_str)
-                    # Round to nearest bucket
                     seconds = (ts.minute * 60 + ts.second)
                     rounded_seconds = (seconds // bucket_seconds) * bucket_seconds
                     rounded_ts = ts.replace(second=rounded_seconds % 60,
@@ -2869,44 +3099,71 @@ def get_hashrate_history():
                 except Exception:
                     return ts_str
 
+            active_miners = set()
             for miner in fleet.miners.values():
                 miner_data = fleet.db.get_miner_by_ip(miner.ip)
                 if miner_data:
                     history = fleet.db.get_stats_history(miner_data['id'], hours)
                     for h in history:
-                        # Only include data from online/overheating miners
                         if h.get('hashrate') is not None and h.get('status') in ('online', 'overheating'):
                             hashrate_val = h['hashrate'] or 0
-                            # Per-miner data point (keep exact timestamp)
+                            power_val = h.get('power') or 0
                             data_points.append({
                                 'timestamp': h['timestamp'],
                                 'hashrate': hashrate_val,
                                 'hashrate_ths': hashrate_val / 1e12,
                                 'miner_ip': miner.ip
                             })
-                            # Aggregate for totals using rounded timestamp
                             bucket_ts = round_timestamp(h['timestamp'])
-                            aggregated[bucket_ts] += hashrate_val
-                            aggregated_count[bucket_ts] += 1
-                            if h.get('power'):
-                                total_power_by_timestamp[bucket_ts] += h['power']
+                            # Store per-miner data for this bucket (last reading wins)
+                            bucket_miner_data[bucket_ts][miner.ip] = {
+                                'hashrate': hashrate_val,
+                                'power': power_val
+                            }
+                            last_known[miner.ip] = {
+                                'hashrate': hashrate_val,
+                                'power': power_val
+                            }
+                            active_miners.add(miner.ip)
 
-            # Add aggregated total data points
-            total_data = [
-                {
-                    'timestamp': timestamp,
-                    'hashrate': hashrate,
-                    'hashrate_ths': hashrate / 1e12,
-                    'total_power': total_power_by_timestamp.get(timestamp, 0),
+            # Build totals — only count miners with a recent data point
+            # A miner must have reported within STALE_WINDOW seconds of the
+            # current bucket to be included; otherwise it contributes 0.
+            STALE_WINDOW = 90  # 3x the 30-second update interval
+            all_buckets = sorted(bucket_miner_data.keys())
+            last_seen = {}  # {miner_ip: last_bucket_iso}  track recency
+            running_state = {}  # {miner_ip: {'hashrate': val, 'power': val}}
+            total_data = []
+            for bucket_ts in all_buckets:
+                bucket = bucket_miner_data[bucket_ts]
+                # Update running state and last-seen time with new readings
+                for ip, vals in bucket.items():
+                    running_state[ip] = vals
+                    last_seen[ip] = bucket_ts
+                # Sum only miners whose last data point is within STALE_WINDOW
+                bucket_dt = dt.fromisoformat(bucket_ts)
+                total_hashrate = 0
+                total_power = 0
+                for ip, vals in running_state.items():
+                    last_dt = dt.fromisoformat(last_seen[ip])
+                    if (bucket_dt - last_dt).total_seconds() <= STALE_WINDOW:
+                        total_hashrate += vals['hashrate']
+                        total_power += vals['power']
+                total_data.append({
+                    'timestamp': bucket_ts,
+                    'hashrate': total_hashrate,
+                    'hashrate_ths': total_hashrate / 1e12,
+                    'total_power': total_power,
                     'miner_ip': '_total_'
-                }
-                for timestamp, hashrate in sorted(aggregated.items())
-            ]
+                })
 
+        last_updated = data_points[-1]['timestamp'] if data_points else None
         return jsonify({
             'success': True,
             'data': data_points,
-            'totals': total_data
+            'totals': total_data,
+            'data_point_count': len(data_points),
+            'last_updated': last_updated
         })
     except Exception as e:
         return jsonify({
@@ -2982,9 +3239,33 @@ def get_power_history():
                     'power': total_power
                 })
 
+        last_updated = data_points[-1]['timestamp'] if data_points else None
         return jsonify({
             'success': True,
-            'data': data_points
+            'data': data_points,
+            'data_point_count': len(data_points),
+            'last_updated': last_updated
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/history/efficiency', methods=['GET'])
+def get_efficiency_history():
+    """Get pre-computed efficiency (J/TH) history for charting"""
+    try:
+        hours = validate_hours(int(request.args.get('hours', 24)))
+        data_points = fleet.db.get_efficiency_history(hours)
+
+        last_updated = data_points[-1]['timestamp'] if data_points else None
+        return jsonify({
+            'success': True,
+            'data': data_points,
+            'data_point_count': len(data_points),
+            'last_updated': last_updated
         })
     except Exception as e:
         return jsonify({
@@ -3037,17 +3318,78 @@ def alert_config():
             fleet.alert_mgr.configure(
                 telegram_bot_token=data.get('telegram_bot_token'),
                 telegram_chat_id=data.get('telegram_chat_id'),
-                telegram_enabled=data.get('telegram_enabled', True)
+                telegram_enabled=data.get('telegram_enabled', True),
+                enabled_alert_types=data.get('enabled_alert_types'),
+                miner_overrides=data.get('miner_overrides'),
+                quiet_hours_enabled=data.get('quiet_hours_enabled'),
+                quiet_hours_start=data.get('quiet_hours_start'),
+                quiet_hours_end=data.get('quiet_hours_end'),
+                daily_report_enabled=data.get('daily_report_enabled'),
+                daily_report_time=data.get('daily_report_time'),
+                high_temp_threshold=data.get('high_temp_threshold'),
+                low_hashrate_threshold_pct=data.get('low_hashrate_threshold_pct')
             )
             return jsonify({
                 'success': True,
-                'message': 'Telegram alert configuration updated'
+                'message': 'Alert configuration updated'
             })
         except Exception as e:
             return jsonify({
                 'success': False,
                 'error': str(e)
             }), 500
+
+
+@app.route('/api/alerts/daily-report', methods=['POST'])
+def trigger_daily_report():
+    """Manually trigger a daily report"""
+    try:
+        # Gather fleet data
+        total_hashrate = 0
+        total_power = 0
+        miners_online = 0
+        temps = []
+        with fleet.lock:
+            for miner in fleet.miners.values():
+                if miner.last_status and miner.last_status.get('status') in ('online', 'overheating'):
+                    miners_online += 1
+                    total_hashrate += miner.last_status.get('hashrate', 0) or 0
+                    total_power += miner.last_status.get('power', 0) or 0
+                    t = miner.last_status.get('temperature')
+                    if t: temps.append(t)
+
+        hashrate_th = total_hashrate / 1e12
+        avg_temp = sum(temps) / len(temps) if temps else 0
+        efficiency = (total_power / hashrate_th) if hashrate_th > 0 else 0
+
+        fleet_data = {
+            'miners_online': miners_online,
+            'miners_total': len(fleet.miners),
+            'uptime_pct': (miners_online / len(fleet.miners) * 100) if fleet.miners else 0,
+            'sats_earned': 0,
+            'revenue': 0,
+            'energy_cost': 0,
+            'avg_efficiency_jth': round(efficiency, 1),
+            'avg_temp': round(avg_temp, 1)
+        }
+
+        # Try to get profitability data
+        try:
+            prof = fleet.profitability_calc.calculate_profitability(
+                total_hashrate, total_power, fleet.energy_rate_mgr.get_current_rate()
+            )
+            fleet_data['revenue'] = prof.get('revenue_per_day', 0)
+            fleet_data['energy_cost'] = prof.get('energy_cost_per_day', 0)
+            fleet_data['sats_earned'] = round(prof.get('btc_per_day', 0) * 1e8)
+        except Exception:
+            pass
+
+        msg = fleet.alert_mgr.generate_daily_report(fleet_data)
+        fleet.alert_mgr.send_custom_alert('Daily Mining Report', msg, level='info')
+
+        return jsonify({'success': True, 'message': 'Daily report sent', 'report': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/alerts/history', methods=['GET'])
@@ -3954,6 +4296,141 @@ def get_donation_stats():
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pool-directory', methods=['GET'])
+def get_pool_directory():
+    """Get comprehensive mining pool directory"""
+    import json as json_lib
+    try:
+        pool_file = os.path.join(os.path.dirname(__file__), 'static', 'mining_pools.json')
+        with open(pool_file, 'r') as f:
+            pool_data = json_lib.load(f)
+        return jsonify({'success': True, 'data': pool_data})
+    except FileNotFoundError:
+        return jsonify({'success': False, 'error': 'Pool directory data not found'}), 404
+    except Exception as e:
+        logger.error(f"Error loading pool directory: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/pool-directory/compare', methods=['POST'])
+def compare_pools():
+    """Compare selected pools side-by-side"""
+    import json as json_lib
+    try:
+        data = request.get_json()
+        pool_ids = data.get('pool_ids', [])
+        if len(pool_ids) < 2 or len(pool_ids) > 4:
+            return jsonify({'success': False, 'error': 'Select 2-4 pools to compare'}), 400
+
+        pool_file = os.path.join(os.path.dirname(__file__), 'static', 'mining_pools.json')
+        with open(pool_file, 'r') as f:
+            pool_data = json_lib.load(f)
+
+        selected = [p for p in pool_data.get('pools', []) if p['id'] in pool_ids]
+        return jsonify({'success': True, 'pools': selected})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/energy/seasonal-config', methods=['GET', 'POST', 'DELETE'])
+def seasonal_config():
+    """Manage seasonal rate configuration"""
+    if request.method == 'GET':
+        try:
+            with fleet.db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM seasonal_config ORDER BY id")
+                rows = cursor.fetchall()
+                seasons = [dict(r) for r in rows]
+            return jsonify({'success': True, 'seasons': seasons})
+        except Exception as e:
+            return jsonify({'success': True, 'seasons': []})
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            seasons = data.get('seasons', [])
+            with fleet.db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM seasonal_config")
+                for season in seasons:
+                    cursor.execute("""
+                        INSERT INTO seasonal_config
+                        (season_name, start_month, start_day, end_month, end_day)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        season['season_name'],
+                        season['start_month'],
+                        season['start_day'],
+                        season['end_month'],
+                        season['end_day']
+                    ))
+            return jsonify({'success': True, 'message': 'Seasonal configuration saved'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 400
+
+    elif request.method == 'DELETE':
+        try:
+            with fleet.db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM seasonal_config")
+            return jsonify({'success': True, 'message': 'Seasonal configuration cleared'})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/energy/rates/seasonal', methods=['POST'])
+def set_seasonal_rates():
+    """Set energy rates for a specific season"""
+    try:
+        data = request.get_json()
+        season = data.get('season', 'all')
+        rates = data.get('rates', [])
+
+        with fleet.db._get_connection() as conn:
+            cursor = conn.cursor()
+            # Clear existing rates for this season
+            cursor.execute("DELETE FROM energy_rates WHERE season = ?", (season,))
+            # Add new rates
+            for rate in rates:
+                cursor.execute("""
+                    INSERT INTO energy_rates
+                    (day_of_week, start_time, end_time, rate_per_kwh, rate_type, season)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    rate.get('day_of_week', 'all'),
+                    rate['start_time'],
+                    rate['end_time'],
+                    rate['rate_per_kwh'],
+                    rate.get('rate_type', 'standard'),
+                    season
+                ))
+
+        return jsonify({'success': True, 'message': f'Rates saved for {season} season'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/miner-specs', methods=['GET'])
+def get_miner_specs():
+    """Get miner specifications database from device_specifications.json"""
+    import json as json_lib
+    try:
+        # Primary: device_specifications.json at project root
+        specs_file = os.path.join(os.path.dirname(__file__), 'device_specifications.json')
+        if not os.path.exists(specs_file):
+            # Fallback: static/miner_specs.json
+            specs_file = os.path.join(os.path.dirname(__file__), 'static', 'miner_specs.json')
+        with open(specs_file, 'r') as f:
+            specs_data = json_lib.load(f)
+        return jsonify({'success': True, 'data': specs_data})
+    except FileNotFoundError:
+        return jsonify({'success': False, 'error': 'Miner specs data not found'}), 404
+    except Exception as e:
+        logger.error(f"Error loading miner specs: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
