@@ -170,115 +170,7 @@
 
             <!-- Fleet Tab -->
             <div id="fleet-tab" class="tab-content active">
-                <!-- Fleet Statistics -->
-                <section class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Miners</div>
-                        <div class="stat-value" id="total-miners">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Online</div>
-                        <div class="stat-value success" id="online-miners">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Offline</div>
-                        <div class="stat-value danger" id="offline-miners">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Overheated</div>
-                        <div class="stat-value warning" id="overheated-miners">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Total Hashrate</div>
-                        <div class="stat-value" id="total-hashrate">0 GH/s</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">
-                            Total Shares
-                            <select id="shares-timerange" class="stat-timerange">
-                                <option value="1">Last Hour</option>
-                                <option value="6">Last 6 Hours</option>
-                                <option value="12">Last 12 Hours</option>
-                                <option value="24" selected>Last 24 Hours</option>
-                                <option value="168">Last Week</option>
-                            </select>
-                        </div>
-                        <div class="stat-value success" id="total-shares">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Best Difficulty</div>
-                        <div class="stat-value" id="best-difficulty">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">
-                            Energy Used
-                            <select id="power-timerange" class="stat-timerange">
-                                <option value="1">Last Hour</option>
-                                <option value="6">Last 6 Hours</option>
-                                <option value="12">Last 12 Hours</option>
-                                <option value="24" selected>Last 24 Hours</option>
-                                <option value="168">Last Week</option>
-                            </select>
-                        </div>
-                        <div class="stat-value" id="total-power">-- kWh</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Average Chip Temperature</div>
-                        <div class="stat-value" id="avg-temp">0°C</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Fleet Efficiency <span class="help-icon" onclick="showEfficiencyTooltip(event)" title="What is J/TH?">?</span></div>
-                        <div class="stat-value" id="fleet-efficiency">-- J/TH</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Solo Mining Odds</div>
-                        <div class="solo-odds-details">
-                            <div class="solo-odds-row">
-                                <span class="solo-odds-label">Chance per block:</span>
-                                <span class="solo-odds-value" id="solo-odds-block">--</span>
-                            </div>
-                            <div class="solo-odds-row">
-                                <span class="solo-odds-label">Chance per day:</span>
-                                <span class="solo-odds-value" id="solo-odds-day">--</span>
-                            </div>
-                            <div class="solo-odds-row">
-                                <span class="solo-odds-label">Time estimate:</span>
-                                <span class="solo-odds-value" id="solo-odds-time">--</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Fleet Performance Chart -->
-                <section class="chart-section">
-                    <div class="chart-header">
-                        <h3>Fleet Performance - Hashrate & Temperature</h3>
-                        <div class="chart-controls">
-                            <select id="fleet-chart-timerange" class="chart-timerange-select">
-                                <option value="1">Last Hour</option>
-                                <option value="3">Last 3 Hours</option>
-                                <option value="6" selected>Last 6 Hours</option>
-                                <option value="12">Last 12 Hours</option>
-                                <option value="24">Last 24 Hours</option>
-                                <option value="168">Last Week</option>
-                                <option value="720">Last 30 Days</option>
-                            </select>
-                            <button id="fleet-chart-refresh" class="btn btn-secondary btn-sm">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
-                                    <polyline points="23 4 23 10 17 10"/>
-                                    <polyline points="1 20 1 14 7 14"/>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                                </svg>
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="fleet-combined-chart"></canvas>
-                    </div>
-                </section>
-
-                <!-- Metrics Dashboard Cards -->
+                <!-- Hero Cards (primary display - top of page) -->
                 <section class="metrics-section">
                     <div class="metrics-grid metrics-grid-compact">
                         <!-- Card 1: Fleet Status -->
@@ -307,6 +199,22 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="fleet-status-row fleet-status-row-secondary">
+                                    <div class="fleet-status-item">
+                                        <div class="fleet-status-label">Best Difficulty</div>
+                                        <div class="fleet-status-value">
+                                            <span id="best-difficulty">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="fleet-status-item">
+                                        <div class="fleet-status-label">Solo Mining Odds</div>
+                                        <div class="fleet-status-value">
+                                            <span id="solo-odds-day">--</span>
+                                            <span class="fleet-status-sub">/day</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="fleet-status-badges" id="fleet-status-badges"></div>
                             </div>
                         </div>
 
@@ -338,6 +246,11 @@
                                     <div class="earnings-row earnings-row-profit">
                                         <span class="earnings-label">Net profit/day</span>
                                         <span class="earnings-amount" id="card-daily-profit">$0.00</span>
+                                    </div>
+                                    <div class="earnings-divider"></div>
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Energy used (24h)</span>
+                                        <span class="earnings-amount" id="total-power">-- kWh</span>
                                     </div>
                                 </div>
                             </div>
@@ -376,6 +289,35 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- Fleet Performance Chart -->
+                <section class="chart-section">
+                    <div class="chart-header">
+                        <h3>Fleet Performance - Hashrate & Temperature</h3>
+                        <div class="chart-controls">
+                            <select id="fleet-chart-timerange" class="chart-timerange-select">
+                                <option value="1">Last Hour</option>
+                                <option value="3" selected>Last 3 Hours</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="12">Last 12 Hours</option>
+                                <option value="24">Last 24 Hours</option>
+                                <option value="168">Last Week</option>
+                                <option value="720">Last 30 Days</option>
+                            </select>
+                            <button id="fleet-chart-refresh" class="btn btn-secondary btn-sm">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fleet-combined-chart"></canvas>
                     </div>
                 </section>
 
@@ -1097,47 +1039,6 @@
 
             <!-- Charts Tab -->
             <div id="charts-tab" class="tab-content">
-                <!-- Performance Metrics (moved above Historical Data) -->
-                <section class="chart-section performance-metrics-section">
-                    <h3>Fleet Performance Overview</h3>
-                    <div class="stats-grid stats-grid-performance">
-                        <div class="stat-card stat-card-highlight">
-                            <div class="stat-label">Fleet Efficiency <span class="help-icon" onclick="showEfficiencyTooltip(event)" title="Power consumption per terahash. Lower is better.">?</span></div>
-                            <div class="stat-value" id="charts-fleet-efficiency">-- J/TH</div>
-                            <div class="stat-benchmark" id="charts-efficiency-benchmark"></div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Total Hashrate</div>
-                            <div class="stat-value" id="fleet-total-hashrate">-- TH/s</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Total Power</div>
-                            <div class="stat-value" id="fleet-total-power">-- W</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Daily Energy Cost</div>
-                            <div class="stat-value" id="fleet-daily-energy">-- kWh</div>
-                            <div class="stat-sub" id="fleet-daily-cost"></div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Accepted Shares</div>
-                            <div class="stat-value success" id="charts-accepted-shares">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Rejected Shares</div>
-                            <div class="stat-value danger" id="charts-rejected-shares">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Accept Rate</div>
-                            <div class="stat-value success" id="charts-accept-rate">0%</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Avg Temperature</div>
-                            <div class="stat-value" id="charts-avg-temp">0°C</div>
-                        </div>
-                    </div>
-                </section>
-
                 <section class="chart-controls-section">
                     <div class="section-header-with-actions">
                         <div>
@@ -1179,8 +1080,8 @@
                         <h3>Fleet Performance - Hashrate & Temperature</h3>
                         <div class="chart-controls">
                             <select id="combined-chart-timerange" class="chart-timerange-select">
-                                <option value="6" selected>Last 6 Hours</option>
-                                <option value="24">Last 24 Hours</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="24" selected>Last 24 Hours</option>
                                 <option value="168">Last 7 Days</option>
                                 <option value="720">Last 30 Days</option>
                             </select>
@@ -1189,6 +1090,16 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="combined-chart"></canvas>
+                    </div>
+                    <div class="chart-annotation" id="combined-chart-annotation">
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Hashrate</span>
+                            <span class="chart-annotation-value" id="charts-total-hashrate">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Avg Temp</span>
+                            <span class="chart-annotation-value" id="charts-avg-temp">--</span>
+                        </div>
                     </div>
                     <div class="chart-meta" id="combined-chart-meta"></div>
                 </section>
@@ -1199,8 +1110,8 @@
                         <h3>Power Consumption History</h3>
                         <div class="chart-controls">
                             <select id="power-chart-timerange" class="chart-timerange-select">
-                                <option value="6" selected>Last 6 Hours</option>
-                                <option value="24">Last 24 Hours</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="24" selected>Last 24 Hours</option>
                                 <option value="168">Last 7 Days</option>
                                 <option value="720">Last 30 Days</option>
                             </select>
@@ -1209,6 +1120,20 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="power-chart"></canvas>
+                    </div>
+                    <div class="chart-annotation" id="power-chart-annotation">
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Avg Power</span>
+                            <span class="chart-annotation-value" id="charts-avg-power">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Energy</span>
+                            <span class="chart-annotation-value" id="charts-total-energy">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Est. Cost</span>
+                            <span class="chart-annotation-value" id="charts-energy-cost">--</span>
+                        </div>
                     </div>
                     <div class="chart-meta" id="power-chart-meta"></div>
                 </section>
@@ -1229,6 +1154,20 @@
                     <div class="chart-container">
                         <canvas id="profitability-chart"></canvas>
                     </div>
+                    <div class="chart-annotation" id="profitability-chart-annotation">
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Revenue</span>
+                            <span class="chart-annotation-value" id="charts-total-revenue">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Cost</span>
+                            <span class="chart-annotation-value" id="charts-total-cost">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Net Profit</span>
+                            <span class="chart-annotation-value" id="charts-net-profit">--</span>
+                        </div>
+                    </div>
                     <div class="chart-meta" id="profitability-chart-meta"></div>
                 </section>
 
@@ -1238,8 +1177,8 @@
                         <h3>Mining Efficiency (J/TH)</h3>
                         <div class="chart-controls">
                             <select id="efficiency-chart-timerange" class="chart-timerange-select">
-                                <option value="6" selected>Last 6 Hours</option>
-                                <option value="24">Last 24 Hours</option>
+                                <option value="6">Last 6 Hours</option>
+                                <option value="24" selected>Last 24 Hours</option>
                                 <option value="168">Last 7 Days</option>
                                 <option value="720">Last 30 Days</option>
                             </select>
@@ -1248,6 +1187,16 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="efficiency-chart"></canvas>
+                    </div>
+                    <div class="chart-annotation" id="efficiency-chart-annotation">
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Fleet Avg</span>
+                            <span class="chart-annotation-value" id="charts-fleet-efficiency">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Benchmark</span>
+                            <span class="chart-annotation-value" id="charts-efficiency-benchmark">--</span>
+                        </div>
                     </div>
                     <div class="chart-meta" id="efficiency-chart-meta"></div>
                 </section>
@@ -1266,6 +1215,24 @@
                     </div>
                     <div class="chart-container" style="height: 300px;">
                         <canvas id="shares-chart"></canvas>
+                    </div>
+                    <div class="chart-annotation" id="shares-chart-annotation">
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Accepted</span>
+                            <span class="chart-annotation-value" id="charts-accepted-shares">0</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Rejected</span>
+                            <span class="chart-annotation-value" id="charts-rejected-shares">0</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Accept Rate</span>
+                            <span class="chart-annotation-value" id="charts-accept-rate">0%</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Est. Scoring</span>
+                            <span class="chart-annotation-value" id="charts-scoring-shares">0</span>
+                        </div>
                     </div>
                     <div class="chart-meta" id="shares-chart-meta"></div>
                 </section>
@@ -1682,6 +1649,13 @@
                                     <div class="count-details">
                                         <span class="count-value" id="modal-rejected-shares">0</span>
                                         <span class="count-label">Rejected</span>
+                                    </div>
+                                </div>
+                                <div class="share-count" style="border-left: 3px solid var(--cyan);">
+                                    <span class="count-icon" style="color: var(--cyan);">~</span>
+                                    <div class="count-details">
+                                        <span class="count-value" id="modal-scoring-shares">0</span>
+                                        <span class="count-label">Est. Score <span class="help-icon" onclick="showScoringTooltip(event)" title="What is scoring?">?</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -2340,6 +2314,20 @@
             loadMetricsData();
         });
     </script>
+
+    <!-- Scoring Shares Help Tooltip -->
+    <div class="scoring-tooltip-overlay" id="scoring-tooltip-overlay" onclick="closeScoringTooltip()"></div>
+    <div class="scoring-tooltip" id="scoring-tooltip">
+        <button class="close-btn" onclick="closeScoringTooltip()">&times;</button>
+        <h4>Est. Scoring Shares</h4>
+        <p><strong>Scoring shares</strong> estimate how a PPLNS pool (like Braiins/Slush) weights your recent work. More recent shares count more.</p>
+        <div class="formula">score = shares &times; e<sup>(-age / 300)</sup></div>
+        <p>Each share's contribution decays exponentially with a 300-second (5-minute) half-life constant. Shares older than ~25 minutes contribute almost nothing.</p>
+        <div class="equivalence">
+            <strong>This is an estimate.</strong> Your actual pool scoring may differ based on pool-specific parameters, network conditions, and the exact PPLNS window used.
+        </div>
+        <p>A higher score means more of your recent work is being counted toward the next block reward.</p>
+    </div>
 
     <!-- Efficiency Help Tooltip -->
     <div class="efficiency-tooltip-overlay" id="efficiency-tooltip-overlay" onclick="closeEfficiencyTooltip()"></div>

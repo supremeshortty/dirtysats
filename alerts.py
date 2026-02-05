@@ -12,6 +12,16 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 
+def format_hashrate(hashrate_ghs: float) -> str:
+    """Format hashrate from GH/s to appropriate human-readable unit."""
+    if abs(hashrate_ghs) >= 1e6:
+        return f"{hashrate_ghs / 1e6:.2f} PH/s"
+    elif abs(hashrate_ghs) >= 1e3:
+        return f"{hashrate_ghs / 1e3:.2f} TH/s"
+    else:
+        return f"{hashrate_ghs:.2f} GH/s"
+
+
 class AlertLevel(Enum):
     """Alert severity levels"""
     INFO = "info"
@@ -429,7 +439,7 @@ class AlertManager:
         if not self.config.alert_on_miner_online:
             return
 
-        data = {'hashrate': f"{hashrate:.2f} GH/s"}
+        data = {'hashrate': format_hashrate(hashrate)}
         if temperature:
             data['temperature'] = f"{temperature:.1f}°C"
 
@@ -458,7 +468,7 @@ class AlertManager:
             data={
                 'temperature': f"{temperature:.1f}°C",
                 'threshold': f"{threshold:.1f}°C",
-                'hashrate': f"{hashrate:.2f} GH/s",
+                'hashrate': format_hashrate(hashrate),
                 'frequency': f"{frequency} MHz"
             }
         )
@@ -529,8 +539,8 @@ class AlertManager:
             message=f"Miner {miner_ip} hashrate dropped by {percent_drop:.1f}%",
             miner_ip=miner_ip,
             data={
-                'current_hashrate': f"{current_hashrate:.2f} GH/s",
-                'expected_hashrate': f"{expected_hashrate:.2f} GH/s",
+                'current_hashrate': format_hashrate(current_hashrate),
+                'expected_hashrate': format_hashrate(expected_hashrate),
                 'drop_percent': f"{percent_drop:.1f}%"
             }
         )

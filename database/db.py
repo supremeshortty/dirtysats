@@ -3,6 +3,7 @@ SQLite database operations for fleet manager
 """
 import sqlite3
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from contextlib import contextmanager
@@ -842,6 +843,83 @@ class Database:
                 'avg_temperature': power_row['avg_temperature'] if power_row else 0,
                 'avg_hashrate': power_row['avg_hashrate'] if power_row else 0,
                 'best_difficulty': diff_row['best_difficulty'] if diff_row else 0
+            }
+
+    def get_scoring_shares(self, hours: int = 1, miner_id: int = None) -> Dict:
+        """Estimate PPLNS scoring shares using exponential decay.
+
+        Uses the formula: score = sum(share_delta * exp(-age / C))
+        where C=300 seconds (standard decay constant, same as Braiins/Slush).
+        Recent shares (0-5 min) carry most weight; shares >25 min old are negligible.
+        """
+        DECAY_CONSTANT = 300  # seconds
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.now()
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT s.miner_id, m.ip, s.timestamp,
+                       COALESCE(s.shares_accepted, 0) as shares_accepted
+                FROM stats s
+                JOIN miners m ON s.miner_id = m.id
+                WHERE s.timestamp > ?
+                AND s.status = 'online'
+            """
+            params = [cutoff]
+
+            if miner_id is not None:
+                query += " AND s.miner_id = ?"
+                params.append(miner_id)
+
+            query += " ORDER BY s.miner_id, s.timestamp ASC"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            per_miner = {}
+            current_miner_id = None
+            prev_row = None
+
+            for row in rows:
+                mid = row['miner_id']
+                ip = row['ip']
+                ts_raw = row['timestamp']
+                try:
+                    ts = datetime.strptime(ts_raw, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    ts = datetime.strptime(ts_raw[:19], '%Y-%m-%d %H:%M:%S')
+                shares = row['shares_accepted']
+
+                if mid != current_miner_id:
+                    current_miner_id = mid
+                    prev_row = (ts, shares, ip)
+                    if ip not in per_miner:
+                        per_miner[ip] = 0.0
+                    continue
+
+                prev_ts, prev_shares, _ = prev_row
+                share_delta = shares - prev_shares
+                interval = (ts - prev_ts).total_seconds()
+
+                prev_row = (ts, shares, ip)
+
+                # Skip counter resets (miner reboot) or data gaps
+                if share_delta <= 0 or interval > 300:
+                    continue
+
+                midpoint = prev_ts + (ts - prev_ts) / 2
+                age = (now - midpoint).total_seconds()
+                weight = math.exp(-age / DECAY_CONSTANT)
+                per_miner[ip] = per_miner.get(ip, 0.0) + share_delta * weight
+
+            total = sum(per_miner.values())
+
+            return {
+                'total_scoring_shares': round(total, 2),
+                'per_miner': {ip: round(score, 2) for ip, score in per_miner.items()},
+                'decay_constant': DECAY_CONSTANT
             }
 
     # Alert Management Methods
