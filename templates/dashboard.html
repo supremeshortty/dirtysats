@@ -207,10 +207,22 @@
                                         </div>
                                     </div>
                                     <div class="fleet-status-item">
-                                        <div class="fleet-status-label">Solo Mining Odds</div>
+                                        <div class="fleet-status-label" style="display: flex; align-items: center; gap: 8px;">
+                                            Solo Mining Odds
+                                            <select id="solo-odds-timeframe" class="chart-timerange-select" style="font-size: 0.7rem; padding: 2px 6px; text-transform: none; letter-spacing: 0;" onchange="updateSoloOddsDisplay()">
+                                                <option value="block">Per Block</option>
+                                                <option value="hour">Per Hour</option>
+                                                <option value="day" selected>Per Day</option>
+                                                <option value="week">Per Week</option>
+                                                <option value="month">Per Month</option>
+                                                <option value="year">Per Year</option>
+                                            </select>
+                                        </div>
                                         <div class="fleet-status-value">
-                                            <span id="solo-odds-day">--</span>
-                                            <span class="fleet-status-sub">/day</span>
+                                            <span id="solo-odds-hero">--</span>
+                                        </div>
+                                        <div style="font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 2px;">
+                                            <span id="solo-odds-time">--</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1086,6 +1098,7 @@
                                 <option value="720">Last 30 Days</option>
                             </select>
                             <button id="combined-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
+                            <button id="combined-chart-view-toggle" class="btn btn-secondary btn-sm" onclick="toggleCombinedChartView()">Per Miner</button>
                         </div>
                     </div>
                     <div class="chart-container">
@@ -1104,15 +1117,14 @@
                     <div class="chart-meta" id="combined-chart-meta"></div>
                 </section>
 
-                <!-- Power Chart -->
+                <!-- Energy Consumption Chart -->
                 <section class="chart-section">
                     <div class="chart-header">
-                        <h3>Power Consumption History</h3>
+                        <h3>Energy Consumption History</h3>
                         <div class="chart-controls">
                             <select id="power-chart-timerange" class="chart-timerange-select">
-                                <option value="6">Last 6 Hours</option>
-                                <option value="24" selected>Last 24 Hours</option>
-                                <option value="168">Last 7 Days</option>
+                                <option value="48">Last 48 Hours</option>
+                                <option value="168" selected>Last 7 Days</option>
                                 <option value="720">Last 30 Days</option>
                             </select>
                             <button id="power-chart-refresh" class="btn btn-secondary btn-sm">Refresh</button>
@@ -1123,16 +1135,16 @@
                     </div>
                     <div class="chart-annotation" id="power-chart-annotation">
                         <div class="chart-annotation-item">
-                            <span class="chart-annotation-label">Avg Power</span>
-                            <span class="chart-annotation-value" id="charts-avg-power">--</span>
+                            <span class="chart-annotation-label">Total Energy</span>
+                            <span class="chart-annotation-value" id="charts-energy-total">--</span>
                         </div>
                         <div class="chart-annotation-item">
-                            <span class="chart-annotation-label">Energy</span>
-                            <span class="chart-annotation-value" id="charts-total-energy">--</span>
-                        </div>
-                        <div class="chart-annotation-item">
-                            <span class="chart-annotation-label">Est. Cost</span>
+                            <span class="chart-annotation-label">Total Cost</span>
                             <span class="chart-annotation-value" id="charts-energy-cost">--</span>
+                        </div>
+                        <div class="chart-annotation-item">
+                            <span class="chart-annotation-label">Avg Daily</span>
+                            <span class="chart-annotation-value" id="charts-energy-avg">--</span>
                         </div>
                     </div>
                     <div class="chart-meta" id="power-chart-meta"></div>
@@ -1361,26 +1373,40 @@
 
                     <!-- Search and Filter Bar -->
                     <div class="pool-directory-filters">
-                        <div class="pool-search-wrap">
-                            <svg class="pool-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8"/>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            </svg>
-                            <input type="text" id="pool-directory-search" class="pool-directory-search" placeholder="Search pools by name...">
+                        <!-- Top row: Search + Sort -->
+                        <div class="pool-filter-top-row">
+                            <div class="pool-search-wrap">
+                                <svg class="pool-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                <input type="text" id="pool-directory-search" class="pool-directory-search" placeholder="Search pools by name...">
+                            </div>
+                            <select id="pool-directory-sort" class="pool-directory-sort">
+                                <option value="name-az">Name A-Z</option>
+                                <option value="name-za">Name Z-A</option>
+                                <option value="fee-low">Fee Low-High</option>
+                                <option value="fee-high">Fee High-Low</option>
+                                <option value="home-first">Home Miner First</option>
+                            </select>
                         </div>
-                        <div class="pool-filter-buttons">
-                            <button class="pool-filter-btn active" data-filter="all">All</button>
-                            <button class="pool-filter-btn" data-filter="home-miner">Home Miner Friendly</button>
-                            <button class="pool-filter-btn" data-filter="no-kyc">No KYC</button>
-                            <button class="pool-filter-btn" data-filter="lightning">Lightning Support</button>
-                            <button class="pool-filter-btn" data-filter="low-fee">Low Fee (&lt;2%)</button>
-                            <button class="pool-filter-btn" data-filter="solo">Solo Mining</button>
-                            <button class="pool-filter-btn" data-filter="fpps">FPPS/PPS</button>
-                            <button class="pool-filter-btn" data-filter="pplns">PPLNS</button>
+                        <!-- Bottom row: Filter pills + Compare -->
+                        <div class="pool-filter-bottom-row">
+                            <div class="pool-filter-buttons">
+                                <button class="pool-filter-btn active" data-filter="all">All</button>
+                                <button class="pool-filter-btn" data-filter="active-only">Active Only</button>
+                                <button class="pool-filter-btn" data-filter="home-miner">Home Miner Friendly</button>
+                                <button class="pool-filter-btn" data-filter="no-kyc">No KYC</button>
+                                <button class="pool-filter-btn" data-filter="lightning">Lightning Support</button>
+                                <button class="pool-filter-btn" data-filter="low-fee">Low Fee (&lt;2%)</button>
+                                <button class="pool-filter-btn" data-filter="solo">Solo Mining</button>
+                                <button class="pool-filter-btn" data-filter="fpps">FPPS/PPS</button>
+                                <button class="pool-filter-btn" data-filter="pplns">PPLNS</button>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" id="compare-pools-btn" onclick="showPoolComparison()" disabled>
+                                Compare Selected (0)
+                            </button>
                         </div>
-                        <button class="btn btn-secondary btn-sm" id="compare-pools-btn" onclick="showPoolComparison()" disabled>
-                            Compare Selected (0)
-                        </button>
                     </div>
 
                     <!-- Pool Directory Cards Grid -->
@@ -1388,6 +1414,8 @@
                     <div class="pool-directory-grid" id="pool-directory-grid">
                         <p class="loading">Loading pool directory...</p>
                     </div>
+                    <!-- Pagination -->
+                    <div class="pool-directory-pagination" id="pool-directory-pagination"></div>
                 </section>
 
                 <!-- Existing Pool Configuration Section -->
@@ -1655,7 +1683,7 @@
                                     <span class="count-icon" style="color: var(--cyan);">~</span>
                                     <div class="count-details">
                                         <span class="count-value" id="modal-scoring-shares">0</span>
-                                        <span class="count-label">Est. Score <span class="help-icon" onclick="showScoringTooltip(event)" title="What is scoring?">?</span></span>
+                                        <span class="count-label">Est. Scoring Shares <span class="help-icon" onclick="showScoringTooltip(event)" title="What is scoring?">?</span></span>
                                     </div>
                                 </div>
                             </div>

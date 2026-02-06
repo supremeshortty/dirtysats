@@ -81,6 +81,14 @@ class UtilityRateService:
             utilities = {}
             query_lower = query.lower()
 
+            # Expand brand names to subsidiary names for OpenEI lookups.
+            # OpenEI uses legal subsidiary names (e.g. "Northern States Power Co")
+            # rather than brand names (e.g. "Xcel Energy").
+            subsidiary_names = BRAND_TO_SUBSIDIARIES.get(query_lower, [])
+            subsidiary_names_lower = [s.lower() for s in subsidiary_names]
+            if subsidiary_names:
+                logger.info(f"Brand '{query}' expanded to {len(subsidiary_names)} subsidiaries: {subsidiary_names}")
+
             # Strategy 1: Fetch utility companies list and filter locally.
             # The /utility_companies endpoint only supports version 'latest' (up to v3),
             # NOT version 7, and has NO 'search' parameter.
@@ -120,7 +128,18 @@ class UtilityRateService:
                             item.get('name', '') or
                             item.get('utility', '')
                         )
-                        if utility_name and query_lower in utility_name.lower():
+                        if not utility_name:
+                            continue
+                        name_lower = utility_name.lower()
+                        # Match if original query is in the name, OR if the name
+                        # matches any known subsidiary of the searched brand
+                        is_match = query_lower in name_lower
+                        if not is_match and subsidiary_names_lower:
+                            is_match = any(
+                                sub in name_lower or name_lower in sub
+                                for sub in subsidiary_names_lower
+                            )
+                        if is_match:
                             if utility_name not in utilities:
                                 utilities[utility_name] = {
                                     'utility_name': utility_name,
@@ -148,17 +167,21 @@ class UtilityRateService:
                 logger.warning(f"Utility companies endpoint failed: {e}")
 
             # Strategy 2: Search the rates endpoint with ratesforutility
-            if len(utilities) < limit:
+            # Search for the original query, plus each subsidiary name if brand was expanded
+            rate_search_terms = [query] + subsidiary_names
+            for search_term in rate_search_terms:
+                if len(utilities) >= limit:
+                    break
                 try:
                     params = {
                         'version': '7',
                         'format': 'json',
                         'api_key': self.api_key,
-                        'ratesforutility': query,
+                        'ratesforutility': search_term,
                         'detail': 'minimal',
                         'limit': 500
                     }
-                    logger.info(f"OpenEI: Searching rates endpoint for utility '{query}'")
+                    logger.info(f"OpenEI: Searching rates endpoint for utility '{search_term}'")
                     response = requests.get(self.API_BASE_URL, params=params, timeout=15)
                     logger.info(f"OpenEI utility_rates response status: {response.status_code}")
 
@@ -173,13 +196,13 @@ class UtilityRateService:
                                         'eia_id': item.get('eiaid', ''),
                                         'state': item.get('state', ''),
                                     }
-                            logger.info(f"OpenEI: rates endpoint found {len(data.get('items', []))} rate items")
+                            logger.info(f"OpenEI: rates endpoint found {len(data.get('items', []))} rate items for '{search_term}'")
                         else:
                             logger.warning(f"OpenEI rates endpoint returned error: {data.get('error')}")
                     else:
                         logger.warning(f"OpenEI rates endpoint returned HTTP {response.status_code}")
                 except Exception as e:
-                    logger.warning(f"Rates endpoint search failed: {e}")
+                    logger.warning(f"Rates endpoint search failed for '{search_term}': {e}")
 
             # Strategy 3: Try address-based search if query looks like a location
             if not utilities and (len(query.split()) <= 3 or any(c.isdigit() for c in query)):
@@ -214,6 +237,10 @@ class UtilityRateService:
                 logger.warning(f"OpenEI search returned no results for '{query}' across all strategies")
 
             result = list(utilities.values())[:limit]
+            # If we matched via brand-to-subsidiary mapping, tag results with the brand name
+            if subsidiary_names and result:
+                for r in result:
+                    r['brand_name'] = query
             logger.info(f"OpenEI search for '{query}' found {len(result)} unique utilities total")
             return result
 
@@ -830,59 +857,169 @@ class ProfitabilityCalculator:
 
     def calculate_solo_odds(self, hashrate_hs: float, difficulty: float = None) -> dict:
         """
-        Calculate solo mining odds - the probability of finding a block.
+        Calculate solo mining odds using the solochance.org API for accuracy.
 
-        This uses the same formula as solochance.com:
-        - Chance per block = (hashrate_hs * 600) / (difficulty * 2^32)
-        - Chance per day = (hashrate_hs * 86400) / (difficulty * 2^32)
-        - Time estimate = 1 / chance_per_day (in days, converted to years)
+        Calls https://api.solochance.org/getSoloChanceCalculations with the fleet
+        hashrate to get exact odds matching solochance.org. Falls back to local
+        calculation if the API is unreachable.
 
         Args:
             hashrate_hs: Hashrate in H/s (hashes per second)
-            difficulty: Network difficulty (fetched if not provided)
+            difficulty: Network difficulty (used only for local fallback)
 
         Returns:
-            Dictionary with solo mining odds metrics (exact numbers, no rounding)
+            Dictionary with solo mining odds metrics for all timeframes
         """
+        if hashrate_hs <= 0:
+            return self._empty_solo_odds(difficulty)
+
+        # Try solochance.org API first for exact matching numbers
+        try:
+            result = self._fetch_solochance_api(hashrate_hs)
+            if result:
+                return result
+        except Exception as e:
+            logger.warning(f"SoloChance API failed, using local calculation: {e}")
+
+        # Fallback to local calculation
+        return self._calculate_solo_odds_local(hashrate_hs, difficulty)
+
+    def _fetch_solochance_api(self, hashrate_hs: float) -> dict:
+        """Fetch solo mining odds from solochance.org API."""
+        # Convert H/s to the best unit for the API
+        hashrate_ths = hashrate_hs / 1e12
+        if hashrate_ths >= 0.001:
+            api_hashrate = hashrate_ths
+            api_unit = 'TH'
+        else:
+            api_hashrate = hashrate_hs / 1e9
+            api_unit = 'GH'
+
+        url = (
+            f"https://api.solochance.org/getSoloChanceCalculations"
+            f"?currency=BTC&hashrate={api_hashrate}&hashrateUnit={api_unit}"
+        )
+        response = requests.get(url, timeout=8)
+        response.raise_for_status()
+        data = response.json()
+
+        if 'blockChanceText' not in data:
+            return None
+
+        # Parse "1 in X chance" text to extract odds number
+        def _parse_odds_text(text):
+            if not text:
+                return 0
+            # "1 in 895,223,646 chance" -> 895223646
+            parts = text.replace(',', '').split()
+            for i, p in enumerate(parts):
+                if p == 'in' and i + 1 < len(parts):
+                    try:
+                        return int(parts[i + 1])
+                    except ValueError:
+                        pass
+            return 0
+
+        block_odds = _parse_odds_text(data.get('blockChanceText', ''))
+        day_odds = _parse_odds_text(data.get('dayChanceText', ''))
+
+        # Compute time estimate from day chance
+        chance_per_day = data.get('dayChance', 0)
+        if chance_per_day and chance_per_day > 0:
+            time_to_block_days = 1 / chance_per_day
+            time_to_block_years = time_to_block_days / 365
+        elif day_odds > 0:
+            time_to_block_days = day_odds
+            time_to_block_years = time_to_block_days / 365
+        else:
+            time_to_block_days = float('inf')
+            time_to_block_years = float('inf')
+
+        # Format time estimate
+        if time_to_block_years >= 1:
+            time_estimate_display = f"{int(time_to_block_years):,} years"
+        elif time_to_block_days >= 30:
+            time_estimate_display = f"{int(time_to_block_days / 30):,} months"
+        elif time_to_block_days >= 1:
+            time_estimate_display = f"{int(time_to_block_days):,} days"
+        else:
+            time_estimate_display = f"{int(time_to_block_days * 24):,} hours"
+
+        # Strip " chance" suffix from display text for cleaner UI
+        def _clean(text):
+            return text.replace(' chance', '') if text else 'N/A'
+
+        return {
+            'hashrate_hs': hashrate_hs,
+            'source': 'solochance.org',
+            'network_hashrate_text': data.get('networkHashrateText', ''),
+            'chance_per_block': data.get('blockChance', 0),
+            'chance_per_block_odds': block_odds,
+            'chance_per_block_display': _clean(data.get('blockChanceText', 'N/A')),
+            'chance_per_hour': data.get('hourChance', 0),
+            'chance_per_hour_odds': _parse_odds_text(data.get('hourChanceText', '')),
+            'chance_per_hour_display': _clean(data.get('hourChanceText', 'N/A')),
+            'chance_per_day': data.get('dayChance', 0),
+            'chance_per_day_odds': day_odds,
+            'chance_per_day_display': _clean(data.get('dayChanceText', 'N/A')),
+            'chance_per_week': data.get('weekChance', 0),
+            'chance_per_week_odds': _parse_odds_text(data.get('weekChanceText', '')),
+            'chance_per_week_display': _clean(data.get('weekChanceText', 'N/A')),
+            'chance_per_month': data.get('monthChance', 0),
+            'chance_per_month_odds': _parse_odds_text(data.get('monthChanceText', '')),
+            'chance_per_month_display': _clean(data.get('monthChanceText', 'N/A')),
+            'chance_per_year': data.get('yearChance', 0),
+            'chance_per_year_odds': _parse_odds_text(data.get('yearChanceText', '')),
+            'chance_per_year_display': _clean(data.get('yearChanceText', 'N/A')),
+            'time_to_block_days': time_to_block_days,
+            'time_to_block_years': time_to_block_years,
+            'time_estimate_display': time_estimate_display
+        }
+
+    def _empty_solo_odds(self, difficulty=None) -> dict:
+        """Return empty solo odds for zero hashrate."""
+        return {
+            'hashrate_hs': 0,
+            'chance_per_block': 0, 'chance_per_block_odds': 0, 'chance_per_block_display': 'N/A',
+            'chance_per_hour': 0, 'chance_per_hour_odds': 0, 'chance_per_hour_display': 'N/A',
+            'chance_per_day': 0, 'chance_per_day_odds': 0, 'chance_per_day_display': 'N/A',
+            'chance_per_week': 0, 'chance_per_week_odds': 0, 'chance_per_week_display': 'N/A',
+            'chance_per_month': 0, 'chance_per_month_odds': 0, 'chance_per_month_display': 'N/A',
+            'chance_per_year': 0, 'chance_per_year_odds': 0, 'chance_per_year_display': 'N/A',
+            'time_to_block_days': float('inf'), 'time_to_block_years': float('inf'),
+            'time_estimate_display': 'Never'
+        }
+
+    def _calculate_solo_odds_local(self, hashrate_hs: float, difficulty: float = None) -> dict:
+        """Local fallback calculation when solochance.org API is unreachable."""
         if difficulty is None:
             difficulty = self.btc_fetcher.get_network_difficulty()
             if difficulty is None:
                 return {'error': 'Unable to fetch network difficulty'}
 
-        if hashrate_hs <= 0:
-            return {
-                'hashrate_hs': 0,
-                'difficulty': difficulty,
-                'chance_per_block': 0,
-                'chance_per_block_odds': 0,
-                'chance_per_block_display': 'N/A',
-                'chance_per_day': 0,
-                'chance_per_day_odds': 0,
-                'chance_per_day_display': 'N/A',
-                'time_to_block_days': float('inf'),
-                'time_to_block_years': float('inf'),
-                'time_estimate_display': 'Never'
-            }
+        two_32 = difficulty * (2**32)
 
-        # Chance per block: probability during one 10-minute block period
-        # Formula: (hashrate_hs * 600) / (difficulty * 2^32)
-        chance_per_block = (hashrate_hs * 600) / (difficulty * (2**32))
+        chance_per_block = (hashrate_hs * 600) / two_32
         chance_per_block_odds = int(1 / chance_per_block) if chance_per_block > 0 else float('inf')
-
-        # Chance per day: probability over 24 hours (144 blocks)
-        # Formula: (hashrate_hs * 86400) / (difficulty * 2^32)
-        chance_per_day = (hashrate_hs * 86400) / (difficulty * (2**32))
+        chance_per_hour = (hashrate_hs * 3600) / two_32
+        chance_per_hour_odds = int(1 / chance_per_hour) if chance_per_hour > 0 else float('inf')
+        chance_per_day = (hashrate_hs * 86400) / two_32
         chance_per_day_odds = int(1 / chance_per_day) if chance_per_day > 0 else float('inf')
+        chance_per_week = (hashrate_hs * 604800) / two_32
+        chance_per_week_odds = max(1, int(1 / chance_per_week)) if chance_per_week > 0 else float('inf')
+        chance_per_month = (hashrate_hs * 2592000) / two_32
+        chance_per_month_odds = max(1, int(1 / chance_per_month)) if chance_per_month > 0 else float('inf')
+        chance_per_year = (hashrate_hs * 31536000) / two_32
+        chance_per_year_odds = max(1, int(1 / chance_per_year)) if chance_per_year > 0 else float('inf')
 
-        # Time to block in days and years
         time_to_block_days = 1 / chance_per_day if chance_per_day > 0 else float('inf')
         time_to_block_years = time_to_block_days / 365
 
-        # Format displays with commas (exact numbers, no abbreviation)
-        chance_per_block_display = f"1 in {chance_per_block_odds:,}"
-        chance_per_day_display = f"1 in {chance_per_day_odds:,}"
+        def _fmt(odds_val):
+            if odds_val == float('inf'):
+                return 'N/A'
+            return f"1 in {max(1, odds_val):,}"
 
-        # Format time estimate (exact number with commas)
         if time_to_block_years >= 1:
             time_estimate_display = f"{int(time_to_block_years):,} years"
         elif time_to_block_days >= 30:
@@ -894,15 +1031,20 @@ class ProfitabilityCalculator:
 
         return {
             'hashrate_hs': hashrate_hs,
-            'difficulty': difficulty,
-            'chance_per_block': chance_per_block,
-            'chance_per_block_odds': chance_per_block_odds,
-            'chance_per_block_display': chance_per_block_display,
-            'chance_per_day': chance_per_day,
-            'chance_per_day_odds': chance_per_day_odds,
-            'chance_per_day_display': chance_per_day_display,
-            'time_to_block_days': time_to_block_days,
-            'time_to_block_years': time_to_block_years,
+            'source': 'local',
+            'chance_per_block': chance_per_block, 'chance_per_block_odds': chance_per_block_odds,
+            'chance_per_block_display': _fmt(chance_per_block_odds),
+            'chance_per_hour': chance_per_hour, 'chance_per_hour_odds': chance_per_hour_odds,
+            'chance_per_hour_display': _fmt(chance_per_hour_odds),
+            'chance_per_day': chance_per_day, 'chance_per_day_odds': chance_per_day_odds,
+            'chance_per_day_display': _fmt(chance_per_day_odds),
+            'chance_per_week': chance_per_week, 'chance_per_week_odds': chance_per_week_odds,
+            'chance_per_week_display': _fmt(chance_per_week_odds),
+            'chance_per_month': chance_per_month, 'chance_per_month_odds': chance_per_month_odds,
+            'chance_per_month_display': _fmt(chance_per_month_odds),
+            'chance_per_year': chance_per_year, 'chance_per_year_odds': chance_per_year_odds,
+            'chance_per_year_display': _fmt(chance_per_year_odds),
+            'time_to_block_days': time_to_block_days, 'time_to_block_years': time_to_block_years,
             'time_estimate_display': time_estimate_display
         }
 
@@ -2357,4 +2499,180 @@ ENERGY_COMPANY_PRESETS = {
             {"start_time": "00:00", "end_time": "23:59", "rate_per_kwh": 0.12, "rate_type": "standard"},
         ]
     }
+}
+
+# Brand name to subsidiary mapping for OpenEI API searches.
+# OpenEI uses legal subsidiary names, not brand names. This mapping allows
+# users to search by familiar brand names (e.g. "Xcel Energy") and still
+# find the correct utility companies in the API.
+BRAND_TO_SUBSIDIARIES = {
+    "xcel energy": [
+        "Northern States Power Co - Minnesota",
+        "Northern States Power Co - Wisconsin",
+        "Public Service Company of Colorado",
+        "Southwestern Public Service Company"
+    ],
+    "duke energy": [
+        "Duke Energy Carolinas, LLC",
+        "Duke Energy Progress, LLC",
+        "Duke Energy Florida, LLC",
+        "Duke Energy Indiana, LLC",
+        "Duke Energy Ohio, Inc.",
+        "Duke Energy Kentucky, Inc."
+    ],
+    "nextera energy": [
+        "Florida Power & Light Co",
+        "Gulf Power Company"
+    ],
+    "dominion energy": [
+        "Virginia Electric & Power Co",
+        "Dominion Energy South Carolina"
+    ],
+    "southern company": [
+        "Alabama Power Company",
+        "Georgia Power Company",
+        "Mississippi Power Company",
+        "Gulf Power Company"
+    ],
+    "entergy": [
+        "Entergy Arkansas, LLC",
+        "Entergy Louisiana, LLC",
+        "Entergy Mississippi, LLC",
+        "Entergy New Orleans, LLC",
+        "Entergy Texas, Inc."
+    ],
+    "eversource": [
+        "Eversource Energy",
+        "NSTAR Electric Company",
+        "Connecticut Light & Power",
+        "Public Service Co of New Hampshire"
+    ],
+    "pg&e": [
+        "Pacific Gas & Electric Co"
+    ],
+    "pacific gas": [
+        "Pacific Gas & Electric Co"
+    ],
+    "sce": [
+        "Southern California Edison Co"
+    ],
+    "southern california edison": [
+        "Southern California Edison Co"
+    ],
+    "consumers energy": [
+        "Consumers Energy Company"
+    ],
+    "dte energy": [
+        "DTE Electric Company"
+    ],
+    "alliant energy": [
+        "Interstate Power & Light Co",
+        "Wisconsin Power & Light Co"
+    ],
+    "we energies": [
+        "Wisconsin Electric Power Co"
+    ],
+    "ameren": [
+        "Ameren Illinois Co",
+        "Ameren Missouri"
+    ],
+    "ppl": [
+        "PPL Electric Utilities Corp",
+        "Louisville Gas & Electric Co",
+        "Kentucky Utilities Co"
+    ],
+    "firstenergy": [
+        "Ohio Edison Co",
+        "The Cleveland Electric Illuminating Co",
+        "The Toledo Edison Co",
+        "Jersey Central Power & Light Co",
+        "Metropolitan Edison Co",
+        "Pennsylvania Electric Co",
+        "Monongahela Power Co",
+        "Potomac Edison Co",
+        "West Penn Power Co"
+    ],
+    "aep": [
+        "Appalachian Power Co",
+        "Indiana Michigan Power Co",
+        "Ohio Power Co",
+        "Public Service Co of Oklahoma",
+        "Southwestern Electric Power Co"
+    ],
+    "conedison": [
+        "Consolidated Edison Co of New York"
+    ],
+    "con edison": [
+        "Consolidated Edison Co of New York"
+    ],
+    "national grid": [
+        "National Grid - New York",
+        "National Grid - Massachusetts",
+        "Narragansett Electric Co"
+    ],
+    "centerpoint": [
+        "CenterPoint Energy Houston Electric"
+    ],
+    "oncor": [
+        "Oncor Electric Delivery Company"
+    ],
+    "puget sound energy": [
+        "Puget Sound Energy"
+    ],
+    "pse": [
+        "Puget Sound Energy"
+    ],
+    "rocky mountain power": [
+        "PacifiCorp - Rocky Mountain Power"
+    ],
+    "pacificorp": [
+        "PacifiCorp"
+    ],
+    "avista": [
+        "Avista Corporation"
+    ],
+    "idaho power": [
+        "Idaho Power Company"
+    ],
+    "austin energy": [
+        "Austin Energy"
+    ],
+    "salt river project": [
+        "Salt River Project"
+    ],
+    "srp": [
+        "Salt River Project"
+    ],
+    "aps": [
+        "Arizona Public Service Company"
+    ],
+    "arizona public service": [
+        "Arizona Public Service Company"
+    ],
+    "tucson electric": [
+        "Tucson Electric Power Co"
+    ],
+    "tep": [
+        "Tucson Electric Power Co"
+    ],
+    "nv energy": [
+        "Nevada Power Company",
+        "Sierra Pacific Power Company"
+    ],
+    "cleco": [
+        "Cleco Power LLC"
+    ],
+    "empire district": [
+        "The Empire District Electric Co"
+    ],
+    "oge energy": [
+        "Oklahoma Gas & Electric Co"
+    ],
+    "evergy": [
+        "Evergy Kansas Central",
+        "Evergy Metro"
+    ],
+    "midamerican": [
+        "MidAmerican Energy Company"
+    ],
 }

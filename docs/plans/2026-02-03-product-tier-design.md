@@ -108,6 +108,7 @@ No miner limits on any tier.
 - Pool performance comparator
 - Predictive revenue model (7 / 30 / 90 day projections)
 - Best / worst miner ranking
+- Estimated PPLNS scoring shares (fleet-wide and per-miner, exponential decay formula)
 
 ### Pool Directory & Comparison
 - Full directory (50+ pools with detailed specs)

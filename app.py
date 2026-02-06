@@ -551,11 +551,21 @@ class FleetManager:
                 # Get current energy rate
                 current_rate = self.energy_rate_mgr.get_current_rate()
 
+                # Auto-detect pool fee if available
+                pool_fee = None
+                if self.pool_manager:
+                    pool_configs = self.pool_manager.get_all_pool_configs()
+                    if pool_configs:
+                        pool_fee = pool_configs[0].get('fee_percent', 2.5)
+
                 # Calculate profitability
                 prof = self.profitability_calc.calculate_profitability(
                     total_hashrate=total_hashrate,
                     total_power_watts=total_power,
-                    energy_rate_per_kwh=current_rate
+                    energy_rate_per_kwh=current_rate,
+                    pool_fee_percent=pool_fee,
+                    rate_manager=self.energy_rate_mgr,
+                    mining_scheduler=self.mining_scheduler
                 )
 
                 if 'error' not in prof:
@@ -861,6 +871,10 @@ def get_aggregate_stats_route():
 
     try:
         agg_stats = fleet.db.get_aggregate_stats(hours)
+        scoring = fleet.db.get_scoring_shares(hours)
+        agg_stats['scoring_shares_total'] = scoring['total_scoring_shares']
+        agg_stats['scoring_shares_per_miner'] = scoring['per_miner']
+        agg_stats['scoring_decay_constant'] = scoring['decay_constant']
         return jsonify({
             'success': True,
             'hours': hours,
@@ -1653,6 +1667,7 @@ def get_all_pools():
                     'ip': ip,
                     'model': miner.model,
                     'type': miner.type,
+                    'custom_name': miner.custom_name,
                     'name': miner.custom_name or miner.model,
                     'pools': mock_pools,
                     'active_pool': 0,
@@ -1666,6 +1681,7 @@ def get_all_pools():
                         'ip': ip,
                         'model': miner.model,
                         'type': miner.type,
+                        'custom_name': miner.custom_name,
                         'name': miner.custom_name or miner.model,
                         'pools': pools_info.get('pools', []),
                         'active_pool': pools_info.get('active_pool', 0)
@@ -2660,6 +2676,8 @@ def get_actual_energy_consumption():
             'total_cost': round(cost_data['total_cost'], 4),
             'time_coverage_percent': round(energy_data['time_coverage_percent'], 1),
             'readings_count': energy_data['readings_count'],
+            'avg_power_watts': energy_data.get('avg_power_watts', 0),
+            'integrated_hours': energy_data.get('integrated_hours', 0),
             'cost_by_rate_type': {
                 k: round(v, 4) for k, v in cost_data['cost_by_rate_type'].items()
             },
@@ -4027,7 +4045,7 @@ def add_mock_miners():
                     fan_speed=status.get('fan_speed'),
                     shares_accepted=status.get('shares_accepted'),
                     shares_rejected=status.get('shares_rejected'),
-                    best_difficulty=str(status.get('best_difficulty', '')),
+                    best_difficulty=status.get('best_difficulty', 0),
                     timestamp=stat_time
                 )
 

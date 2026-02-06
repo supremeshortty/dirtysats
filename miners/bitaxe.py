@@ -9,6 +9,35 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# Suffix multipliers for human-readable numeric strings (e.g. '8.52G')
+_SUFFIX_MULTIPLIERS = {
+    'K': 1e3, 'M': 1e6, 'G': 1e9, 'T': 1e12, 'P': 1e15, 'E': 1e18,
+}
+
+
+def _parse_numeric(value) -> float:
+    """Parse a numeric value that may have a suffix like K, M, G, T, P, E.
+
+    Examples: '8.52G' -> 8520000000.0, 1234 -> 1234.0, '2.5M' -> 2500000.0
+    """
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if not s:
+        return 0.0
+    suffix = s[-1].upper()
+    if suffix in _SUFFIX_MULTIPLIERS:
+        try:
+            return float(s[:-1]) * _SUFFIX_MULTIPLIERS[suffix]
+        except ValueError:
+            return 0.0
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
 
 class BitaxeAPIHandler(MinerAPIHandler):
     """Handler for ESP-Miner based devices (BitAxe, NerdQAxe, LuckyMiner, etc.)"""
@@ -196,8 +225,8 @@ class BitaxeAPIHandler(MinerAPIHandler):
                 # Mining statistics
                 'shares_accepted': int(data.get('sharesAccepted', data.get('shares', 0))),
                 'shares_rejected': int(data.get('sharesRejected', 0)),
-                'best_difficulty': data.get('bestDiff', data.get('bestDifficulty', 0)),
-                'session_difficulty': data.get('bestSessionDiff', data.get('sessionDiff', 0)),
+                'best_difficulty': _parse_numeric(data.get('bestDiff', data.get('bestDifficulty', 0))),
+                'session_difficulty': _parse_numeric(data.get('bestSessionDiff', data.get('sessionDiff', 0))),
                 'uptime_seconds': int(data.get('uptimeSeconds', data.get('runningTime', 0))),
                 # Device info
                 'hostname': data.get('hostname', ''),

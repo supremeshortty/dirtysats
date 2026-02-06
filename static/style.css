@@ -2547,6 +2547,14 @@ input[type="date"]::-webkit-inner-spin-button {
     color: var(--text-primary);
 }
 
+.utility-brand {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--cyan);
+    margin-left: 8px;
+    opacity: 0.85;
+}
+
 .utility-item .utility-state {
     color: var(--text-muted);
     font-size: 0.85rem;
@@ -3015,20 +3023,6 @@ input[type="date"]::-webkit-inner-spin-button {
 .strategy-card.recommended {
     border-color: var(--success);
     background: linear-gradient(135deg, var(--space) 0%, var(--success-glow) 100%);
-}
-
-.strategy-card.recommended::before {
-    content: "RECOMMENDED";
-    position: absolute;
-    top: 12px;
-    right: -28px;
-    background: var(--success);
-    color: var(--void);
-    padding: 4px 36px;
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    transform: rotate(45deg);
 }
 
 .strategy-name {
@@ -3718,7 +3712,7 @@ input[type="date"]::-webkit-inner-spin-button {
     position: absolute;
     cursor: pointer;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: var(--border);
+    background: var(--border-default);
     border-radius: 24px;
     transition: 0.2s;
 }
@@ -3732,7 +3726,7 @@ input[type="date"]::-webkit-inner-spin-button {
     transition: 0.2s;
 }
 .toggle-switch input:checked + .toggle-slider {
-    background: var(--accent);
+    background: var(--cyan);
 }
 .toggle-switch input:checked + .toggle-slider:before {
     transform: translateX(20px);
@@ -3743,7 +3737,7 @@ input[type="date"]::-webkit-inner-spin-button {
     background: var(--space);
     padding: 24px;
     border-radius: var(--radius-xl);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-default);
     margin-bottom: 24px;
 }
 .mining-timeline-section h3 {
@@ -3789,7 +3783,7 @@ input[type="date"]::-webkit-inner-spin-button {
     border: 1px solid rgba(255, 82, 82, 0.4);
 }
 .timeline-current {
-    box-shadow: 0 0 0 2px var(--accent), 0 0 12px rgba(0,212,255,0.3);
+    box-shadow: 0 0 0 2px var(--cyan), 0 0 12px rgba(0,212,255,0.3);
 }
 .timeline-legend {
     display: flex;
@@ -3813,7 +3807,7 @@ input[type="date"]::-webkit-inner-spin-button {
 .legend-reduced { background: rgba(255, 171, 0, 0.6); }
 .legend-off { background: rgba(255, 82, 82, 0.5); }
 .legend-current {
-    background: var(--accent);
+    background: var(--cyan);
     box-shadow: 0 0 6px rgba(0,212,255,0.5);
 }
 .timeline-loading {
@@ -3830,7 +3824,7 @@ input[type="date"]::-webkit-inner-spin-button {
     background: var(--space);
     padding: 20px 24px;
     border-radius: var(--radius-xl);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-default);
     margin-bottom: 20px;
 }
 .alert-types-section h3,
@@ -3850,9 +3844,9 @@ input[type="date"]::-webkit-inner-spin-button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    background: var(--space-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
     padding: 10px 14px;
     font-size: 0.85rem;
     color: var(--text-primary);
@@ -3882,9 +3876,9 @@ input[type="date"]::-webkit-inner-spin-button {
 .quiet-hours-times input[type="time"],
 .daily-report-time input[type="time"] {
     padding: 6px 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    background: var(--space-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: 0.85rem;
 }
@@ -4358,8 +4352,10 @@ input[type="date"]::-webkit-inner-spin-button {
 }
 
 .pool-item.active {
-    background: var(--success-glow);
-    border-color: var(--success);
+    background: var(--space-lighter);
+    border-left: 3px solid var(--success);
+    border-color: var(--border-default);
+    border-left-color: var(--success);
 }
 
 .pool-item.active h4 {
@@ -4402,6 +4398,8 @@ input[type="date"]::-webkit-inner-spin-button {
    ============================================================================ */
 .pool-directory-section {
     margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .pool-directory-section h2 {
@@ -4414,6 +4412,42 @@ input[type="date"]::-webkit-inner-spin-button {
     gap: 12px;
     margin-bottom: 20px;
     margin-top: 16px;
+}
+
+.pool-filter-top-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.pool-filter-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.pool-directory-sort {
+    padding: 10px 14px;
+    background: var(--space-light);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+    min-width: 160px;
+}
+
+.pool-directory-sort:focus {
+    border-color: var(--cyan);
+}
+
+.pool-directory-sort option {
+    background: var(--space);
+    color: var(--text-primary);
 }
 
 .pool-search-wrap {
@@ -4498,6 +4532,7 @@ input[type="date"]::-webkit-inner-spin-button {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+    align-items: start;
 }
 
 /* Pool Directory Card */
@@ -4509,6 +4544,20 @@ input[type="date"]::-webkit-inner-spin-button {
     transition: all var(--transition-base);
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.pd-card.status-private,
+.pd-card.status-legacy,
+.pd-card.status-caution {
+    opacity: 0.6;
+}
+
+.pd-card.status-private:hover,
+.pd-card.status-legacy:hover,
+.pd-card.status-caution:hover {
+    opacity: 0.8;
 }
 
 .pd-card::before {
@@ -4535,8 +4584,8 @@ input[type="date"]::-webkit-inner-spin-button {
 
 .pd-card-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    gap: 10px;
+    align-items: center;
     margin-bottom: 12px;
 }
 
@@ -4642,6 +4691,7 @@ input[type="date"]::-webkit-inner-spin-button {
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
+    margin-bottom: 12px;
 }
 
 .pool-badge {
@@ -4653,6 +4703,9 @@ input[type="date"]::-webkit-inner-spin-button {
     font-weight: 600;
     font-family: 'DM Sans', sans-serif;
     white-space: nowrap;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .pool-badge.badge-green {
@@ -4683,33 +4736,133 @@ input[type="date"]::-webkit-inner-spin-button {
     display: flex;
     gap: 8px;
     align-items: center;
+    margin-top: auto;
 }
 
-.pd-signup-btn {
+.pd-visit-btn {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     padding: 6px 14px;
-    background: var(--cyan);
-    color: var(--void);
-    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 500;
     font-family: 'DM Sans', sans-serif;
     cursor: pointer;
     text-decoration: none;
     transition: all var(--transition-fast);
 }
 
-.pd-signup-btn:hover {
-    background: var(--cyan-dim);
-    transform: scale(1.03);
+.pd-visit-btn:hover {
+    border-color: var(--cyan-dim);
+    color: var(--cyan);
 }
 
-.pd-signup-btn svg {
-    width: 14px;
-    height: 14px;
+/* Status label on non-active pool cards */
+.pd-status-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: auto;
+}
+
+.pd-status-label.status-private {
+    background: rgba(156, 163, 175, 0.12);
+    color: var(--text-muted);
+    border: 1px solid rgba(156, 163, 175, 0.2);
+}
+
+.pd-status-label.status-legacy {
+    background: rgba(247, 147, 26, 0.1);
+    color: var(--amber);
+    border: 1px solid rgba(247, 147, 26, 0.2);
+}
+
+.pd-status-label.status-caution {
+    background: rgba(255, 82, 82, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(255, 82, 82, 0.2);
+}
+
+/* Pagination */
+.pool-directory-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    margin-top: 24px;
+    padding-top: 16px;
+}
+
+.pool-page-btn {
+    padding: 6px 12px;
+    background: var(--space-light);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-width: 36px;
+    text-align: center;
+}
+
+.pool-page-btn:hover:not(:disabled) {
+    border-color: var(--cyan-dim);
+    color: var(--text-primary);
+}
+
+.pool-page-btn.active {
+    background: var(--cyan);
+    border-color: var(--cyan);
+    color: var(--void);
+    font-weight: 600;
+}
+
+.pool-page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* +N tooltip badge */
+.pool-badge.badge-more {
+    background: rgba(156, 163, 175, 0.08);
+    color: var(--text-dim);
+    border: 1px solid rgba(156, 163, 175, 0.12);
+    cursor: default;
+    position: relative;
+}
+
+.pool-badge.badge-more:hover .badge-more-tooltip {
+    display: block;
+}
+
+.badge-more-tooltip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--space);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    z-index: 10;
+    margin-bottom: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .pd-details-toggle {
@@ -4816,6 +4969,20 @@ input[type="date"]::-webkit-inner-spin-button {
 
     .pool-search-wrap {
         max-width: 100%;
+    }
+
+    .pool-filter-top-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .pool-directory-sort {
+        min-width: unset;
+    }
+
+    .pool-filter-bottom-row {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 
@@ -5808,7 +5975,7 @@ input[type="date"]::-webkit-inner-spin-button {
 
 .gauge-percent {
     display: block;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     font-family: var(--font-mono);
     color: var(--text-primary);
@@ -8398,4 +8565,381 @@ input[type="date"]::-webkit-inner-spin-button {
     .container {
         padding-left: 0;
     }
+}
+
+/* Pool directory - initial avatar circle */
+.pd-card-initial {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    font-family: 'Chakra Petch', sans-serif;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+/* Pool compare checkbox - subtle styling */
+.pool-compare-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+}
+
+.pool-compare-check:hover {
+    color: var(--text-secondary);
+}
+
+.pool-compare-check input[type="checkbox"] {
+    accent-color: var(--cyan);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.pool-compare-check span {
+    user-select: none;
+}
+
+/* ============================================================================
+   POOL COMPARISON MODAL
+   ============================================================================ */
+.modal-content.pool-comparison-modal {
+    max-width: 900px;
+    width: 100%;
+    background: linear-gradient(180deg, var(--space) 0%, var(--void) 100%);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 80px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 212, 255, 0.1);
+}
+
+.pool-comparison-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.pool-comparison-modal .modal-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-bright);
+    font-weight: 700;
+}
+
+.pool-comparison-content {
+    overflow-y: auto;
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+}
+
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.comparison-table th {
+    text-align: right;
+    padding: 12px 16px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+    width: 160px;
+    background: var(--space-light);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.comparison-table td {
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-subtle);
+    word-break: break-word;
+}
+
+.comparison-table tr:first-child th,
+.comparison-table tr:first-child td {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-bright);
+    padding-top: 16px;
+}
+
+.comparison-table tr:last-child td,
+.comparison-table tr:last-child th {
+    border-bottom: none;
+}
+
+.comparison-table .val-yes {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.comparison-table .val-no {
+    color: var(--text-dim);
+}
+
+@media (max-width: 768px) {
+    .modal-content.pool-comparison-modal {
+        max-width: 100%;
+        border-radius: var(--radius-md);
+    }
+
+    .comparison-table th {
+        width: 120px;
+        padding: 10px 12px;
+        font-size: 0.75rem;
+    }
+
+    .comparison-table td {
+        padding: 10px 12px;
+        font-size: 0.8rem;
+    }
+
+    .comparison-table tr:first-child th,
+    .comparison-table tr:first-child td {
+        font-size: 0.9rem;
+    }
+}
+
+/* ============================================================================
+   LIGHT MODE OVERHAUL
+   All overrides scoped to [data-theme="light"]. Dark mode is untouched.
+   ============================================================================ */
+
+/* A. Missing light-mode variable overrides --------------------------------- */
+[data-theme="light"] {
+    --cyan-dim: #0e7490;
+    --cyan-bright: rgba(8, 145, 178, 0.3);
+    --success: #059669;
+    --success-dim: #047857;
+    --success-glow: rgba(5, 150, 105, 0.12);
+    --warning: #d97706;
+    --warning-glow: rgba(217, 119, 6, 0.12);
+    --danger: #dc2626;
+    --danger-dim: #b91c1c;
+    --danger-glow: rgba(220, 38, 38, 0.1);
+    --glow-cyan: 0 0 20px rgba(8, 145, 178, 0.15);
+    --glow-amber: 0 0 20px rgba(217, 119, 6, 0.15);
+    --glow-success: 0 0 20px rgba(5, 150, 105, 0.15);
+    --glow-danger: 0 0 20px rgba(220, 38, 38, 0.15);
+}
+
+/* B. Groups modal fix (uses undefined vars in dark mode) ------------------- */
+[data-theme="light"] .groups-modal-content {
+    background: var(--void);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-lg);
+}
+[data-theme="light"] .groups-modal-header {
+    border-bottom: 1px solid var(--border-default);
+}
+[data-theme="light"] .groups-modal-header .modal-close-btn,
+[data-theme="light"] .groups-modal-header button {
+    color: var(--text-secondary);
+}
+[data-theme="light"] .create-group-form input[type="text"] {
+    background: var(--space-surface);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+}
+[data-theme="light"] .group-item {
+    background: var(--space-surface);
+    border: 1px solid var(--border-default);
+}
+
+/* C. Miner detail modal ---------------------------------------------------- */
+[data-theme="light"] .modal-content.miner-detail-modal {
+    background: linear-gradient(180deg, var(--void) 0%, var(--space-dark) 100%);
+    box-shadow: var(--shadow-lg);
+}
+
+/* D. Hardcoded white rgba overrides ---------------------------------------- */
+[data-theme="light"] .earnings-row.earnings-header {
+    background: rgba(0, 0, 0, 0.03);
+}
+[data-theme="light"] .timeline-hour {
+    color: rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] .spinner {
+    border-color: rgba(0, 0, 0, 0.1);
+    border-top-color: var(--cyan);
+}
+[data-theme="light"] .badge.tech-badge {
+    background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .share-item {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .miner-card-shares-detail {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* E. Timeline blocks (softer light-mode colors) ---------------------------- */
+[data-theme="light"] .timeline-full {
+    background: rgba(5, 150, 105, 0.2);
+    border-color: rgba(5, 150, 105, 0.4);
+}
+[data-theme="light"] .timeline-reduced {
+    background: rgba(217, 119, 6, 0.2);
+    border-color: rgba(217, 119, 6, 0.4);
+}
+[data-theme="light"] .timeline-off {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+[data-theme="light"] .timeline-current {
+    background: rgba(8, 145, 178, 0.25);
+    border-color: rgba(8, 145, 178, 0.5);
+}
+
+/* F. Mini-timeline blocks -------------------------------------------------- */
+[data-theme="light"] .mini-timeline-block.timeline-full {
+    background: rgba(5, 150, 105, 0.25);
+}
+[data-theme="light"] .mini-timeline-block.timeline-reduced {
+    background: rgba(217, 119, 6, 0.25);
+}
+[data-theme="light"] .mini-timeline-block.timeline-off {
+    background: rgba(220, 38, 38, 0.2);
+}
+
+/* G. Legend dots ------------------------------------------------------------ */
+[data-theme="light"] .legend-full { background: rgba(5, 150, 105, 0.5); }
+[data-theme="light"] .legend-reduced { background: rgba(217, 119, 6, 0.5); }
+[data-theme="light"] .legend-off { background: rgba(220, 38, 38, 0.4); }
+
+/* H. Chart section --------------------------------------------------------- */
+[data-theme="light"] .chart-section {
+    background: var(--void);
+    border-color: var(--border-default);
+}
+[data-theme="light"] .chart-annotation {
+    background: var(--space-dark);
+}
+
+/* I. Miner card status colors ---------------------------------------------- */
+[data-theme="light"] .miner-card.overheated::after { background: #dc2626; }
+[data-theme="light"] .status-badge.overheated { color: #dc2626; }
+[data-theme="light"] .miner-card.overheating::after { background: #d97706; }
+[data-theme="light"] .status-badge.overheating { color: #d97706; }
+[data-theme="light"] .temp-warning { color: #d97706 !important; }
+[data-theme="light"] .efficiency-excellent { color: #059669 !important; }
+[data-theme="light"] .efficiency-good { color: #0d9488 !important; }
+[data-theme="light"] .efficiency-poor { color: #d97706 !important; }
+[data-theme="light"] .efficiency-bad { color: #dc2626 !important; }
+
+/* J. Miner avatar glow colors ---------------------------------------------- */
+[data-theme="light"] .miner-avatar.overheated {
+    border-color: #dc2626;
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.3);
+}
+[data-theme="light"] .miner-avatar.overheating {
+    border-color: #d97706;
+    box-shadow: 0 0 12px rgba(217, 119, 6, 0.25);
+}
+
+/* K. Optimization badge colors --------------------------------------------- */
+[data-theme="light"] .optimization-badge.tuning {
+    background: rgba(217, 119, 6, 0.1);
+    color: #b45309;
+    border-color: rgba(217, 119, 6, 0.3);
+}
+[data-theme="light"] .optimization-badge.applied {
+    background: rgba(5, 150, 105, 0.1);
+    color: #047857;
+    border-color: rgba(5, 150, 105, 0.3);
+}
+
+/* L. Accuracy badge -------------------------------------------------------- */
+[data-theme="light"] .accuracy-badge.high-accuracy {
+    background: rgba(124, 58, 237, 0.08);
+    border-color: rgba(124, 58, 237, 0.2);
+}
+
+/* M. Pool bar status colors ------------------------------------------------ */
+[data-theme="light"] .pool-bar.overheated .pool-dot { background: #dc2626; }
+[data-theme="light"] .pool-bar.overheated .pool-text { color: #dc2626; }
+[data-theme="light"] .pool-bar.overheated { box-shadow: 0 0 8px rgba(220, 38, 38, 0.2); }
+
+/* N. Auto-optimize card gradients ------------------------------------------ */
+[data-theme="light"] .auto-optimize-card {
+    background: linear-gradient(135deg, rgba(5, 150, 105, 0.06), rgba(5, 150, 105, 0.02));
+    border-color: rgba(5, 150, 105, 0.15);
+}
+[data-theme="light"] .auto-optimize-card.optimizing {
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.02));
+    border-color: rgba(217, 119, 6, 0.2);
+}
+
+/* O. Miner card optimizing states ------------------------------------------ */
+[data-theme="light"] .miner-card.optimizing {
+    border-color: rgba(217, 119, 6, 0.3);
+    box-shadow: 0 0 12px rgba(217, 119, 6, 0.1);
+}
+[data-theme="light"] .miner-card.optimizing.success {
+    border-color: rgba(5, 150, 105, 0.25);
+}
+
+/* P. Share dots ------------------------------------------------------------- */
+[data-theme="light"] .miner-card-shares-dot.accepted { background: #059669; }
+[data-theme="light"] .miner-card-shares-dot.rejected { background: #dc2626; }
+
+/* Q. Fan/tuning text colors ------------------------------------------------ */
+[data-theme="light"] .fan-mode-btn .mode-desc { color: var(--text-muted); }
+[data-theme="light"] .auto-fan-desc { color: var(--text-muted); }
+
+/* R. Pool comparison & miner detail modal box shadow ----------------------- */
+[data-theme="light"] .modal-content.pool-comparison-modal,
+[data-theme="light"] .modal-content.miner-detail-modal {
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--border-default);
+}
+
+/* S. Power limit alert ----------------------------------------------------- */
+[data-theme="light"] .power-limit-alert {
+    background: rgba(217, 119, 6, 0.06);
+    border-color: rgba(217, 119, 6, 0.2);
+    color: #92400e;
+}
+
+/* T. Button gradient overrides --------------------------------------------- */
+[data-theme="light"] .btn-success {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+[data-theme="light"] .auto-optimize-btn.stop {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+/* U. Perf highlight -------------------------------------------------------- */
+[data-theme="light"] .perf-highlight {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.06), rgba(8, 145, 178, 0.06));
+    border-color: rgba(124, 58, 237, 0.15);
+}
+
+/* V. Auto-fan info --------------------------------------------------------- */
+[data-theme="light"] .auto-fan-info {
+    background: rgba(5, 150, 105, 0.06);
+    border-color: rgba(5, 150, 105, 0.15);
 }

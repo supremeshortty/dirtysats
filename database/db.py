@@ -10,6 +10,35 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
+# Suffix multipliers for human-readable numeric strings (e.g. '8.52G')
+_SUFFIX_MULTIPLIERS = {
+    'K': 1e3, 'M': 1e6, 'G': 1e9, 'T': 1e12, 'P': 1e15, 'E': 1e18,
+}
+
+
+def _parse_numeric(value) -> Optional[float]:
+    """Parse a numeric value that may have a suffix like K, M, G, T, P, E.
+
+    Returns None if value is None, otherwise returns a float.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if not s:
+        return None
+    suffix = s[-1].upper()
+    if suffix in _SUFFIX_MULTIPLIERS:
+        try:
+            return float(s[:-1]) * _SUFFIX_MULTIPLIERS[suffix]
+        except ValueError:
+            return 0.0
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
 
 class Database:
     """Handle all database operations"""
@@ -397,6 +426,7 @@ class Database:
         """Add stats entry for a miner"""
         if timestamp is None:
             timestamp = datetime.now()
+        best_difficulty = _parse_numeric(best_difficulty)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -458,7 +488,7 @@ class Database:
                 """)
                 row = cursor.fetchone()
                 if row and row['max_diff'] is not None:
-                    return float(row['max_diff'])
+                    return _parse_numeric(row['max_diff']) or 0.0
                 return 0.0
         except Exception:
             return 0.0
@@ -652,13 +682,15 @@ class Database:
             cursor = conn.cursor()
 
             # Get all power readings ordered by timestamp
+            # Group by second-level precision to aggregate all miners polled in the same cycle
             cursor.execute("""
-                SELECT timestamp, SUM(power) as total_power
+                SELECT strftime('%Y-%m-%d %H:%M:%S', timestamp) as timestamp,
+                       SUM(power) as total_power
                 FROM stats
                 WHERE timestamp > ?
                 AND status IN ('online', 'overheating')
                 AND power > 0
-                GROUP BY timestamp
+                GROUP BY strftime('%Y-%m-%d %H:%M:%S', timestamp)
                 ORDER BY timestamp ASC
             """, (cutoff,))
             rows = cursor.fetchall()
@@ -684,12 +716,14 @@ class Database:
                 # Calculate time interval in hours
                 interval_seconds = (next_ts - current_ts).total_seconds()
 
-                # Skip if interval is too large (gap in data > 5 minutes)
-                if interval_seconds > 300:
+                # Skip if interval is too large (gap in data > 15 minutes)
+                if interval_seconds > 900:
                     continue
 
                 interval_hours = interval_seconds / 3600
-                energy_wh = power_watts * interval_hours
+                next_power = rows[i + 1]['total_power'] or 0
+                avg_power = (power_watts + next_power) / 2
+                energy_wh = avg_power * interval_hours
                 total_energy_wh += energy_wh
 
                 # Track by hour for TOU calculation
@@ -700,6 +734,15 @@ class Database:
                 hourly_energy[hour_key]['readings'] += 1
 
             # Calculate time coverage (what % of the requested period has data)
+            # Count actual integrated time (excluding gaps) for accurate average power
+            total_integrated_seconds = 0
+            for i in range(len(rows) - 1):
+                current_ts = datetime.fromisoformat(rows[i]['timestamp'])
+                next_ts = datetime.fromisoformat(rows[i + 1]['timestamp'])
+                interval_seconds = (next_ts - current_ts).total_seconds()
+                if interval_seconds <= 900:
+                    total_integrated_seconds += interval_seconds
+
             if rows:
                 first_ts = datetime.fromisoformat(rows[0]['timestamp'])
                 last_ts = datetime.fromisoformat(rows[-1]['timestamp'])
@@ -707,6 +750,9 @@ class Database:
                 time_coverage = (actual_span / hours) * 100 if hours > 0 else 0
             else:
                 time_coverage = 0
+
+            # Calculate average power from actual readings (for extrapolation when coverage is low)
+            avg_power_watts = (total_energy_wh / (total_integrated_seconds / 3600)) if total_integrated_seconds > 0 else 0
 
             # Convert hourly breakdown to list
             hourly_breakdown = [
@@ -718,6 +764,8 @@ class Database:
                 'total_kwh': total_energy_wh / 1000,
                 'readings_count': readings_count,
                 'time_coverage_percent': min(100, time_coverage),
+                'avg_power_watts': round(avg_power_watts, 2),
+                'integrated_hours': round(total_integrated_seconds / 3600, 2),
                 'hourly_breakdown': hourly_breakdown
             }
 

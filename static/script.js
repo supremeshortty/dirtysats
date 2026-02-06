@@ -787,7 +787,8 @@ const CHART_COLORS = {
     },
     shares: {
         accepted: '#00e676',  // Success green
-        rejected: '#6b7280'   // Muted gray
+        rejected: '#ef4444',  // Red
+        scoring: '#15803d'    // Dark green
     },
     // Hashrate colors - COOL tones (cyans, blues, purples)
     hashrateColors: [
@@ -1302,47 +1303,42 @@ async function loadStats(cache) {
             }
         }
 
-        // Get time-based stats for power - calculate TOTAL ENERGY CONSUMED (kWh)
+        // Get actual energy consumption from the backend (same as energy page)
         const powerTimerangeEl = document.getElementById('power-timerange');
         const powerHours = powerTimerangeEl ? parseInt(powerTimerangeEl.value) : 24;
         const energyDisplayEl = document.getElementById('total-power');
 
         try {
-            const powerResponse = await fetch(`${API_BASE}/api/history/power?hours=${powerHours}`);
-            const powerData = await powerResponse.json();
+            const energyResponse = await fetch(`${API_BASE}/api/energy/consumption/actual?hours=${powerHours}`);
+            const energyData = await energyResponse.json();
 
-            if (powerData.success && powerData.data && powerData.data.length > 0) {
-                // Calculate average power (W) over the selected period
-                const totalPower = powerData.data.reduce((sum, point) => sum + (point.power || 0), 0);
-                const avgPowerWatts = totalPower / powerData.data.length;
-
-                // Calculate total energy consumed: Energy (kWh) = Power (W) × Time (h) ÷ 1000
-                const energyKwh = (avgPowerWatts * powerHours) / 1000;
-
-                // Always display in kWh
-                if (energyDisplayEl) energyDisplayEl.textContent = `${energyKwh.toFixed(2)} kWh`;
-            } else {
-                // Fallback: estimate from current live power if no historical data
-                const livePower = stats?.total_power ?? 0;
-                if (livePower > 0) {
-                    const energyKwh = (livePower * powerHours) / 1000;
-                    if (energyDisplayEl) energyDisplayEl.textContent = `${energyKwh.toFixed(2)} kWh`;
+            if (energyData.success && energyDisplayEl) {
+                const coverage = energyData.time_coverage_percent || 0;
+                if (coverage >= 80) {
+                    // Good data coverage — show actual integrated value
+                    energyDisplayEl.textContent = `${energyData.total_kwh.toFixed(2)} kWh`;
+                } else if (energyData.avg_power_watts > 0) {
+                    // Low coverage — extrapolate from actual avg power readings
+                    const estimatedKwh = (energyData.avg_power_watts * powerHours) / 1000;
+                    energyDisplayEl.textContent = `~${estimatedKwh.toFixed(2)} kWh`;
                 } else {
-                    if (energyDisplayEl) energyDisplayEl.textContent = `0.00 kWh`;
+                    energyDisplayEl.textContent = `0.00 kWh`;
                 }
             }
         } catch (powerError) {
-            console.error('Error loading power history:', powerError);
-            // Still show estimate based on current power
+            console.error('Error loading energy consumption:', powerError);
             const livePower = stats?.total_power ?? 0;
             const energyKwh = (livePower * powerHours) / 1000;
-            if (energyDisplayEl) energyDisplayEl.textContent = `${energyKwh.toFixed(2)} kWh`;
+            if (energyDisplayEl) energyDisplayEl.textContent = `~${energyKwh.toFixed(2)} kWh`;
         }
 
     } catch (error) {
         console.error('Error loading stats:', error);
     }
 }
+
+// Solo odds data cache for dropdown switching
+let soloOddsData = null;
 
 // Load fleet solo mining odds
 async function loadSoloOdds() {
@@ -1351,14 +1347,41 @@ async function loadSoloOdds() {
         const data = await response.json();
 
         if (data.success && data.solo_chance) {
-            const odds = data.solo_chance;
-            const dayEl = document.getElementById('solo-odds-day');
-            if (dayEl) {
-                dayEl.textContent = odds.chance_per_day_display || '--';
-            }
+            soloOddsData = data.solo_chance;
+            updateSoloOddsDisplay();
         }
     } catch (error) {
         console.error('Error loading solo odds:', error);
+    }
+}
+
+// Update solo odds display based on selected timeframe
+function updateSoloOddsDisplay() {
+    if (!soloOddsData) return;
+
+    const odds = soloOddsData;
+    const timeframe = document.getElementById('solo-odds-timeframe')?.value || 'day';
+
+    // Map timeframe to API display field
+    const displayMap = {
+        block: odds.chance_per_block_display,
+        hour:  odds.chance_per_hour_display,
+        day:   odds.chance_per_day_display,
+        week:  odds.chance_per_week_display,
+        month: odds.chance_per_month_display,
+        year:  odds.chance_per_year_display
+    };
+
+    // Set hero value for selected timeframe
+    const heroEl = document.getElementById('solo-odds-hero');
+    if (heroEl) {
+        heroEl.textContent = displayMap[timeframe] || '--';
+    }
+
+    // Set time estimate
+    const timeEl = document.getElementById('solo-odds-time');
+    if (timeEl) {
+        timeEl.textContent = odds.time_estimate_display ? `≈ ${odds.time_estimate_display}` : '--';
     }
 }
 
@@ -1465,6 +1488,31 @@ async function updateMetricCards(cache) {
             console.error('Error loading profitability for metric cards:', profError);
         }
 
+        // Energy used (24h) on Today's Earnings card
+        const energyDisplayEl = document.getElementById('total-power');
+        if (energyDisplayEl) {
+            try {
+                const energyResponse = await fetch(`${API_BASE}/api/energy/consumption/actual?hours=24`);
+                const energyData = await energyResponse.json();
+                if (energyData.success) {
+                    const coverage = energyData.time_coverage_percent || 0;
+                    if (coverage >= 80) {
+                        energyDisplayEl.textContent = `${energyData.total_kwh.toFixed(2)} kWh`;
+                    } else if (energyData.avg_power_watts > 0) {
+                        const estimatedKwh = (energyData.avg_power_watts * 24) / 1000;
+                        energyDisplayEl.textContent = `~${estimatedKwh.toFixed(2)} kWh`;
+                    } else {
+                        energyDisplayEl.textContent = '0.00 kWh';
+                    }
+                }
+            } catch (e) {
+                const livePower = stats?.total_power ?? 0;
+                energyDisplayEl.textContent = livePower > 0
+                    ? `~${((livePower * 24) / 1000).toFixed(2)} kWh`
+                    : '0.00 kWh';
+            }
+        }
+
         // --- Card 3: Fleet Efficiency ---
         const fleetEffEl = document.getElementById('card-fleet-efficiency');
         const avgTempEl = document.getElementById('card-avg-temp');
@@ -1498,7 +1546,7 @@ async function updateMetricCards(cache) {
                 const hrTH = hr / 1e12;
                 if (hrTH > 0) {
                     minerEfficiencies.push({
-                        name: miner.custom_name || miner.ip,
+                        name: miner.custom_name || miner.model || miner.type || miner.ip,
                         efficiency: pw / hrTH
                     });
                 }
@@ -1781,6 +1829,10 @@ function createMinerCard(miner) {
                     <div class="miner-stat">
                         <span class="miner-stat-label">Fan Speed</span>
                         <span class="miner-stat-value">${formatFanSpeed(status.fan_speed)}</span>
+                    </div>
+                    <div class="miner-stat">
+                        <span class="miner-stat-label">Best Diff</span>
+                        <span class="miner-stat-value">${formatDifficulty(status.best_difficulty || 0)}</span>
                     </div>
                 </div>
             ` : `
@@ -2528,12 +2580,14 @@ function displayUtilityResults(utilities) {
     const container = document.getElementById('utility-list');
     const wrapper = document.getElementById('utility-search-results');
 
-    const html = utilities.map(utility => `
+    const html = utilities.map(utility => {
+        const brandTag = utility.brand_name ? `<span class="utility-brand">${utility.brand_name} subsidiary</span>` : '';
+        return `
         <div class="utility-item" data-utility-name="${utility.utility_name}" data-eia-id="${utility.eia_id || ''}">
-            <div class="utility-name">${utility.utility_name}</div>
+            <div class="utility-name">${utility.utility_name} ${brandTag}</div>
             <div class="utility-info">${utility.state || ''} ${utility.eia_id ? `(EIA: ${utility.eia_id})` : ''}</div>
         </div>
-    `).join('');
+    `}).join('');
 
     container.innerHTML = html;
     wrapper.style.display = 'block';
@@ -3203,23 +3257,63 @@ async function loadEnergyConsumption() {
         if (data.success) {
             const energyEl = document.getElementById('energy-today');
             const costEl = document.getElementById('cost-today');
+            const coverage = data.time_coverage_percent || 0;
+            const avgPower = data.avg_power_watts || 0;
 
-            energyEl.textContent = `${(data.total_kwh ?? 0).toFixed(2)} kWh`;
+            // When data coverage is good, use actual values; otherwise extrapolate from avg power + TOU rates
+            if (coverage >= 80) {
+                energyEl.textContent = `${(data.total_kwh ?? 0).toFixed(2)} kWh`;
+                const peakCost = data.cost_by_rate_type?.peak ?? 0;
+                const offPeakCost = data.cost_by_rate_type?.['off-peak'] ?? 0;
+                const totalCost = data.total_cost ?? 0;
 
-            // Build cost display with TOU breakdown visible
-            const peakCost = data.cost_by_rate_type?.peak ?? 0;
-            const offPeakCost = data.cost_by_rate_type?.['off-peak'] ?? 0;
-            const standardCost = data.cost_by_rate_type?.standard ?? 0;
-            const totalCost = data.total_cost ?? 0;
+                if (peakCost > 0 || offPeakCost > 0) {
+                    costEl.innerHTML = `$${totalCost.toFixed(2)}<span class="cost-breakdown">Peak: $${peakCost.toFixed(2)} | Off-Peak: $${offPeakCost.toFixed(2)}</span>`;
+                } else {
+                    costEl.textContent = `$${totalCost.toFixed(2)}`;
+                }
+            } else if (avgPower > 0) {
+                // Low coverage — extrapolate using avg power from actual readings + TOU schedule
+                const estKwh = (avgPower * 24) / 1000;
+                energyEl.textContent = `~${estKwh.toFixed(2)} kWh`;
 
-            // Show breakdown inline if TOU rates are used
-            if (peakCost > 0 || offPeakCost > 0) {
-                costEl.innerHTML = `$${totalCost.toFixed(2)}<span class="cost-breakdown">Peak: $${peakCost.toFixed(2)} | Off-Peak: $${offPeakCost.toFixed(2)}</span>`;
-                costEl.title = `Coverage: ${(data.time_coverage_percent ?? 0).toFixed(0)}%`;
-            } else if (standardCost > 0) {
-                costEl.textContent = `$${totalCost.toFixed(2)}`;
+                // Fetch TOU rates to compute estimated cost breakdown
+                try {
+                    const ratesResp = await fetch(`${API_BASE}/api/energy/rates`);
+                    const ratesData = await ratesResp.json();
+                    const rates = ratesData.rates || [];
+
+                    let peakHours = 0, offPeakHours = 0;
+                    for (const r of rates) {
+                        const [sh, sm] = r.start_time.split(':').map(Number);
+                        const [eh, em] = r.end_time.split(':').map(Number);
+                        const start = sh + sm / 60;
+                        const end = (r.end_time === '23:59') ? 24 : eh + em / 60;
+                        const span = end - start;
+                        if (r.rate_type === 'peak') peakHours += span;
+                        else offPeakHours += span;
+                    }
+                    if (peakHours === 0 && offPeakHours === 0) offPeakHours = 24;
+
+                    const peakRate = rates.find(r => r.rate_type === 'peak')?.rate_per_kwh ?? 0;
+                    const offPeakRate = rates.find(r => r.rate_type === 'off-peak')?.rate_per_kwh ?? ratesData.current_rate ?? 0;
+
+                    const peakCost = (avgPower * peakHours / 1000) * peakRate;
+                    const offPeakCost = (avgPower * offPeakHours / 1000) * offPeakRate;
+                    const totalCost = peakCost + offPeakCost;
+
+                    if (peakCost > 0 || offPeakCost > 0) {
+                        costEl.innerHTML = `~$${totalCost.toFixed(2)}<span class="cost-breakdown">Peak: ~$${peakCost.toFixed(2)} | Off-Peak: ~$${offPeakCost.toFixed(2)}</span>`;
+                    } else {
+                        costEl.textContent = `~$${totalCost.toFixed(2)}`;
+                    }
+                } catch (e) {
+                    const estCost = estKwh * (ratesData?.current_rate ?? 0.10);
+                    costEl.textContent = `~$${estCost.toFixed(2)}`;
+                }
             } else {
-                costEl.textContent = `$${totalCost.toFixed(2)}`;
+                energyEl.textContent = '0.00 kWh';
+                costEl.textContent = '$0.00';
             }
         }
     } catch (error) {
@@ -3451,14 +3545,31 @@ function updateLastUpdateTime() {
 // FLEET PAGE CHART
 // ============================================================================
 
+// Insert null points in sorted time-series data where gaps exceed threshold
+function insertGapBreaks(sortedData, gapThresholdMs) {
+    if (sortedData.length < 2) return sortedData;
+    const result = [];
+    for (let i = 0; i < sortedData.length; i++) {
+        result.push(sortedData[i]);
+        if (i < sortedData.length - 1) {
+            const gap = sortedData[i + 1].x.getTime() - sortedData[i].x.getTime();
+            if (gap > gapThresholdMs) {
+                // Insert a null point midway to break the line
+                result.push({ x: new Date(sortedData[i].x.getTime() + gap / 2), y: null });
+            }
+        }
+    }
+    return result;
+}
+
 // Load Fleet Combined Chart (6 hours, compact view for dashboard)
 // Style: Total hashrate (red with fill), average hashrate (dashed), avg temperature (white/gray)
-async function loadFleetCombinedChart(hours = 3) {
+async function loadFleetCombinedChart(hours = 3, { canvasId = 'fleet-combined-chart', instanceKey = 'fleetCombined', cancelKey = 'fleetCombined' } = {}) {
     // Skip updates when tab is hidden
     if (!chartsVisible) return;
 
     // Cancel any pending request for this chart
-    const signal = cancelChartRequest('fleetCombined');
+    const signal = cancelChartRequest(cancelKey);
 
     try {
         // Fetch both temperature and hashrate data in parallel with abort support
@@ -3505,6 +3616,9 @@ async function loadFleetCombinedChart(hours = 3) {
             .map(([time, bucket]) => ({ x: new Date(parseInt(time)), y: bucket.sum }))
             .sort((a, b) => a.x - b.x);
 
+        // Use data directly — fleet chart connects points for visual continuity
+        const totalHashrateDataWithGaps = totalHashrateData;
+
         // No EMA smoothing — display actual data points.
         // Visual smoothing is handled by Chart.js tension: 0.2 on the dataset.
 
@@ -3530,6 +3644,8 @@ async function loadFleetCombinedChart(hours = 3) {
         const avgTempData = Object.entries(tempByTime)
             .map(([time, bucket]) => ({ x: new Date(parseInt(time)), y: bucket.sum / bucket.count }))
             .sort((a, b) => a.x - b.x);
+
+        const avgTempDataWithGaps = avgTempData;
 
         // Calculate axis ranges
         let maxHashrate = totalHashrateData.length > 0 ? Math.max(...totalHashrateData.map(d => d.y)) : 10;
@@ -3563,7 +3679,7 @@ async function loadFleetCombinedChart(hours = 3) {
         if (totalHashrateData.length > 0) {
             datasets.push({
                 label: 'Total Hashrate',
-                data: totalHashrateData,
+                data: totalHashrateDataWithGaps,
                 borderColor: '#e74c3c',
                 backgroundColor: 'rgba(231, 76, 60, 0.25)',
                 borderWidth: 1,
@@ -3575,7 +3691,8 @@ async function loadFleetCombinedChart(hours = 3) {
                 pointHoverRadius: 4,
                 pointBackgroundColor: '#e74c3c',
                 pointBorderColor: '#e74c3c',
-                pointBorderWidth: 0
+                pointBorderWidth: 0,
+                spanGaps: true
             });
         }
 
@@ -3593,7 +3710,8 @@ async function loadFleetCombinedChart(hours = 3) {
                 yAxisID: 'y-hashrate',
                 order: 0,
                 pointRadius: 0,
-                pointHoverRadius: 0
+                pointHoverRadius: 0,
+                spanGaps: true
             });
         }
 
@@ -3601,7 +3719,7 @@ async function loadFleetCombinedChart(hours = 3) {
         if (avgTempData.length > 0) {
             datasets.push({
                 label: 'ASIC Temp',
-                data: avgTempData,
+                data: avgTempDataWithGaps,
                 borderColor: 'rgba(255, 255, 255, 0.85)',
                 backgroundColor: 'transparent',
                 borderWidth: 1,
@@ -3613,7 +3731,8 @@ async function loadFleetCombinedChart(hours = 3) {
                 pointHoverRadius: 4,
                 pointBackgroundColor: 'rgba(255, 255, 255, 0.85)',
                 pointBorderColor: 'rgba(255, 255, 255, 0.85)',
-                pointBorderWidth: 0
+                pointBorderWidth: 0,
+                spanGaps: true
             });
         }
 
@@ -3742,24 +3861,21 @@ async function loadFleetCombinedChart(hours = 3) {
         };
 
         // Update existing chart or create new one (prevents flickering)
-        if (chartInstances.fleetCombined) {
-            // Update data arrays in place to prevent flicker
-            updateChartData(chartInstances.fleetCombined, chartData, chartOptions);
+        if (chartInstances[instanceKey]) {
+            updateChartData(chartInstances[instanceKey], chartData, chartOptions);
         } else {
-            // First time - create the chart
-            const canvas = document.getElementById('fleet-combined-chart');
+            const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            chartInstances.fleetCombined = new Chart(ctx, {
+            chartInstances[instanceKey] = new Chart(ctx, {
                 type: 'line',
                 data: chartData,
                 options: chartOptions
             });
         }
-        // Keep legacy reference in sync
-        fleetCombinedChart = chartInstances.fleetCombined;
+        if (instanceKey === 'fleetCombined') fleetCombinedChart = chartInstances[instanceKey];
     } catch (error) {
         // Ignore abort errors (expected when user changes timeframe quickly)
         if (error.name === 'AbortError') return;
@@ -3978,12 +4094,29 @@ async function loadChartsTab() {
     ]);
 }
 
+let combinedChartViewMode = 'fleet'; // 'fleet' or 'per-miner'
+
+function toggleCombinedChartView() {
+    combinedChartViewMode = combinedChartViewMode === 'fleet' ? 'per-miner' : 'fleet';
+    const btn = document.getElementById('combined-chart-view-toggle');
+    if (btn) btn.textContent = combinedChartViewMode === 'fleet' ? 'Per Miner' : 'Fleet Total';
+    const hours = parseInt(document.getElementById('combined-chart-timerange')?.value) || 24;
+    loadCombinedChart(hours);
+}
+
 // Load Combined Hashrate & Temperature Chart (AxeOS-style)
 async function loadCombinedChart(hours = 24) {
-    // Skip updates when tab is hidden
-    if (!chartsVisible) return;
+    // Delegate to fleet combined chart with Charts page canvas
+    return loadFleetCombinedChart(hours, {
+        canvasId: 'combined-chart',
+        instanceKey: 'combined',
+        cancelKey: 'combined'
+    });
+}
 
-    // Cancel any pending request for this chart
+// Legacy combined chart — kept as dead code reference, not called
+async function _loadCombinedChart_legacy(hours = 24) {
+    if (!chartsVisible) return;
     const signal = cancelChartRequest('combined');
 
     try {
@@ -4037,9 +4170,9 @@ async function loadCombinedChart(hours = 24) {
         // Adaptive axis range to show fluctuations clearly
         const hashrateRange = maxHashrate - minHashrate;
         const hashratePadding = Math.max(hashrateRange * 0.15, maxHashrate * 0.02); // 15% of range or 2% of max
-        const hashrateAxisMin = Math.max(0, minHashrate - hashratePadding);
-        const hashrateAxisMax = maxHashrate + hashratePadding;
-        const unitInfo = getHashrateUnitInfo(hashrateAxisMax);
+        let hashrateAxisMin = Math.max(0, minHashrate - hashratePadding);
+        let hashrateAxisMax = maxHashrate + hashratePadding;
+        let unitInfo = getHashrateUnitInfo(hashrateAxisMax);
 
         // Group temperature data by miner IP - filter out null/invalid values
         const minerTempData = {};
@@ -4063,63 +4196,197 @@ async function loadCombinedChart(hours = 24) {
         // Get unique miner IPs from both datasets
         const minerIPs = [...new Set([...Object.keys(minerHashrateData), ...Object.keys(minerTempData)])];
 
-        // Create datasets - AxeOS style: per-miner hashrate + per-miner temp
+        // Create datasets based on view mode
         const datasets = [];
 
-        // Add per-miner hashrate datasets (left y-axis) - COOL colors, solid lines
-        minerIPs.forEach((ip, index) => {
-            const color = CHART_COLORS.hashrateColors[index % CHART_COLORS.hashrateColors.length];
-            const displayName = getMinerDisplayName(ip);
+        if (combinedChartViewMode === 'fleet') {
+            // FLEET TOTAL MODE: Aggregate like the fleet chart
+            // Sum hashrate across all miners per timestamp bucket
+            const BUCKET_SIZE = hours <= 1 ? 1 * 60 * 1000 :
+                               hours <= 6 ? 5 * 60 * 1000 :
+                               hours <= 24 ? 15 * 60 * 1000 :
+                               hours <= 168 ? 60 * 60 * 1000 :
+                               4 * 60 * 60 * 1000;
 
-            if (minerHashrateData[ip] && minerHashrateData[ip].length > 0) {
+            const hashrateByTime = {};
+            Object.entries(minerHashrateData).forEach(([ip, data]) => {
+                data.forEach(point => {
+                    const bucketTime = Math.round(point.x.getTime() / BUCKET_SIZE) * BUCKET_SIZE;
+                    if (!hashrateByTime[bucketTime]) hashrateByTime[bucketTime] = {};
+                    hashrateByTime[bucketTime][ip] = point.y;
+                });
+            });
+
+            const totalHashrateData = Object.entries(hashrateByTime)
+                .map(([time, miners]) => ({
+                    x: new Date(parseInt(time)),
+                    y: Object.values(miners).reduce((a, b) => a + b, 0)
+                }))
+                .sort((a, b) => a.x - b.x);
+
+            // Average temperature across all miners per bucket
+            const tempByTime = {};
+            Object.entries(minerTempData).forEach(([ip, data]) => {
+                data.forEach(point => {
+                    const bucketTime = Math.round(point.x.getTime() / BUCKET_SIZE) * BUCKET_SIZE;
+                    if (!tempByTime[bucketTime]) tempByTime[bucketTime] = { sum: 0, count: 0 };
+                    tempByTime[bucketTime].sum += point.y;
+                    tempByTime[bucketTime].count++;
+                });
+            });
+
+            const avgTempData = Object.entries(tempByTime)
+                .map(([time, bucket]) => ({
+                    x: new Date(parseInt(time)),
+                    y: bucket.sum / bucket.count
+                }))
+                .sort((a, b) => a.x - b.x);
+
+            // Recalculate axis ranges for fleet totals
+            if (totalHashrateData.length > 0) {
+                maxHashrate = Math.max(...totalHashrateData.map(d => d.y));
+                minHashrate = Math.min(...totalHashrateData.map(d => d.y));
+            }
+            if (maxHashrate === 0) maxHashrate = 10;
+            const fleetHashrateRange = maxHashrate - minHashrate;
+            const fleetHashratePadding = Math.max(fleetHashrateRange * 0.3, maxHashrate * 0.05);
+            const fleetAxisMin = Math.max(0, minHashrate - fleetHashratePadding);
+            const fleetAxisMax = maxHashrate + fleetHashratePadding;
+
+            // Override axis values
+            hashrateAxisMin = fleetAxisMin;
+            hashrateAxisMax = fleetAxisMax;
+            unitInfo = getHashrateUnitInfo(hashrateAxisMax);
+
+            const avgHashrate = totalHashrateData.length > 0
+                ? totalHashrateData.reduce((sum, d) => sum + d.y, 0) / totalHashrateData.length
+                : 0;
+
+            // Insert gap breaks
+            const gapThreshold = BUCKET_SIZE * 2.5;
+            const totalWithGaps = typeof insertGapBreaks === 'function' ? insertGapBreaks(totalHashrateData, gapThreshold) : totalHashrateData;
+            const tempWithGaps = typeof insertGapBreaks === 'function' ? insertGapBreaks(avgTempData, gapThreshold) : avgTempData;
+
+            if (totalHashrateData.length > 0) {
                 datasets.push({
-                    label: `${displayName}`,
-                    data: minerHashrateData[ip],
-                    borderColor: color,
-                    backgroundColor: color + '15',
+                    label: 'Total Hashrate',
+                    data: totalWithGaps,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.25)',
                     borderWidth: 1,
-                    fill: false,
-                    tension: 0.1,
+                    fill: true,
+                    tension: 0.2,
                     yAxisID: 'y-hashrate',
                     order: 1,
                     pointRadius: 0,
-                    pointHoverRadius: 3,
-                    pointBackgroundColor: color,
-                    pointBorderColor: color,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: '#e74c3c',
+                    pointBorderColor: '#e74c3c',
                     pointBorderWidth: 0,
-                    metricType: 'hashrate',
+                    spanGaps: false
+                });
+            }
+
+            // Average hashrate reference line
+            if (totalHashrateData.length > 0) {
+                datasets.push({
+                    label: 'Avg Hashrate',
+                    data: [
+                        { x: totalHashrateData[0].x, y: avgHashrate },
+                        { x: totalHashrateData[totalHashrateData.length - 1].x, y: avgHashrate }
+                    ],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderDash: [6, 4],
+                    fill: false,
+                    tension: 0,
+                    yAxisID: 'y-hashrate',
+                    order: 0,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
                     spanGaps: true
                 });
             }
-        });
 
-        // Add per-miner temperature datasets (right y-axis) - WARM colors, dashed lines
-        minerIPs.forEach((ip, index) => {
-            const color = CHART_COLORS.tempColors[index % CHART_COLORS.tempColors.length];
-            const displayName = getMinerDisplayName(ip);
-
-            if (minerTempData[ip] && minerTempData[ip].length > 0) {
+            // Average temperature line
+            if (avgTempData.length > 0) {
                 datasets.push({
-                    label: `${displayName}`,
-                    data: minerTempData[ip],
-                    borderColor: color,
+                    label: 'Avg Temp',
+                    data: tempWithGaps,
+                    borderColor: 'rgba(255, 255, 255, 0.85)',
                     backgroundColor: 'transparent',
                     borderWidth: 1,
                     fill: false,
-                    tension: 0.1,
+                    tension: 0.2,
                     yAxisID: 'y-temperature',
                     order: 2,
                     pointRadius: 0,
-                    pointHoverRadius: 3,
-                    pointBackgroundColor: color,
-                    pointBorderColor: color,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: 'rgba(255, 255, 255, 0.85)',
+                    pointBorderColor: 'rgba(255, 255, 255, 0.85)',
                     pointBorderWidth: 0,
-                    borderDash: [8, 4],
-                    metricType: 'temperature',
-                    spanGaps: true
+                    spanGaps: false
                 });
             }
-        });
+        } else {
+            // PER-MINER MODE: per-miner hashrate + per-miner temp
+
+            // Add per-miner hashrate datasets (left y-axis) - COOL colors, solid lines
+            minerIPs.forEach((ip, index) => {
+                const color = CHART_COLORS.hashrateColors[index % CHART_COLORS.hashrateColors.length];
+                const displayName = getMinerDisplayName(ip);
+
+                if (minerHashrateData[ip] && minerHashrateData[ip].length > 0) {
+                    datasets.push({
+                        label: `${displayName}`,
+                        data: minerHashrateData[ip],
+                        borderColor: color,
+                        backgroundColor: color + '15',
+                        borderWidth: 1,
+                        fill: false,
+                        tension: 0.1,
+                        yAxisID: 'y-hashrate',
+                        order: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        pointBackgroundColor: color,
+                        pointBorderColor: color,
+                        pointBorderWidth: 0,
+                        metricType: 'hashrate',
+                        spanGaps: true
+                    });
+                }
+            });
+
+            // Add per-miner temperature datasets (right y-axis) - WARM colors, dashed lines
+            minerIPs.forEach((ip, index) => {
+                const color = CHART_COLORS.tempColors[index % CHART_COLORS.tempColors.length];
+                const displayName = getMinerDisplayName(ip);
+
+                if (minerTempData[ip] && minerTempData[ip].length > 0) {
+                    datasets.push({
+                        label: `${displayName}`,
+                        data: minerTempData[ip],
+                        borderColor: color,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        fill: false,
+                        tension: 0.1,
+                        yAxisID: 'y-temperature',
+                        order: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        pointBackgroundColor: color,
+                        pointBorderColor: color,
+                        pointBorderWidth: 0,
+                        borderDash: [8, 4],
+                        metricType: 'temperature',
+                        spanGaps: true
+                    });
+                }
+            });
+        }
 
         // Chart data and options
         const chartData = { datasets };
@@ -4133,7 +4400,7 @@ async function loadCombinedChart(hours = 24) {
             },
             plugins: {
                 legend: {
-                    display: false  // Hide legend - names shown on hover only
+                    display: combinedChartViewMode === 'fleet' || combinedChartViewMode === 'per-miner'  // Show legend in both modes
                 },
                 tooltip: {
                     ...CHART_DEFAULTS.plugins.tooltip,
@@ -4255,127 +4522,14 @@ async function loadCombinedChart(hours = 24) {
 }
 
 // Load Power Chart
-async function loadPowerChart(hours = 24) {
-    // Skip updates when tab is hidden
-    if (!chartsVisible) return;
-
-    // Cancel any pending request for this chart
-    const signal = cancelChartRequest('power');
-
-    try {
-        const response = await fetch(`${API_BASE}/api/history/power?hours=${hours}`, { signal });
-        const result = await response.json();
-
-        if (!result.success) {
-            console.error('Error loading power history:', result.error);
-            return;
-        }
-
-        // Prepare data - filter out null/invalid values
-        const validData = result.data.filter(point => point.power != null && point.power > 0);
-        const labels = validData.map(point => new Date(point.timestamp));
-        let data = validData.map(point => point.power);
-
-        // Apply EMA smoothing to eliminate sharp steps/discontinuities
-        if (data.length > 1) {
-            const alpha = 0.4; // Smoothing factor (higher = less smoothing)
-            let ema = data[0];
-            for (let i = 0; i < data.length; i++) {
-                ema = alpha * data[i] + (1 - alpha) * ema;
-                data[i] = ema;
-            }
-        }
-
-        // Calculate adaptive power axis
-        const maxPower = data.length > 0 ? Math.max(...data) : 100;
-        const powerAxisMax = getAdaptiveAxisMax(maxPower);
-
-        // Chart data and options
-        const chartData = {
-            labels,
-            datasets: [{
-                label: 'Fleet Power',
-                data,
-                borderColor: CHART_COLORS.power.line,
-                backgroundColor: CHART_COLORS.power.fill,
-                fill: true,
-                tension: 0.35,
-                borderWidth: 1,
-                pointRadius: 0,
-                pointHoverRadius: 3,
-                pointBackgroundColor: CHART_COLORS.power.line,
-                pointBorderColor: CHART_COLORS.power.line,
-                pointBorderWidth: 0,
-                spanGaps: true  // Connect across data gaps for visual continuity
-            }]
-        };
-        const chartOptions = {
-            ...CHART_DEFAULTS,
-            animation: false,
-            plugins: {
-                ...CHART_DEFAULTS.plugins,
-                tooltip: {
-                    ...CHART_DEFAULTS.plugins.tooltip,
-                    callbacks: {
-                        label: function(context) {
-                            const watts = context.parsed.y;
-                            const kw = (watts / 1000).toFixed(2);
-                            return `Power: ${watts.toFixed(0)} W (${kw} kW)`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: hours <= 24 ? 'hour' : 'day' },
-                    // Auto-scale to fit data
-                    ticks: { color: CHART_COLORS.text, font: { size: 11 } },
-                    grid: { color: CHART_COLORS.grid }
-                },
-                y: {
-                    beginAtZero: true,
-                    max: powerAxisMax,
-                    title: {
-                        display: true,
-                        text: powerAxisMax >= 1000 ? 'Power (kW)' : 'Power (W)',
-                        color: CHART_COLORS.power.line,
-                        font: { size: 12, weight: '600' }
-                    },
-                    ticks: {
-                        color: CHART_COLORS.power.line,
-                        font: { size: 11 },
-                        callback: function(value) {
-                            return value >= 1000 ? (value/1000).toFixed(1) : value.toFixed(0);
-                        }
-                    },
-                    grid: { color: CHART_COLORS.grid }
-                }
-            }
-        };
-
-        // Update existing chart or create new one (prevents flickering)
-        if (chartInstances.power) {
-            updateChartData(chartInstances.power, chartData, chartOptions);
-        } else {
-            const canvas = document.getElementById('power-chart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            chartInstances.power = new Chart(ctx, {
-                type: 'line',
-                data: chartData,
-                options: chartOptions
-            });
-        }
-        // Keep legacy reference in sync
-        powerChart = chartInstances.power;
-        updateChartMeta('power', result.data_point_count || result.data?.length || 0, result.last_updated);
-    } catch (error) {
-        if (error.name === 'AbortError') return;
-        console.error('Error loading power chart:', error);
-    }
+async function loadPowerChart(hours = 168) {
+    // Delegate to energy consumption bar chart with Charts page canvas/summary IDs
+    return loadEnergyConsumptionChart(hours, {
+        canvasId: 'power-chart',
+        instanceKey: 'power',
+        cancelKey: 'power',
+        summaryIds: { total: 'charts-energy-total', cost: 'charts-energy-cost', avg: 'charts-energy-avg' }
+    });
 }
 
 // Load Profitability Chart
@@ -4736,14 +4890,26 @@ async function loadSharesMetrics(hours = 24) {
         scoringSharesCache = aggStats?.scoring_shares_per_miner || {};
 
         // Chart data and options
+        const scoringTotal = aggStats?.scoring_shares_total ?? 0;
+        const chartLabels = [
+            `Accepted: ${formatNumber(totalShares)} (${acceptRate}%)`,
+            `Rejected: ${formatNumber(totalRejected)} (${rejectRate}%)`
+        ];
+        const chartDataValues = [totalShares, totalRejected];
+        const chartBgColors = [CHART_COLORS.shares.accepted, CHART_COLORS.shares.rejected];
+
+        if (scoringTotal > 0) {
+            const scoringRate = totalAttempts > 0 ? ((scoringTotal / totalAttempts) * 100).toFixed(2) : 0;
+            chartLabels.push(`Scoring: ${formatNumber(scoringTotal)} (${scoringRate}%) - PPLNS weighted`);
+            chartDataValues.push(scoringTotal);
+            chartBgColors.push(CHART_COLORS.shares.scoring);
+        }
+
         const chartData = {
-            labels: [
-                `Accepted: ${formatNumber(totalShares)} (${acceptRate}%)`,
-                `Rejected: ${formatNumber(totalRejected)} (${rejectRate}%)`
-            ],
+            labels: chartLabels,
             datasets: [{
-                data: [totalShares, totalRejected],
-                backgroundColor: [CHART_COLORS.shares.accepted, CHART_COLORS.shares.rejected],
+                data: chartDataValues,
+                backgroundColor: chartBgColors,
                 borderWidth: 0,
                 hoverOffset: 8,
                 borderRadius: 4
@@ -4808,13 +4974,14 @@ async function loadSharesMetrics(hours = 24) {
                 const centerY = height / 2 - 10;
                 // Total shares count
                 drawCtx.font = "bold 20px 'JetBrains Mono', monospace";
-                drawCtx.fillStyle = '#e2e8f0';
+                const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+                drawCtx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
                 drawCtx.textAlign = 'center';
                 drawCtx.textBaseline = 'middle';
                 drawCtx.fillText(formatNumber(totalAttempts), centerX, centerY - 8);
                 // Accept rate
                 drawCtx.font = "13px 'Outfit', sans-serif";
-                drawCtx.fillStyle = '#9ca3af';
+                drawCtx.fillStyle = isDark ? '#9ca3af' : '#64748b';
                 drawCtx.fillText(`${acceptRate}% accepted`, centerX, centerY + 14);
                 drawCtx.restore();
             }
@@ -5159,49 +5326,59 @@ document.getElementById('energy-chart-timerange')?.addEventListener('change', ()
 });
 
 // Load Energy Consumption History Chart
-async function loadEnergyConsumptionChart(hours = 168) {
+async function loadEnergyConsumptionChart(hours = 168, { canvasId = 'energy-consumption-chart', instanceKey = 'energyConsumption', cancelKey = 'energyConsumption', summaryIds = null } = {}) {
     // Skip updates when tab is hidden
     if (!chartsVisible) return;
 
     // Cancel any pending request for this chart
-    const signal = cancelChartRequest('energyConsumption');
+    const signal = cancelChartRequest(cancelKey);
 
     try {
         const response = await fetch(`${API_BASE}/api/energy/consumption/actual?hours=${hours}`, { signal });
         const data = await response.json();
 
-        const canvas = document.getElementById('energy-consumption-chart');
+        const canvas = document.getElementById(canvasId);
         if (!canvas) return;
 
+        // Determine summary element IDs
+        const totalElId = summaryIds?.total || 'energy-chart-total';
+        const costElId = summaryIds?.cost || 'energy-chart-cost';
+        const avgElId = summaryIds?.avg || 'energy-chart-avg';
+
         if (!data.success || !data.hourly_breakdown || data.hourly_breakdown.length === 0) {
-            // No data available - clear chart data but keep instance, update summary to show no data
-            if (chartInstances.energyConsumption) {
-                chartInstances.energyConsumption.data.datasets[0].data = [];
-                chartInstances.energyConsumption.update('none');
+            if (chartInstances[instanceKey]) {
+                chartInstances[instanceKey].data.datasets[0].data = [];
+                chartInstances[instanceKey].update('none');
             }
-            document.getElementById('energy-chart-total').textContent = '0.00 kWh';
-            document.getElementById('energy-chart-cost').textContent = '$0.00';
-            document.getElementById('energy-chart-avg').textContent = '0.00 kWh';
+            const te = document.getElementById(totalElId); if (te) te.textContent = '0.00 kWh';
+            const ce = document.getElementById(costElId); if (ce) ce.textContent = '$0.00';
+            const ae = document.getElementById(avgElId); if (ae) ae.textContent = '0.00 kWh';
             return;
         }
 
         // Prepare chart data - aggregate by day if showing more than 48 hours
         let chartDataPoints;
         if (hours > 48) {
-            // Aggregate by day
+            // Aggregate by day, extrapolating partial days using avg power
             const dailyData = {};
             data.hourly_breakdown.forEach(item => {
                 const day = item.hour.split(' ')[0];
                 if (!dailyData[day]) {
-                    dailyData[day] = { kwh: 0, readings: 0 };
+                    dailyData[day] = { kwh: 0, readings: 0, hoursWithData: 0 };
                 }
                 dailyData[day].kwh += item.kwh;
                 dailyData[day].readings += item.readings;
+                dailyData[day].hoursWithData++;
             });
-            chartDataPoints = Object.entries(dailyData).map(([date, values]) => ({
-                x: new Date(date),
-                y: values.kwh
-            }));
+            chartDataPoints = Object.entries(dailyData).map(([date, values]) => {
+                let kwh = values.kwh;
+                // Extrapolate partial days: if <20h of data, scale up based on avg power
+                if (values.hoursWithData > 0 && values.hoursWithData < 20) {
+                    const avgPowerKw = kwh / values.hoursWithData;
+                    kwh = avgPowerKw * 24;
+                }
+                return { x: new Date(date), y: kwh };
+            });
         } else {
             // Hourly data
             chartDataPoints = data.hourly_breakdown.map(item => ({
@@ -5266,30 +5443,52 @@ async function loadEnergyConsumptionChart(hours = 168) {
         };
 
         // Update existing chart or create new one (prevents flickering)
-        if (chartInstances.energyConsumption) {
-            updateChartData(chartInstances.energyConsumption, chartData, chartOptions);
+        if (chartInstances[instanceKey]) {
+            updateChartData(chartInstances[instanceKey], chartData, chartOptions);
         } else {
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            chartInstances.energyConsumption = new Chart(ctx, {
+            chartInstances[instanceKey] = new Chart(ctx, {
                 type: 'bar',
                 data: chartData,
                 options: chartOptions
             });
         }
-        // Keep legacy reference in sync
-        energyConsumptionChart = chartInstances.energyConsumption;
+        if (instanceKey === 'energyConsumption') energyConsumptionChart = chartInstances[instanceKey];
 
-        // Update summary
-        const totalKwh = data.total_kwh || 0;
-        const totalCost = data.total_cost || 0;
-        const days = hours / 24;
-        const avgDaily = days > 0 ? totalKwh / days : 0;
+        // Update summary — only count days with actual consumption for averages
+        const daysWithData = chartDataPoints.filter(p => p.y > 0);
+        const totalKwh = daysWithData.reduce((sum, p) => sum + p.y, 0);
+        const numDays = hours > 48 ? daysWithData.length : Math.max(1, hours / 24);
+        const avgDaily = numDays > 0 ? totalKwh / numDays : 0;
 
-        document.getElementById('energy-chart-total').textContent = `${totalKwh.toFixed(2)} kWh`;
-        document.getElementById('energy-chart-cost').textContent = `$${totalCost.toFixed(2)}`;
-        document.getElementById('energy-chart-avg').textContent = `${avgDaily.toFixed(2)} kWh`;
+        // Compute cost from totalKwh using TOU blended rate so cost always matches the chart
+        let totalCost = 0;
+        try {
+            const ratesResp = await fetch(`${API_BASE}/api/energy/rates`);
+            const ratesData = await ratesResp.json();
+            const rates = ratesData.rates || [];
+            let peakHours = 0, offPeakHours = 0, peakRate = 0, offPeakRate = ratesData.current_rate || 0.10;
+            for (const r of rates) {
+                const [sh, sm] = r.start_time.split(':').map(Number);
+                const [eh, em] = r.end_time.split(':').map(Number);
+                const span = (r.end_time === '23:59' ? 24 : eh + em / 60) - (sh + sm / 60);
+                if (r.rate_type === 'peak') { peakHours += span; peakRate = r.rate_per_kwh; }
+                else { offPeakHours += span; offPeakRate = r.rate_per_kwh; }
+            }
+            if (peakHours === 0 && offPeakHours === 0) offPeakHours = 24;
+            // Blended $/kWh weighted by hours in each rate period
+            const blendedRate = (peakHours * peakRate + offPeakHours * offPeakRate) / (peakHours + offPeakHours);
+            totalCost = totalKwh * blendedRate;
+        } catch (e) {
+            // Fallback: use raw API cost
+            totalCost = data.total_cost || 0;
+        }
+
+        const totalEl = document.getElementById(totalElId); if (totalEl) totalEl.textContent = `${totalKwh.toFixed(2)} kWh`;
+        const costEl = document.getElementById(costElId); if (costEl) costEl.textContent = `$${totalCost.toFixed(2)}`;
+        const avgEl = document.getElementById(avgElId); if (avgEl) avgEl.textContent = `${avgDaily.toFixed(2)} kWh`;
 
     } catch (error) {
         if (error.name === 'AbortError') return;
@@ -5369,9 +5568,72 @@ startAutoRefresh = function() {
 // Load Pools Tab
 let poolDirectoryData = null;
 let selectedPoolsForCompare = new Set();
+let poolDirectoryLoaded = false;
+let poolCurrentPage = 1;
+const POOLS_PER_PAGE = 12;
+
+// -- Badge Helpers --
+
+function extractFeeDisplay(pool) {
+    const raw = pool.fee_structure?.standard || '';
+    // Try to extract a numeric percentage
+    const match = raw.match(/([\d.]+)\s*%/);
+    if (match) return match[1] + '%';
+    // Clean labels for known non-numeric values
+    const lower = raw.toLowerCase();
+    if (lower.includes('private') || lower === '') return 'Private';
+    if (lower.includes('n/a')) return 'N/A';
+    if (lower.includes('varies') || lower.includes('competitive')) return 'Varies';
+    if (lower.includes('maintenance') || lower.includes('not')) return 'N/A';
+    if (lower.includes('tbd') || lower.includes('undisclosed') || lower.includes('exact')) return 'Undisclosed';
+    // Fallback: if short enough, use it; otherwise label unknown
+    return raw.length <= 8 ? raw : 'Varies';
+}
+
+function extractFeeNumber(pool) {
+    const raw = pool.fee_structure?.standard || '';
+    const match = raw.match(/([\d.]+)\s*%/);
+    return match ? parseFloat(match[1]) : 99;
+}
+
+function extractPayoutDisplay(method) {
+    if (!method) return '';
+    const upper = method.toUpperCase();
+    const known = ['FPPS', 'PPS+', 'PPS', 'PPLNS', 'SOLO', 'TIDES', 'SLICE'];
+    const found = [];
+    for (const k of known) {
+        if (upper.includes(k) && !found.includes(k)) {
+            // Avoid duplicate PPS if PPS+ already matched
+            if (k === 'PPS' && found.includes('PPS+')) continue;
+            if (k === 'PPS' && found.includes('FPPS')) continue;
+            found.push(k);
+        }
+    }
+    if (found.length > 0) return found.join(' / ');
+    // Fallback: take first word(s) before parenthesis
+    const clean = method.split('(')[0].trim();
+    return clean.length <= 12 ? clean : clean.substring(0, 12);
+}
+
+function poolNameHash(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = ((hash << 5) - hash) + name.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash) % 360;
+}
+
+// -- Pool Tab Loading --
 
 async function loadPoolsTab() {
+    if (poolDirectoryLoaded) {
+        // On subsequent calls, only reload miner pool config, not directory
+        await loadAllPools();
+        return;
+    }
     await Promise.all([loadAllPools(), loadPoolDirectory()]);
+    poolDirectoryLoaded = true;
 }
 
 // Load pool directory from API
@@ -5382,97 +5644,134 @@ async function loadPoolDirectory() {
         if (!result.success || !result.data || !result.data.pools) return;
 
         poolDirectoryData = result.data.pools;
-        renderPoolDirectory(poolDirectoryData);
+        filterPoolDirectory();
         initPoolDirectoryFilters();
     } catch (error) {
         console.error('Error loading pool directory:', error);
     }
 }
 
-// Render pool directory cards
+// Render pool directory cards (paginated)
 function renderPoolDirectory(pools) {
     const grid = document.getElementById('pool-directory-grid');
     const countEl = document.getElementById('pool-directory-count');
     if (!grid) return;
 
+    // Capture state before rebuild
+    const expandedIds = new Set();
+    const checkedIds = new Set(selectedPoolsForCompare);
+    grid.querySelectorAll('.pd-card-details.open').forEach(el => {
+        const card = el.closest('.pd-card');
+        if (card?.dataset?.poolId) expandedIds.add(card.dataset.poolId);
+    });
+
+    // Pagination
+    const totalPages = Math.ceil(pools.length / POOLS_PER_PAGE);
+    if (poolCurrentPage > totalPages) poolCurrentPage = totalPages || 1;
+    const startIdx = (poolCurrentPage - 1) * POOLS_PER_PAGE;
+    const pagePools = pools.slice(startIdx, startIdx + POOLS_PER_PAGE);
+
+    if (countEl) countEl.textContent = `Showing ${startIdx + 1}-${Math.min(startIdx + POOLS_PER_PAGE, pools.length)} of ${pools.length} pools`;
+
     while (grid.firstChild) grid.removeChild(grid.firstChild);
 
-    if (countEl) countEl.textContent = `Showing ${pools.length} pools`;
-
-    pools.forEach(pool => {
+    pagePools.forEach(pool => {
         const card = document.createElement('div');
-        card.className = 'pool-dir-card';
+        card.className = 'pd-card';
         card.dataset.poolId = pool.id;
+
+        // Apply status class for dimming
+        const status = pool.status || 'active';
+        if (status !== 'active') {
+            card.classList.add(`status-${status}`);
+        }
 
         // Header with initial circle and name
         const header = document.createElement('div');
-        header.className = 'pool-dir-header';
+        header.className = 'pd-card-header';
         const initial = document.createElement('div');
-        initial.className = 'pool-dir-initial';
+        initial.className = 'pd-card-initial';
         initial.textContent = (pool.name || '?')[0].toUpperCase();
-        initial.style.background = `hsl(${(pool.name || '').length * 37 % 360}, 60%, 45%)`;
+        initial.style.background = `hsl(${poolNameHash(pool.name || '')}, 60%, 45%)`;
         const nameWrap = document.createElement('div');
+        nameWrap.style.flex = '1';
         const nameEl = document.createElement('div');
-        nameEl.className = 'pool-dir-name';
+        nameEl.className = 'pd-card-name';
         nameEl.textContent = pool.name;
         nameWrap.appendChild(nameEl);
         header.appendChild(initial);
         header.appendChild(nameWrap);
 
-        // Badges
+        // Status label for non-active pools
+        if (status !== 'active') {
+            const statusLabel = document.createElement('span');
+            statusLabel.className = `pd-status-label status-${status}`;
+            statusLabel.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            header.appendChild(statusLabel);
+        }
+
+        // Badges (max 4: fee + payout + up to 2 feature badges)
         const badges = document.createElement('div');
         badges.className = 'pool-dir-badges';
 
         // Fee badge
-        const feeStr = pool.fee_structure?.standard || '?';
-        const feeNum = parseFloat(feeStr);
+        const feeDisplay = extractFeeDisplay(pool);
+        const feeNum = extractFeeNumber(pool);
         const feeBadge = document.createElement('span');
         feeBadge.className = 'pool-badge';
         feeBadge.classList.add(feeNum < 1 ? 'badge-green' : feeNum <= 2 ? 'badge-yellow' : 'badge-red');
-        feeBadge.textContent = feeStr.includes('%') ? feeStr : feeStr + '%';
+        if (feeNum >= 99) feeBadge.classList.replace('badge-red', 'badge-neutral');
+        feeBadge.textContent = feeDisplay;
         badges.appendChild(feeBadge);
 
         // Payout method badge
-        const payoutBadge = document.createElement('span');
-        payoutBadge.className = 'pool-badge badge-neutral';
-        payoutBadge.textContent = (pool.payout_method || '').split('(')[0].trim().substring(0, 12);
-        badges.appendChild(payoutBadge);
-
-        // Icon badges
-        if (pool.supports_lightning) {
-            const ltBadge = document.createElement('span');
-            ltBadge.className = 'pool-badge badge-yellow';
-            ltBadge.textContent = 'Lightning';
-            badges.appendChild(ltBadge);
-        }
-        if (!pool.requires_kyc) {
-            const kycBadge = document.createElement('span');
-            kycBadge.className = 'pool-badge badge-green';
-            kycBadge.textContent = 'No KYC';
-            badges.appendChild(kycBadge);
-        }
-        if (pool.supports_solo_mining) {
-            const soloBadge = document.createElement('span');
-            soloBadge.className = 'pool-badge badge-neutral';
-            soloBadge.textContent = 'Solo';
-            badges.appendChild(soloBadge);
-        }
-        if (pool.good_for_home_miners) {
-            const hmBadge = document.createElement('span');
-            hmBadge.className = 'pool-badge badge-green';
-            hmBadge.textContent = 'Home Miner';
-            badges.appendChild(hmBadge);
+        const payoutDisplay = extractPayoutDisplay(pool.payout_method);
+        if (payoutDisplay) {
+            const payoutBadge = document.createElement('span');
+            payoutBadge.className = 'pool-badge badge-neutral';
+            payoutBadge.textContent = payoutDisplay;
+            badges.appendChild(payoutBadge);
         }
 
-        // Description (collapsed by default)
-        const desc = document.createElement('div');
-        desc.className = 'pool-dir-desc';
-        desc.textContent = pool.unique_description || '';
+        // Feature badges (collect all, show max 2, rest as +N)
+        const featureBadges = [];
+        if (pool.supports_lightning) featureBadges.push({ text: 'Lightning', cls: 'badge-yellow' });
+        if (!pool.requires_kyc) featureBadges.push({ text: 'No KYC', cls: 'badge-green' });
+        if (pool.supports_solo_mining) featureBadges.push({ text: 'Solo', cls: 'badge-neutral' });
+        if (pool.good_for_home_miners) featureBadges.push({ text: 'Home Miner', cls: 'badge-green' });
 
-        // Details (expandable)
+        const maxFeatureBadges = 2;
+        const shownFeatures = featureBadges.slice(0, maxFeatureBadges);
+        const extraCount = featureBadges.length - maxFeatureBadges;
+
+        shownFeatures.forEach(fb => {
+            const badge = document.createElement('span');
+            badge.className = `pool-badge ${fb.cls}`;
+            badge.textContent = fb.text;
+            badges.appendChild(badge);
+        });
+
+        if (extraCount > 0) {
+            const moreBadge = document.createElement('span');
+            moreBadge.className = 'pool-badge badge-more';
+            moreBadge.textContent = `+${extraCount}`;
+            const tooltip = document.createElement('span');
+            tooltip.className = 'badge-more-tooltip';
+            tooltip.textContent = featureBadges.slice(maxFeatureBadges).map(f => f.text).join(', ');
+            moreBadge.appendChild(tooltip);
+            badges.appendChild(moreBadge);
+        }
+
+        // Details container (collapsed by default)
         const details = document.createElement('div');
-        details.className = 'pool-dir-details';
-        details.style.display = 'none';
+        details.className = 'pd-card-details';
+        if (expandedIds.has(pool.id)) details.classList.add('open');
+
+        const desc = document.createElement('div');
+        desc.className = 'pd-detail-description';
+        desc.textContent = pool.unique_description || '';
+        details.appendChild(desc);
+
         const detailsText = [];
         if (pool.minimum_payout) {
             detailsText.push(`Min Payout: ${pool.minimum_payout.onchain || 'N/A'}`);
@@ -5486,24 +5785,31 @@ function renderPoolDirectory(pools) {
         if (pool.home_miner_notes) {
             detailsText.push(pool.home_miner_notes);
         }
-        details.textContent = detailsText.join(' | ');
+        if (detailsText.length > 0) {
+            const extraInfo = document.createElement('div');
+            extraInfo.style.cssText = 'font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; line-height: 1.4;';
+            extraInfo.textContent = detailsText.join(' | ');
+            details.appendChild(extraInfo);
+        }
 
         // Actions
         const actions = document.createElement('div');
-        actions.className = 'pool-dir-actions';
+        actions.className = 'pd-card-actions';
 
         const expandBtn = document.createElement('button');
-        expandBtn.className = 'btn btn-secondary btn-xs';
+        expandBtn.className = 'pd-details-toggle';
+        if (expandedIds.has(pool.id)) expandBtn.classList.add('open');
         expandBtn.textContent = 'Details';
         expandBtn.addEventListener('click', () => {
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            details.classList.toggle('open');
+            expandBtn.classList.toggle('open');
         });
         actions.appendChild(expandBtn);
 
         if (pool.website) {
             const linkBtn = document.createElement('a');
-            linkBtn.className = 'btn btn-primary btn-xs';
-            linkBtn.textContent = 'Sign Up';
+            linkBtn.className = 'pd-visit-btn';
+            linkBtn.textContent = 'Visit';
             linkBtn.href = pool.website;
             linkBtn.target = '_blank';
             linkBtn.rel = 'noopener noreferrer';
@@ -5514,6 +5820,7 @@ function renderPoolDirectory(pools) {
         compareChk.className = 'pool-compare-check';
         const chk = document.createElement('input');
         chk.type = 'checkbox';
+        chk.checked = checkedIds.has(pool.id);
         chk.addEventListener('change', () => togglePoolCompare(pool.id, chk.checked));
         const chkLabel = document.createElement('span');
         chkLabel.textContent = 'Compare';
@@ -5523,37 +5830,82 @@ function renderPoolDirectory(pools) {
 
         card.appendChild(header);
         card.appendChild(badges);
-        card.appendChild(desc);
         card.appendChild(details);
         card.appendChild(actions);
         grid.appendChild(card);
     });
+
+    // Render pagination
+    renderPoolPagination(totalPages);
+}
+
+function renderPoolPagination(totalPages) {
+    const container = document.getElementById('pool-directory-pagination');
+    if (!container) return;
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    if (totalPages <= 1) return;
+
+    // Prev button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pool-page-btn';
+    prevBtn.textContent = 'Prev';
+    prevBtn.disabled = poolCurrentPage <= 1;
+    prevBtn.addEventListener('click', () => { poolCurrentPage--; filterPoolDirectory(); });
+    container.appendChild(prevBtn);
+
+    // Page number buttons
+    for (let i = 1; i <= totalPages; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'pool-page-btn';
+        if (i === poolCurrentPage) pageBtn.classList.add('active');
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => { poolCurrentPage = i; filterPoolDirectory(); });
+        container.appendChild(pageBtn);
+    }
+
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pool-page-btn';
+    nextBtn.textContent = 'Next';
+    nextBtn.disabled = poolCurrentPage >= totalPages;
+    nextBtn.addEventListener('click', () => { poolCurrentPage++; filterPoolDirectory(); });
+    container.appendChild(nextBtn);
 }
 
 // Initialize pool directory filters and search
 function initPoolDirectoryFilters() {
-    // Search
     const searchInput = document.getElementById('pool-directory-search');
-    if (searchInput) {
-        searchInput.addEventListener('input', () => filterPoolDirectory());
+    if (searchInput && !searchInput.dataset.bound) {
+        searchInput.dataset.bound = '1';
+        searchInput.addEventListener('input', () => { poolCurrentPage = 1; filterPoolDirectory(); });
     }
 
-    // Filter buttons
     document.querySelectorAll('.pool-filter-btn').forEach(btn => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
         btn.addEventListener('click', () => {
             document.querySelectorAll('.pool-filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            poolCurrentPage = 1;
             filterPoolDirectory();
         });
     });
+
+    const sortSelect = document.getElementById('pool-directory-sort');
+    if (sortSelect && !sortSelect.dataset.bound) {
+        sortSelect.dataset.bound = '1';
+        sortSelect.addEventListener('change', () => { poolCurrentPage = 1; filterPoolDirectory(); });
+    }
 }
 
 function filterPoolDirectory() {
     if (!poolDirectoryData) return;
     const search = (document.getElementById('pool-directory-search')?.value || '').toLowerCase();
     const filter = document.querySelector('.pool-filter-btn.active')?.dataset?.filter || 'all';
+    const sort = document.getElementById('pool-directory-sort')?.value || 'name-az';
 
-    let filtered = poolDirectoryData;
+    let filtered = [...poolDirectoryData];
 
     // Text search
     if (search) {
@@ -5569,10 +5921,11 @@ function filterPoolDirectory() {
     if (filter !== 'all') {
         filtered = filtered.filter(p => {
             switch (filter) {
+                case 'active-only': return (p.status || 'active') === 'active';
                 case 'home-miner': return p.good_for_home_miners;
                 case 'no-kyc': return !p.requires_kyc;
                 case 'lightning': return p.supports_lightning;
-                case 'low-fee': return parseFloat(p.fee_structure?.standard || '99') < 2;
+                case 'low-fee': return extractFeeNumber(p) < 2;
                 case 'solo': return p.supports_solo_mining;
                 case 'fpps': return (p.payout_method || '').toLowerCase().match(/fpps|pps/);
                 case 'pplns': return (p.payout_method || '').toLowerCase().includes('pplns');
@@ -5580,6 +5933,23 @@ function filterPoolDirectory() {
             }
         });
     }
+
+    // Sort non-active pools to bottom, then apply user sort
+    const statusOrder = { active: 0, caution: 1, private: 2, legacy: 3 };
+    filtered.sort((a, b) => {
+        const sa = statusOrder[a.status || 'active'] || 0;
+        const sb = statusOrder[b.status || 'active'] || 0;
+        if (sa !== sb) return sa - sb;
+
+        switch (sort) {
+            case 'name-az': return (a.name || '').localeCompare(b.name || '');
+            case 'name-za': return (b.name || '').localeCompare(a.name || '');
+            case 'fee-low': return extractFeeNumber(a) - extractFeeNumber(b);
+            case 'fee-high': return extractFeeNumber(b) - extractFeeNumber(a);
+            case 'home-first': return (b.good_for_home_miners ? 1 : 0) - (a.good_for_home_miners ? 1 : 0);
+            default: return 0;
+        }
+    });
 
     renderPoolDirectory(filtered);
 }
@@ -5624,10 +5994,11 @@ async function showPoolComparison() {
         const table = document.createElement('table');
         table.className = 'comparison-table';
 
+        const booleanFields = new Set(['Lightning', 'KYC Required', 'Solo Mining', 'Home Miner Friendly']);
         const fields = [
             ['Name', p => p.name],
-            ['Fee', p => p.fee_structure?.standard || '?'],
-            ['Payout Method', p => (p.payout_method || '').split('(')[0].trim()],
+            ['Fee', p => extractFeeDisplay(p)],
+            ['Payout Method', p => extractPayoutDisplay(p.payout_method)],
             ['Min Payout (On-chain)', p => p.minimum_payout?.onchain || 'N/A'],
             ['Lightning', p => p.supports_lightning ? 'Yes' : 'No'],
             ['KYC Required', p => p.requires_kyc ? 'Yes' : 'No'],
@@ -5643,7 +6014,11 @@ async function showPoolComparison() {
             tr.appendChild(th);
             result.pools.forEach(pool => {
                 const td = document.createElement('td');
-                td.textContent = getter(pool);
+                const val = getter(pool);
+                td.textContent = val;
+                if (booleanFields.has(label)) {
+                    td.classList.add(val === 'Yes' ? 'val-yes' : 'val-no');
+                }
                 tr.appendChild(td);
             });
             table.appendChild(tr);
@@ -5708,10 +6083,14 @@ function createPoolCard(miner) {
 
     const poolLabels = ['Primary Pool', 'Secondary Pool (Backup)'];
 
+    // Use nickname from minersCache (populated from dashboard data) as primary source
+    const cached = minersCache[miner.ip];
+    const displayName = (cached && cached.custom_name) || miner.custom_name || miner.model || miner.type;
+
     return `
         <div class="pool-card">
             <div class="pool-card-header">
-                <h3>${miner.custom_name || miner.model || miner.type}</h3>
+                <h3>${displayName}</h3>
                 <div class="pool-card-ip">${miner.ip}</div>
             </div>
             <form id="pool-form-${ipId}" class="pool-form">
@@ -5746,7 +6125,7 @@ function createPoolCard(miner) {
                     `).join('')}
                 </div>
                 <div class="pool-actions">
-                    <button type="submit" class="btn btn-primary">💾 Save Pool Configuration</button>
+                    <button type="submit" class="btn btn-primary pool-save-btn">Save Pool Configuration</button>
                 </div>
             </form>
         </div>
@@ -5992,11 +6371,27 @@ function populateMinerDetail(ip) {
     document.getElementById('modal-pool-shares').textContent = formatNumber(status.shares_accepted || 0);
     document.getElementById('modal-rejected-shares').textContent = formatNumber(status.shares_rejected || 0);
 
-    // Scoring shares from cache (keyed by IP)
+    // Scoring shares — use ip param (not status.ip which may be undefined)
     const modalScoringEl = document.getElementById('modal-scoring-shares');
     if (modalScoringEl) {
-        const minerScore = scoringSharesCache[status.ip] ?? 0;
-        modalScoringEl.textContent = formatScoringNumber(minerScore);
+        const cachedScore = scoringSharesCache[ip];
+        if (cachedScore != null) {
+            modalScoringEl.textContent = formatScoringNumber(cachedScore);
+        } else if (!window._scoringFetchInFlight) {
+            window._scoringFetchInFlight = true;
+            modalScoringEl.textContent = '...';
+            fetch(`${API_BASE}/api/stats/aggregate?hours=1`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.stats?.scoring_shares_per_miner) {
+                        scoringSharesCache = data.stats.scoring_shares_per_miner;
+                        const score = scoringSharesCache[ip] ?? 0;
+                        modalScoringEl.textContent = formatScoringNumber(score);
+                    }
+                })
+                .catch(() => { modalScoringEl.textContent = '0'; })
+                .finally(() => { window._scoringFetchInFlight = false; });
+        }
     }
 
     // Calculate acceptance rate
@@ -6007,9 +6402,11 @@ function populateMinerDetail(ip) {
     const doughnutCanvas = document.getElementById('acceptance-pie-chart');
     const gaugePercent = document.getElementById('acceptance-rate-percent');
     if (doughnutCanvas && gaugePercent) {
-        gaugePercent.textContent = `${acceptRate.toFixed(1)}%`;
         const accepted = status.shares_accepted || 0;
         const rejected = status.shares_rejected || 0;
+        // Show enough precision so it never falsely reads 100% when there are rejected shares
+        const displayRate = (rejected > 0 && acceptRate >= 99.95) ? acceptRate.toFixed(2) : acceptRate.toFixed(1);
+        gaugePercent.textContent = `${displayRate}%`;
         // Ensure rejected slice is always visible (min 1.5% visual) when there are rejected shares
         const visualRejected = rejected > 0 ? Math.max(rejected, (accepted + rejected) * 0.015) : 0;
         const visualAccepted = rejected > 0 ? (accepted + rejected) - visualRejected : accepted;
@@ -6020,7 +6417,7 @@ function populateMinerDetail(ip) {
                 borderWidth: 0,
                 hoverOffset: 0,
                 offset: 0,
-                spacing: 0
+                spacing: 1
             }]
         };
         if (window._acceptanceDoughnutChart) {
@@ -6034,13 +6431,14 @@ function populateMinerDetail(ip) {
                     data: pieData,
                     options: {
                         responsive: false,
-                        cutout: '55%',
+                        cutout: '68%',
                         animation: false,
-                        spacing: 0,
+                        spacing: 1,
                         plugins: {
                             legend: { display: false },
                             tooltip: { enabled: false }
-                        }
+                        },
+                        hover: { mode: null }
                     }
                 });
             }
