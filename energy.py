@@ -1233,17 +1233,11 @@ class ProfitabilityCalculator:
         hashrate_hs = hashrate_th * 1e12
         btc_per_day_gross = (hashrate_hs * 86400 * block_subsidy) / (difficulty * 2**32)
 
-        # Auto-detect pool fee and type if not provided
+        # Pool detection is handled by app.py's get_profitability() which passes
+        # the detected fee via pool_fee_percent. Here we just apply defaults.
         pool_type = None
-        if pool_fee_percent is None and self.pool_manager:
-            pool_configs = self.pool_manager.get_all_pool_configs()
-            if pool_configs:
-                pool_fee_percent = pool_configs[0].get('fee_percent') or self.default_pool_fee_percent
-                pool_type = pool_configs[0].get('pool_type') or 'PPS'
-        elif pool_fee_percent is None:
-            pool_fee_percent = self.default_pool_fee_percent
-
-        # Ensure we have a valid fee (defensive programming)
+        pool_name = None
+        pool_fee_detected = False
         if pool_fee_percent is None or pool_fee_percent < 0:
             pool_fee_percent = self.default_pool_fee_percent
 
@@ -1314,6 +1308,9 @@ class ProfitabilityCalculator:
             'days_until_halving': halving_info.get('estimated_days_until_halving'),
             # Metadata
             'pool_type': pool_type if pool_type else 'PPS',
+            'pool_name': pool_name,
+            'includes_tx_fees': pool_type in ('FPPS', 'FPPS+', 'PPS+') if pool_type else True,
+            'pool_fee_detected': pool_fee_detected,
             'is_estimate': True,
             'estimate_note': f'Pool earnings based on {pool_type or "PPS"} calculation. Pool fee: {pool_fee_percent}%.'
         }

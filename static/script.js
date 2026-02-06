@@ -2511,6 +2511,9 @@ function displayProfitability(prof) {
     const satsPerDay = Math.round((prof.btc_per_day ?? 0) * 100000000);
     const poolFeePercent = prof.pool_fee_percent ?? 2;
     const includesTxFees = prof.includes_tx_fees ?? true;
+    const poolFeeSource = prof.pool_fee_source ?? 'default';
+    const poolName = prof.pool_name ?? null;
+    const poolType = prof.pool_type ?? 'PPS';
     const blockSubsidy = prof.block_subsidy ?? 3.125;
     const blocksUntilHalving = prof.blocks_until_halving ?? 0;
     const daysUntilHalving = prof.days_until_halving ?? 0;
@@ -2565,7 +2568,9 @@ function displayProfitability(prof) {
     const html = `
         <div class="profitability-card">
             <div class="profitability-notice">
-                <span class="data-badge estimated">Estimated</span> Values include ${poolFeePercent}% pool fee${includesTxFees ? ' + tx fees (FPPS)' : ''}. Actual pool earnings may vary.
+                ${poolFeeSource === 'detected' && poolName
+                    ? `<span class="data-badge actual">Live</span> Values include ${poolFeePercent}% ${poolName} fee (${poolType}).`
+                    : `<span class="data-badge estimated">Estimated</span> Values include ${poolFeePercent}% default pool fee${includesTxFees ? ' + tx fees (FPPS)' : ''}. Actual pool earnings may vary.`}
             </div>
             <div class="profitability-grid">
                 <div class="profit-item">

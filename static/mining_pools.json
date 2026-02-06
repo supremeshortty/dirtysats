@@ -2,7 +2,7 @@
   "metadata": {
     "title": "Comprehensive Bitcoin Mining Pools Directory",
     "description": "Complete list of active Bitcoin mining pools available to home miners, with fees, payout methods, minimums, and suitability ratings.",
-    "last_updated": "2026-02-03",
+    "last_updated": "2026-02-06",
     "network_hashrate": "~1,010+ EH/s",
     "current_block_reward": "3.125 BTC",
     "note": "Fee structures, minimum payouts, and pool terms can change frequently. Always verify current terms on each pool's official website before committing hashrate."
@@ -1050,6 +1050,241 @@
       "good_for_home_miners": true, "home_miner_notes": "Very low 1% fee and tiny 0.0005 BTC minimum payout. Good for small miners.",
       "approximate_hashrate_share": "<0.5%", "supported_coins": ["BTC", "LTC"],
       "stratum_urls": ["stratum+tcp://btc.trustpool.cc:3333"]
+    },
+    {
+      "id": "lincoin",
+      "status": "active",
+      "name": "Lincoin",
+      "website": "https://lincoin.com",
+      "fee_structure": {
+        "standard": "2.5%",
+        "notes": "FPPS model with a fixed 2.5% pool fee. Straightforward fee structure with no tiered discounts."
+      },
+      "payout_method": "FPPS (Full Pay-Per-Share)",
+      "payout_method_description": "Standard FPPS payouts including block rewards and transaction fees. Daily automatic distributions.",
+      "minimum_payout": {
+        "onchain": "0.001 BTC",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": true,
+      "unique_description": "A newer FPPS mining pool offering competitive rates and a clean interface. Focuses on simplicity and reliable payouts for Bitcoin miners of all sizes.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "Reasonable 2.5% FPPS fee with low 0.001 BTC minimum payout. Straightforward setup and daily payouts. A solid option for home miners wanting predictable income.",
+      "approximate_hashrate_share": "<1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "neopool",
+      "status": "active",
+      "name": "Neopool",
+      "website": "https://neopool.com",
+      "fee_structure": {
+        "standard": "Not publicly disclosed",
+        "notes": "Fee details available after registration. FPPS payout model."
+      },
+      "payout_method": "FPPS (Full Pay-Per-Share)",
+      "payout_method_description": "FPPS payouts with daily distributions. Exact fee percentage disclosed during onboarding.",
+      "minimum_payout": {
+        "onchain": "Not publicly disclosed",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": true,
+      "unique_description": "An FPPS mining pool with a growing presence. Fee structure is not publicly listed -- miners should verify current terms on the website before committing hashrate.",
+      "good_for_home_miners": false,
+      "home_miner_notes": "Fee and minimum payout details are not publicly disclosed, making it harder to evaluate compared to transparent competitors. Verify terms on the website before signing up.",
+      "approximate_hashrate_share": "<1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "solopool_org",
+      "status": "active",
+      "name": "SoloPool.org",
+      "website": "https://btc.solopool.org",
+      "fee_structure": {
+        "standard": "2%",
+        "notes": "2% fee deducted from block reward if you find a block. No fees if you never find a block."
+      },
+      "payout_method": "SOLO (full block reward minus fee)",
+      "payout_method_description": "Pure solo mining service. Each miner competes independently for the full block reward. If a block is found, 2% is deducted as a service fee.",
+      "minimum_payout": {
+        "onchain": "No minimum (paid on block discovery)",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": true,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": false,
+      "unique_description": "A dedicated solo mining service for Bitcoin. Simple setup -- point your miner at the stratum URL with your Bitcoin address as username. You only pay the 2% fee if you actually find a block.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "Another solo mining 'lottery ticket' option. Same 2% fee as Solo CKPool. No registration required. Good as a secondary mining target for fun alongside a regular pool.",
+      "approximate_hashrate_share": "<0.1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": ["stratum+tcp://btc.solopool.org:3333"]
+    },
+    {
+      "id": "zsolo_bid",
+      "status": "active",
+      "name": "zSolo.bid",
+      "website": "https://zsolo.bid",
+      "fee_structure": {
+        "standard": "Not publicly disclosed",
+        "notes": "Solo mining service. Fee details available on the website."
+      },
+      "payout_method": "SOLO (full block reward minus fee)",
+      "payout_method_description": "Solo mining relay service. Miners compete independently for full block rewards.",
+      "minimum_payout": {
+        "onchain": "No minimum (paid on block discovery)",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": true,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": false,
+      "unique_description": "A solo mining service for Bitcoin miners. Provides stratum relay infrastructure for miners who want to compete independently for full block rewards.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "Solo mining option with simple setup. Check the website for current fee details before pointing your miners here. No registration required.",
+      "approximate_hashrate_share": "<0.1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "ecos_pool",
+      "status": "active",
+      "name": "ECOS Pool",
+      "website": "https://ecos.am/en/mining-pool",
+      "fee_structure": {
+        "standard": "0.25%",
+        "notes": "Extremely low 0.25% FPPS fee -- among the lowest in the industry. Part of the ECOS ecosystem which also offers cloud mining and a crypto wallet."
+      },
+      "payout_method": "FPPS (Full Pay-Per-Share)",
+      "payout_method_description": "FPPS payouts with one of the lowest fee structures available. Daily automatic distributions.",
+      "minimum_payout": {
+        "onchain": "0.001 BTC",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": true,
+      "unique_description": "Part of the ECOS digital asset platform based in Armenia's Free Economic Zone. Stands out with an extremely low 0.25% FPPS pool fee -- one of the lowest in the entire industry. Also offers cloud mining, a crypto wallet, and an investment portfolio in a single platform.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "The 0.25% fee is remarkably low for FPPS and could be the cheapest pooled mining option available. Low 0.001 BTC minimum payout. Worth considering for cost-conscious home miners. Verify current fee on the website as this rate seems unusually low.",
+      "approximate_hashrate_share": "<1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "kryptex_pool",
+      "status": "active",
+      "name": "Kryptex Pool",
+      "website": "https://pool.kryptex.com/btc",
+      "fee_structure": {
+        "standard": "3%",
+        "notes": "PPS+ model at 3% fee. Kryptex also offers mining software for GPU miners with automatic profit switching."
+      },
+      "payout_method": "PPS+",
+      "payout_method_description": "PPS+ payouts combining stable block reward payments with transaction fee sharing.",
+      "minimum_payout": {
+        "onchain": "0.001 BTC",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": true,
+      "unique_description": "Mining pool from the Kryptex platform, known for its easy-to-use mining software that supports both GPU and ASIC mining. The pool offers PPS+ payouts at 3%. Kryptex also provides a mining profitability calculator and automatic profit-switching for GPU miners.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "The 3% fee is on the higher side compared to competitors. However, the Kryptex ecosystem offers a user-friendly experience with good mining software and tools. Low 0.001 BTC minimum payout. Better alternatives exist if you're purely optimizing for lowest fees.",
+      "approximate_hashrate_share": "<1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": ["stratum+tcp://btc.kryptex.network:3333"]
+    },
+    {
+      "id": "canoepool",
+      "status": "active",
+      "name": "CanoePool",
+      "website": "https://www.canoepool.com",
+      "fee_structure": {
+        "pps": "2%",
+        "pplns": "4%",
+        "notes": "Two payout models available. PPS at 2% offers predictable payouts. PPLNS at 4% is unusually higher than PPS, which is atypical -- verify current rates on the website."
+      },
+      "payout_method": "PPS / PPLNS",
+      "payout_method_description": "Miners can choose between PPS for predictable payouts or PPLNS for variance-based rewards. Both models available from settings.",
+      "minimum_payout": {
+        "onchain": "0.001 BTC",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": true,
+      "unique_description": "A multi-model mining pool offering both PPS and PPLNS payout methods. The 2% PPS fee is competitive. Supports Bitcoin mining with a focus on reliable infrastructure.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "The 2% PPS fee is competitive for predictable payouts. Low 0.001 BTC minimum. The PPLNS rate at 4% seems high -- most pools charge less for PPLNS than PPS. Verify current fee structure on their website.",
+      "approximate_hashrate_share": "<1%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "bitdeer",
+      "status": "caution",
+      "name": "Bitdeer",
+      "website": "https://www.bitdeer.com",
+      "fee_structure": {
+        "standard": "Varies by plan",
+        "notes": "Bitdeer is primarily a cloud mining and self-mining platform rather than a traditional pool. Fee structure depends on the specific service plan (cloud mining, hosting, or self-mining). NASDAQ-listed company (BTDR)."
+      },
+      "payout_method": "Cloud / Self-mining (varies by plan)",
+      "payout_method_description": "Payout method depends on the chosen service. Cloud mining plans have fixed terms. Self-mining customers connect their own hardware. Actual pool mechanics vary by arrangement.",
+      "minimum_payout": {
+        "onchain": "Varies by plan",
+        "lightning": "Not supported"
+      },
+      "supports_solo_mining": false,
+      "supports_lightning": false,
+      "requires_kyc": true,
+      "requires_account": true,
+      "unique_description": "NASDAQ-listed (BTDR) digital asset mining platform founded by ex-Bitmain executives. Offers cloud mining, hosting services, and proprietary ASIC chip development (SEAL series). More of a mining services company than a traditional pool. Operates data centers across the US, Norway, and Bhutan.",
+      "good_for_home_miners": false,
+      "home_miner_notes": "Not a traditional mining pool -- primarily offers cloud mining and hosting services. KYC required. Better suited for those purchasing hashrate or hosting hardware remotely. If you already own ASICs at home, connect them to a traditional pool instead.",
+      "approximate_hashrate_share": "~3-4%",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
+    },
+    {
+      "id": "solo_to_node",
+      "status": "active",
+      "name": "Solo Mine to Your Node",
+      "website": "https://github.com/benjamin-wilson/public-pool",
+      "fee_structure": {
+        "standard": "0% (you are the pool)",
+        "notes": "Zero fees when self-hosting. You keep 100% of block rewards + transaction fees. The only costs are electricity for your node and miners."
+      },
+      "payout_method": "SOLO (direct to your wallet)",
+      "payout_method_description": "You run your own stratum server connected to your own Bitcoin Core node. When your miner finds a block, the coinbase transaction pays directly to your wallet address. No intermediary, no pool operator, no fees.",
+      "minimum_payout": {
+        "onchain": "Full block reward (3.125 BTC + fees)",
+        "lightning": "Not applicable"
+      },
+      "supports_solo_mining": true,
+      "supports_lightning": false,
+      "requires_kyc": false,
+      "requires_account": false,
+      "unique_description": "Run your own mining pool by connecting a stratum proxy to your Bitcoin Core full node. This is the most sovereign way to mine -- zero fees, zero trust, zero KYC. You construct your own block templates, choose which transactions to include, and keep 100% of any block reward. This app does not store or manage any node credentials.",
+      "good_for_home_miners": true,
+      "home_miner_notes": "SETUP GUIDE: You need two things -- a Bitcoin Core full node and a stratum proxy. Three software options:\n\n1. Public Pool (easiest) -- Open-source, available on Umbrel/Start9 app stores, or run via Docker. GitHub: github.com/benjamin-wilson/public-pool\n\n2. CKPool (most established) -- Created by Con Kolivas (cgminer author). Linux-based, battle-tested since 2014. GitHub: github.com/kanoi/ckpool\n\n3. DATUM Gateway (newest) -- Built for the OCEAN ecosystem. Available on Umbrel/Start9 or standalone. Supports DATUM protocol for decentralized block templates. GitHub: github.com/ocean-mining/datum-gateway\n\nAll three require: Bitcoin Core node running with RPC enabled + the proxy software. Point your miners at stratum+tcp://YOUR_NODE_IP:3333 (port varies by software). No credentials are stored by this app -- all configuration is done on your node directly.\n\nReality check: With a home ASIC you will almost certainly never find a block solo. This is for sovereignty maximalists and the fun of the lottery, not for reliable income.",
+      "approximate_hashrate_share": "N/A",
+      "supported_coins": ["BTC"],
+      "stratum_urls": []
     }
   ],
   "pool_comparison_summary": {
@@ -1077,6 +1312,10 @@
     ],
     "best_for_solo_mining_lottery": [
       {
+        "pool": "Solo Mine to Your Node",
+        "reason": "0% fee, maximum sovereignty -- run your own stratum proxy on your own Bitcoin node. Keep 100% of block rewards."
+      },
+      {
         "pool": "Public Pool",
         "reason": "0% fee, open source, self-hostable, maximum decentralization."
       },
@@ -1093,20 +1332,27 @@
         "reason": "0.5% solo fee, community-driven, 2,439+ blocks mined."
       },
       {
+        "pool": "SoloPool.org",
+        "reason": "2% fee, dedicated solo mining service with simple setup."
+      },
+      {
         "pool": "ViaBTC SOLO",
         "reason": "1% fee, solo option within a major pool for maximum convenience."
       }
     ],
     "best_for_decentralization": [
+      "Solo Mine to Your Node (run your own pool, construct your own blocks, 0% fees)",
       "OCEAN (TIDES + DATUM + non-custodial)",
       "Public Pool (zero-fee, self-hostable, open source)",
       "DEMAND Pool (Stratum V2, miner-constructed block templates)",
       "Braiins Pool (Stratum V2 support)"
     ],
     "best_for_zero_fees": [
+      "Solo Mine to Your Node (0% always -- you are the pool)",
       "Public Pool (0% always)",
       "Braiins Pool (0% with Braiins OS+ firmware)",
       "AntPool (0% on PPLNS model)",
+      "ECOS Pool (0.25% -- lowest fee FPPS pool)",
       "Foundry USA (0% stated, but KYC required)"
     ],
     "best_for_lightning_payouts": [
@@ -1130,6 +1376,10 @@
       {
         "pool": "GoMining",
         "reason": "Not a real pool -- NFT/cloud mining platform with token complexity and regulatory risk."
+      },
+      {
+        "pool": "Bitdeer",
+        "reason": "Not a traditional pool -- primarily cloud mining and hosting services. KYC required."
       }
     ]
   },

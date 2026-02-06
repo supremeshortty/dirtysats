@@ -1209,6 +1209,13 @@ def set_miner_pools(ip: str):
                 'error': 'Failed to set pool configuration'
             }), 500
 
+        # Re-detect pool config so fee updates immediately
+        if fleet.pool_manager:
+            try:
+                fleet.pool_manager.detect_and_save_pool_configs(force_update=True)
+            except Exception as e:
+                logger.warning(f"Pool re-detection after config change failed: {e}")
+
         return jsonify({
             'success': True,
             'message': 'Pool configuration updated successfully'
@@ -2403,7 +2410,7 @@ def set_manual_rates():
 def get_profitability():
     """
     Calculate current profitability with TOU rates and accurate pool calculations.
-    Pool fees are auto-detected from pool_manager if available.
+    Pool fees are auto-detected using 3-tier fallback: DB → cached miner status → live API.
     """
     try:
         stats = fleet.get_fleet_stats()
@@ -2414,14 +2421,70 @@ def get_profitability():
         # Option to use simple calculation (without schedule/TOU)
         use_simple = request.args.get('simple', 'false').lower() == 'true'
 
-        # Auto-detect pool fee if not provided
-        if pool_fee is None and fleet.pool_manager:
-            pool_configs = fleet.pool_manager.get_all_pool_configs()
-            if pool_configs:
-                pool_fee = pool_configs[0].get('fee_percent', 2.5)
+        # 3-tier pool detection (only if no explicit pool_fee query param)
+        pool_name = None
+        pool_type = None
+        pool_fee_detected = False
 
+        if pool_fee is None and fleet.pool_manager:
+            # Tier 1: DB lookup (fast, works if startup detection succeeded)
+            try:
+                pool_configs = fleet.pool_manager.get_all_pool_configs()
+                if pool_configs:
+                    pool_fee = pool_configs[0].get('fee_percent')
+                    pool_type = pool_configs[0].get('pool_type')
+                    pool_name = pool_configs[0].get('pool_name')
+                    if pool_fee and pool_name:
+                        pool_fee_detected = True
+                        logger.debug(f"Tier 1 pool detection: {pool_name} ({pool_type}) fee={pool_fee}%")
+            except Exception as e:
+                logger.debug(f"Tier 1 pool detection failed: {e}")
+
+            # Tier 2: Cached miner status (no API call, reads from last monitoring cycle)
+            if not pool_fee_detected:
+                try:
+                    for miner_ip, miner in fleet.miners.items():
+                        if not miner.last_status or not isinstance(miner.last_status, dict):
+                            continue
+                        raw = miner.last_status.get('raw')
+                        if not raw or not isinstance(raw, dict):
+                            continue
+                        stratum_url = raw.get('stratumURL', '')
+                        stratum_port = raw.get('stratumPort', '')
+                        if stratum_url:
+                            full_url = f"{stratum_url}:{stratum_port}" if stratum_port else stratum_url
+                            detected = fleet.pool_manager.detect_pool_from_url(full_url)
+                            if detected and detected.get('is_known'):
+                                pool_fee = detected['fee_percent']
+                                pool_type = detected['pool_type']
+                                pool_name = detected['pool_name']
+                                pool_fee_detected = True
+                                logger.debug(f"Tier 2 pool detection (cached status): {pool_name} ({pool_type}) fee={pool_fee}%")
+                                break
+                except Exception as e:
+                    logger.debug(f"Tier 2 pool detection failed: {e}")
+
+            # Tier 3: Live API call (last resort, may timeout on Bitaxe ESP32)
+            if not pool_fee_detected:
+                try:
+                    for miner_ip, miner in fleet.miners.items():
+                        pool_info = fleet.pool_manager._get_miner_pool_info(miner)
+                        if pool_info:
+                            url = pool_info[0].get('url', '')
+                            if url:
+                                detected = fleet.pool_manager.detect_pool_from_url(url)
+                                if detected and detected.get('is_known'):
+                                    pool_fee = detected['fee_percent']
+                                    pool_type = detected['pool_type']
+                                    pool_name = detected['pool_name']
+                                    pool_fee_detected = True
+                                    logger.debug(f"Tier 3 pool detection (live API): {pool_name} ({pool_type}) fee={pool_fee}%")
+                                    break
+                except Exception as e:
+                    logger.debug(f"Tier 3 pool detection failed: {e}")
+
+        # Pass detected (or user-specified) pool_fee to calculate_profitability
         if use_simple:
-            # Simple calculation without schedule/TOU consideration
             prof = fleet.profitability_calc.calculate_profitability(
                 total_hashrate=stats['total_hashrate'],
                 total_power_watts=stats['total_power'],
@@ -2429,7 +2492,6 @@ def get_profitability():
                 pool_fee_percent=pool_fee
             )
         else:
-            # Full calculation with TOU rates and mining schedules
             prof = fleet.profitability_calc.calculate_profitability(
                 total_hashrate=stats['total_hashrate'],
                 total_power_watts=stats['total_power'],
@@ -2442,8 +2504,14 @@ def get_profitability():
         # Add accuracy indicator
         prof['accuracy_percent'] = 95  # ~95% accurate with pool-specific calculations
         prof['data_source'] = 'calculated'
-        if fleet.pool_manager:
+
+        # Override pool metadata from our detection (energy.py only has defaults)
+        if pool_fee_detected:
             prof['pool_fee_source'] = 'detected'
+            prof['pool_name'] = pool_name
+            prof['pool_type'] = pool_type or 'PPS'
+            prof['pool_fee_detected'] = True
+            prof['includes_tx_fees'] = pool_type in ('FPPS', 'FPPS+', 'PPS+') if pool_type else True
         else:
             prof['pool_fee_source'] = 'default'
 
@@ -4021,15 +4089,15 @@ def add_mock_miners():
             if data['custom_name']:
                 fleet.db.update_miner_custom_name(ip, data['custom_name'])
 
-            # Add historical stats for the last 6 hours (every 30 minutes = 12 data points)
+            # Add historical stats for the last 6 hours (every 5 minutes = 72 data points)
             status = data['status']
             base_hashrate = status.get('hashrate', 0)
             base_temp = status.get('temperature', 50)
             base_power = status.get('power', 10)
 
-            for i in range(12):
+            for i in range(72):
                 # Vary values slightly for realistic chart data
-                time_offset = timedelta(hours=6) - timedelta(minutes=i * 30)
+                time_offset = timedelta(hours=6) - timedelta(minutes=i * 5)
                 stat_time = datetime.now() - time_offset
 
                 # Add small random variations (+/- 5%)

@@ -28,7 +28,7 @@ class PoolManager:
                 r'.*ocean\.xyz',
                 r'.*\.ocean\.xyz',
             ],
-            'fee_percent': 0.0,  # No pool fee
+            'fee_percent': 2.0,  # Standard 2% fee
             'pool_type': 'TIDES',
             'default_port': 3334
         },
@@ -82,8 +82,8 @@ class PoolManager:
                 r'.*viabtc\.com',
                 r'stratum.*\.viabtc\.com',
             ],
-            'fee_percent': 2.0,
-            'pool_type': 'FPPS',
+            'fee_percent': 4.0,  # PPS+ default model
+            'pool_type': 'PPS+',
             'default_port': 3333
         },
         'Poolin': {
@@ -136,7 +136,7 @@ class PoolManager:
                 r'solo\.ckpool\.org',
                 r'.*ckpool.*solo',
             ],
-            'fee_percent': 0.5,
+            'fee_percent': 2.0,  # 2% solo mining fee
             'pool_type': 'SOLO',
             'default_port': 3333
         },
@@ -150,6 +150,126 @@ class PoolManager:
             'fee_percent': 0.0,
             'pool_type': 'SOLO',
             'default_port': 8332
+        },
+        'EMCD': {
+            'url_patterns': [r'.*emcd\.io'],
+            'fee_percent': 1.5,
+            'pool_type': 'FPPS',
+            'default_port': 3333
+        },
+        'NiceHash': {
+            'url_patterns': [r'.*nicehash\.com'],
+            'fee_percent': 2.0,
+            'pool_type': 'PPS',
+            'default_port': 3334
+        },
+        'Kano CKPool': {
+            'url_patterns': [r'.*kano\.is'],
+            'fee_percent': 0.9,
+            'pool_type': 'PPLNS',
+            'default_port': 3333
+        },
+        'SpiderPool': {
+            'url_patterns': [r'.*spiderpool\.com'],
+            'fee_percent': 2.0,
+            'pool_type': 'FPPS',
+            'default_port': 3333
+        },
+        'Rawpool': {
+            'url_patterns': [r'.*rawpool\.com'],
+            'fee_percent': 3.5,
+            'pool_type': 'FPPS',
+            'default_port': 3333
+        },
+        'SigmaPool': {
+            'url_patterns': [r'.*sigmapool\.com'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPS+',
+            'default_port': 3333
+        },
+        'Mining Dutch': {
+            'url_patterns': [r'.*mining-dutch\.nl'],
+            'fee_percent': 2.0,
+            'pool_type': 'PPLNS',
+            'default_port': 3333
+        },
+        'LuckPool': {
+            'url_patterns': [r'.*luckpool\.net'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPLNS',
+            'default_port': 3333
+        },
+        'CKPool': {
+            'url_patterns': [r'pool\.ckpool\.org'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPLNS',
+            'default_port': 3333
+        },
+        'BitAxe Pool': {
+            'url_patterns': [r'.*pool\.bitaxe\.org'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPLNS',
+            'default_port': 3333
+        },
+        'Zpool': {
+            'url_patterns': [r'.*zpool\.ca'],
+            'fee_percent': 2.0,
+            'pool_type': 'PPS',
+            'default_port': 3333
+        },
+        'Cruxpool': {
+            'url_patterns': [r'.*cruxpool\.com'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPS',
+            'default_port': 3333
+        },
+        'TrustPool': {
+            'url_patterns': [r'.*trustpool\.cc'],
+            'fee_percent': 1.0,
+            'pool_type': 'PPS+',
+            'default_port': 3333
+        },
+        'BitFuFu': {
+            'url_patterns': [r'.*bitfufu\.com'],
+            'fee_percent': 2.5,
+            'pool_type': 'PPS+',
+            'default_port': 3333
+        },
+        'Hashlabs': {
+            'url_patterns': [r'.*hashlabs\.io'],
+            'fee_percent': 2.0,
+            'pool_type': 'FPPS',
+            'default_port': 3333
+        },
+        'Solo Mining Pool': {
+            'url_patterns': [r'.*solomining\.io'],
+            'fee_percent': 2.0,
+            'pool_type': 'SOLO',
+            'default_port': 3333
+        },
+        'SoloPool.org': {
+            'url_patterns': [r'.*solopool\.org'],
+            'fee_percent': 2.0,
+            'pool_type': 'SOLO',
+            'default_port': 3333
+        },
+        'Kryptex': {
+            'url_patterns': [r'.*kryptex\.network'],
+            'fee_percent': 3.0,
+            'pool_type': 'PPS+',
+            'default_port': 3333
+        },
+        'DEMAND Pool': {
+            'url_patterns': [r'.*dmnd\.work'],
+            'fee_percent': 0.0,
+            'pool_type': 'SOLO',
+            'default_port': 3333
+        },
+        'ECOS Pool': {
+            'url_patterns': [r'.*ecos\.am'],
+            'fee_percent': 0.25,
+            'pool_type': 'FPPS',
+            'default_port': 3333
         },
     }
 
@@ -334,64 +454,39 @@ class PoolManager:
 
     def _get_miner_pool_info(self, miner) -> Optional[List[Dict]]:
         """
-        Get pool information from a miner instance
+        Get pool information from a miner instance via its API handler
 
         Args:
-            miner: Miner instance (Whatsminer, Avalon, etc.)
+            miner: Miner instance with api_handler and ip attributes
 
         Returns:
             List of pool dicts with url, user, password, difficulty, index
         """
         try:
-            # Try to get pool info from miner's API
+            if not hasattr(miner, 'api_handler') or not hasattr(miner, 'ip'):
+                return None
+
+            pool_result = miner.api_handler.get_pools(miner.ip)
+            if not pool_result or 'pools' not in pool_result:
+                return None
+
             pools = []
-
-            # Method 1: Try stats endpoint (common for most miners)
-            if hasattr(miner, 'get_stats'):
-                stats = miner.get_stats()
-                if stats and 'pools' in stats:
-                    for idx, pool in enumerate(stats['pools']):
-                        pools.append({
-                            'index': idx,
-                            'url': pool.get('url', pool.get('pool', '')),
-                            'user': pool.get('user', pool.get('worker', '')),
-                            'password': pool.get('pass', 'x'),
-                            'difficulty': pool.get('diff', pool.get('difficulty')),
-                            'status': pool.get('status', pool.get('stratum_active'))
-                        })
-
-            # Method 2: Try pool-specific method
-            if not pools and hasattr(miner, 'get_pools'):
-                pool_data = miner.get_pools()
-                if pool_data:
-                    for idx, pool in enumerate(pool_data):
-                        pools.append({
-                            'index': idx,
-                            'url': pool.get('url', ''),
-                            'user': pool.get('user', ''),
-                            'password': pool.get('password', 'x'),
-                            'difficulty': pool.get('difficulty'),
-                            'status': pool.get('status')
-                        })
-
-            # Method 3: Try config endpoint
-            if not pools and hasattr(miner, 'get_config'):
-                config = miner.get_config()
-                if config and 'pools' in config:
-                    for idx, pool in enumerate(config['pools']):
-                        pools.append({
-                            'index': idx,
-                            'url': pool.get('url', ''),
-                            'user': pool.get('user', ''),
-                            'password': pool.get('pass', 'x'),
-                            'difficulty': None,
-                            'status': pool.get('enabled', True)
-                        })
+            for idx, pool in enumerate(pool_result['pools']):
+                url = pool.get('url', '')
+                if url:
+                    pools.append({
+                        'index': idx,
+                        'url': url,
+                        'user': pool.get('user', ''),
+                        'password': pool.get('password', 'x'),
+                        'difficulty': pool.get('difficulty'),
+                        'status': pool.get('status')
+                    })
 
             return pools if pools else None
 
         except Exception as e:
-            logger.error(f"Error getting pool info from miner: {e}")
+            logger.error(f"Error getting pool info from miner {getattr(miner, 'ip', '?')}: {e}")
             return None
 
     def update_pool_difficulties(self):
