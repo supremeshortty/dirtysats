@@ -221,7 +221,7 @@
                                         <div class="fleet-status-value">
                                             <span id="solo-odds-hero">--</span>
                                         </div>
-                                        <div style="font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 2px;">
+                                        <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">
                                             <span id="solo-odds-time">--</span>
                                         </div>
                                     </div>
@@ -423,111 +423,11 @@
                             Utility Rate Configuration
                         </h3>
 
-                        <!-- Tab buttons for OpenEI vs Manual -->
-                        <div class="rate-config-tabs">
-                            <button type="button" class="rate-tab active" data-tab="openei">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon-sm">
-                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                                </svg>
-                                Search Utility Database
-                            </button>
-                            <button type="button" class="rate-tab" data-tab="manual">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon-sm">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                                Enter Rates Manually
-                            </button>
-                        </div>
-
-                        <!-- OpenEI Search Panel -->
-                        <div id="openei-panel" class="rate-panel active">
-                            <!-- API Key Configuration -->
-                            <div id="api-key-section" class="api-key-section">
-                                <div class="api-key-header">
-                                    <h4>OpenEI API Key</h4>
-                                    <span id="api-key-status" class="api-key-status"></span>
-                                </div>
-                                <p class="panel-description">
-                                    To search utility rates, you need a free API key from OpenEI (maintained by NREL).
-                                    Each user should get their own key.
-                                </p>
-                                <div id="api-key-form" class="api-key-form">
-                                    <div class="api-key-steps">
-                                        <p><strong>Setup Instructions:</strong></p>
-                                        <ol>
-                                            <li>Visit <a href="https://openei.org/services/api/signup" target="_blank">OpenEI API Signup</a></li>
-                                            <li>Create a free account and get your API key</li>
-                                            <li>Paste your key below and click Save</li>
-                                        </ol>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="openei-api-key">Your API Key:</label>
-                                        <div class="api-key-input-wrapper">
-                                            <input type="password" id="openei-api-key" placeholder="Paste your OpenEI API key here..." autocomplete="off">
-                                            <button type="button" id="toggle-api-key-visibility" class="btn btn-icon-only" title="Show/Hide">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                                    <circle cx="12" cy="12" r="3"/>
-                                                </svg>
-                                            </button>
-                                            <button type="button" id="save-api-key" class="btn btn-primary btn-sm">Save Key</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p class="panel-hint">
-                                    Don't want to set up an API key? Use the <strong>Manual Entry</strong> tab instead to enter your rates directly.
-                                </p>
-                            </div>
-
-                            <hr class="section-divider">
-
-                            <!-- Search Section (shown when API key is configured) -->
-                            <div id="utility-search-section">
-                                <p class="panel-description">
-                                    Search the <a href="https://openei.org/wiki/Utility_Rate_Database" target="_blank">OpenEI Utility Rate Database</a> for official utility rates.
-                                </p>
-
-                                <div class="form-group">
-                                    <label for="utility-search">Search for your utility:</label>
-                                    <div class="search-input-wrapper">
-                                        <input type="text" id="utility-search" placeholder="e.g., Xcel Energy, PG&E, ConEd..." autocomplete="off">
-                                        <button type="button" id="utility-search-btn" class="btn btn-secondary btn-sm">Search</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Search Results -->
-                            <div id="utility-search-results" class="search-results" style="display: none;">
-                                <h4>Select Your Utility:</h4>
-                                <div id="utility-list" class="utility-list"></div>
-                            </div>
-
-                            <!-- Rate Plans -->
-                            <div id="rate-plans-container" style="display: none;">
-                                <h4>Select Your Rate Plan:</h4>
-                                <p class="panel-hint">Choose the rate plan that matches your utility bill. If unsure, look for "Residential" or "Time of Use" plans.</p>
-                                <div id="rate-plans-list" class="rate-plans-list"></div>
-                            </div>
-
-                            <!-- Selected Rate Preview -->
-                            <div id="rate-preview" class="rate-preview" style="display: none;">
-                                <h4>Rate Schedule Preview:</h4>
-                                <div id="rate-preview-content"></div>
-                                <button type="button" id="apply-openei-rate" class="btn btn-primary">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                                        <polyline points="20 6 9 17 4 12"/>
-                                    </svg>
-                                    Apply This Rate Plan
-                                </button>
-                            </div>
-                        </div>
-
                         <!-- Manual Entry Panel -->
-                        <div id="manual-panel" class="rate-panel">
+                        <div id="manual-panel">
                             <p class="panel-description">
-                                Enter your rates manually if your utility isn't in the database, or if you have a custom rate plan.
-                                Check your utility bill or website for accurate rates.
+                                Enter your electricity rates from your utility bill or website.
+                                These are used to calculate energy costs and mining profitability.
                             </p>
 
                             <form id="manual-rate-form">

@@ -2421,53 +2421,6 @@ input[type="date"]::-webkit-inner-spin-button {
     border-top: 1px solid var(--border-subtle);
 }
 
-/* Utility Rate Configuration */
-.rate-config-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 16px;
-}
-
-.rate-tab {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: var(--space);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all var(--transition-fast);
-}
-
-.rate-tab:hover {
-    border-color: var(--border-accent);
-    color: var(--text-primary);
-}
-
-.rate-tab.active {
-    background: var(--cyan-glow);
-    border-color: var(--cyan);
-    color: var(--cyan);
-}
-
-.rate-tab .btn-icon-sm {
-    width: 16px;
-    height: 16px;
-}
-
-.rate-panel {
-    display: none;
-}
-
-.rate-panel.active {
-    display: block;
-}
-
 .panel-description {
     color: var(--text-secondary);
     font-size: 0.9rem;
@@ -2510,296 +2463,6 @@ input[type="date"]::-webkit-inner-spin-button {
 .search-results h4 {
     margin-bottom: 12px;
     color: var(--text-primary);
-}
-
-.utility-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.utility-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: var(--space-light);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.utility-item:hover {
-    border-color: var(--cyan);
-    background: var(--space-lighter);
-}
-
-.utility-item.selected {
-    border-color: var(--cyan);
-    background: var(--cyan-glow);
-}
-
-.utility-item .utility-name {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.utility-brand {
-    font-weight: 400;
-    font-size: 0.75rem;
-    color: var(--cyan);
-    margin-left: 8px;
-    opacity: 0.85;
-}
-
-.utility-item .utility-state {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
-.utility-item .rate-count {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-.utility-item .utility-info {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
-.rate-plans-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.rate-plan-item {
-    padding: 12px 16px;
-    background: var(--space);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.rate-plan-item:hover {
-    border-color: var(--cyan);
-}
-
-.rate-plan-item.selected {
-    border-color: var(--cyan);
-    background: var(--cyan-glow);
-}
-
-.rate-plan-item .plan-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-}
-
-.rate-plan-item .plan-description {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    line-height: 1.4;
-}
-
-.rate-plan-item .plan-dates {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    margin-top: 4px;
-}
-
-.rate-plan-item .rate-plan-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-}
-
-.rate-plan-item .rate-plan-details {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.tou-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    background: var(--yellow);
-    color: var(--space-dark);
-    font-size: 0.7rem;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
-    text-transform: uppercase;
-}
-
-.no-results,
-.error-message {
-    padding: 20px;
-    text-align: center;
-    color: var(--text-muted);
-}
-
-.no-results p,
-.error-message p {
-    margin: 0 0 8px 0;
-}
-
-.no-results .hint,
-.error-message .hint {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-
-/* API Key Section */
-.api-key-section {
-    margin-bottom: 16px;
-}
-
-.api-key-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.api-key-header h4 {
-    margin: 0;
-    color: var(--text-primary);
-}
-
-.api-key-status {
-    font-size: 0.85rem;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-}
-
-.api-key-status.configured {
-    background: var(--green-glow);
-    color: var(--green);
-    cursor: pointer;
-}
-
-.api-key-status.configured:hover {
-    opacity: 0.8;
-}
-
-.api-key-status.not-configured {
-    background: var(--yellow-glow, rgba(245, 158, 11, 0.1));
-    color: var(--yellow);
-}
-
-.api-key-form {
-    background: var(--space-light);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    margin: 12px 0;
-}
-
-.api-key-steps {
-    margin-bottom: 16px;
-}
-
-.api-key-steps ol {
-    margin: 8px 0 0 20px;
-    padding: 0;
-    color: var(--text-secondary);
-}
-
-.api-key-steps li {
-    margin-bottom: 6px;
-}
-
-.api-key-steps a {
-    color: var(--cyan);
-}
-
-.api-key-input-wrapper {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.api-key-input-wrapper input {
-    flex: 1;
-    font-family: monospace;
-}
-
-.btn-icon-only {
-    padding: 8px;
-    background: var(--space);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-secondary);
-    transition: all var(--transition-fast);
-}
-
-.btn-icon-only:hover {
-    border-color: var(--cyan);
-    color: var(--cyan);
-}
-
-.section-divider {
-    border: none;
-    border-top: 1px solid var(--border-subtle);
-    margin: 20px 0;
-}
-
-.rate-preview-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.rate-preview-header strong {
-    color: var(--text-primary);
-}
-
-.rate-preview-header .utility-name {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
-.rate-preview {
-    margin-top: 20px;
-    padding: 16px;
-    background: var(--space);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--cyan);
-}
-
-.rate-preview h4 {
-    margin-bottom: 12px;
-    color: var(--cyan);
-}
-
-.rate-preview-table {
-    width: 100%;
-    margin-bottom: 16px;
-}
-
-.rate-preview-table th,
-.rate-preview-table td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.rate-preview-table th {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
 }
 
 .rate-type-toggle {
@@ -7318,7 +6981,7 @@ input[type="date"]::-webkit-inner-spin-button {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 8px;
+    margin: 12px 0;
 }
 
 .group-tag {
@@ -8943,3 +8606,34 @@ input[type="date"]::-webkit-inner-spin-button {
     background: rgba(5, 150, 105, 0.06);
     border-color: rgba(5, 150, 105, 0.15);
 }
+
+/* W. Miner card state borders ---------------------------------------------- */
+[data-theme="light"] .miner-card.online { border-color: rgba(5, 150, 105, 0.3); }
+[data-theme="light"] .miner-card.offline { border-color: rgba(220, 38, 38, 0.3); }
+[data-theme="light"] .miner-card.overheating { border-color: rgba(217, 119, 6, 0.4); }
+
+/* X. Status badge overheating ---------------------------------------------- */
+[data-theme="light"] .status-badge.overheating {
+    background: rgba(217, 119, 6, 0.1);
+    border-color: rgba(217, 119, 6, 0.3);
+    color: #b45309;
+}
+
+/* Y. Miner IP badge (white-on-white fix) ----------------------------------- */
+[data-theme="light"] .miner-ip-badge { background: rgba(0, 0, 0, 0.04); }
+
+/* Z. Avatar ring glows ----------------------------------------------------- */
+[data-theme="light"] .miner-avatar .avatar-ring { box-shadow: 0 0 12px rgba(5, 150, 105, 0.2); }
+[data-theme="light"] .miner-avatar.offline .avatar-ring { box-shadow: 0 0 12px rgba(220, 38, 38, 0.2); }
+[data-theme="light"] .miner-avatar.overheating .avatar-ring { box-shadow: 0 0 12px rgba(217, 119, 6, 0.2); }
+[data-theme="light"] .miner-avatar.overheated .avatar-ring { box-shadow: 0 0 12px rgba(220, 38, 38, 0.25); }
+
+/* AA. Pool bar offline ----------------------------------------------------- */
+[data-theme="light"] .pool-bar.offline {
+    background: rgba(220, 38, 38, 0.06);
+    border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* AB. Pool dot glows ------------------------------------------------------- */
+[data-theme="light"] .pool-dot { box-shadow: 0 0 8px rgba(5, 150, 105, 0.3); }
+[data-theme="light"] .pool-bar.offline .pool-dot { box-shadow: 0 0 8px rgba(220, 38, 38, 0.3); }

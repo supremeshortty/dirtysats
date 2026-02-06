@@ -189,9 +189,9 @@ class AlertManager:
             self.config.daily_report_enabled = kwargs['daily_report_enabled']
         if 'daily_report_time' in kwargs:
             self.config.daily_report_time = kwargs['daily_report_time']
-        if 'high_temp_threshold' in kwargs:
+        if 'high_temp_threshold' in kwargs and kwargs['high_temp_threshold'] is not None:
             self.config.high_temp_threshold = float(kwargs['high_temp_threshold'])
-        if 'low_hashrate_threshold_pct' in kwargs:
+        if 'low_hashrate_threshold_pct' in kwargs and kwargs['low_hashrate_threshold_pct'] is not None:
             self.config.low_hashrate_threshold_pct = float(kwargs['low_hashrate_threshold_pct'])
 
         self._save_config_to_db()

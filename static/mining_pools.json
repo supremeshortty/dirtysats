@@ -38,7 +38,7 @@
     {
       "id": "braiins_pool",
       "status": "active",
-      "name": "Braiins Pool (formerly Slush Pool)",
+      "name": "Braiins Pool",
       "website": "https://braiins.com/pool",
       "fee_structure": {
         "standard": "2.5% (FPPS)",
@@ -655,7 +655,7 @@
     },
     {
       "id": "poolin",
-      "status": "active",
+      "status": "caution",
       "name": "Poolin",
       "website": "https://www.poolin.com",
       "fee_structure": {
@@ -682,7 +682,7 @@
     },
     {
       "id": "pega_pool",
-      "status": "active",
+      "status": "legacy",
       "name": "PEGA Pool",
       "website": "https://www.pegapool.com",
       "fee_structure": {
@@ -761,7 +761,7 @@
     },
     {
       "id": "novablock",
-      "status": "active",
+      "status": "legacy",
       "name": "NovaBlock",
       "website": "https://novablock.com",
       "fee_structure": {
@@ -787,7 +787,7 @@
     },
     {
       "id": "1thash",
-      "status": "active",
+      "status": "caution",
       "name": "1THash",
       "website": "https://www.1thash.top",
       "fee_structure": { "standard": "2.5%", "notes": "PPS+ fee structure" },
@@ -887,7 +887,7 @@
       "id": "ckpool",
       "status": "active",
       "name": "CKPool",
-      "website": "https://www.ckpool.org",
+      "website": "https://solo.ckpool.org",
       "fee_structure": { "standard": "1%", "notes": "Simple 1% fee pooled mining" },
       "payout_method": "PPLNS",
       "minimum_payout": { "onchain": "0.001 BTC", "lightning": "Not supported" },
@@ -927,7 +927,7 @@
     },
     {
       "id": "huobi_pool",
-      "status": "active",
+      "status": "legacy",
       "name": "Huobi Pool (HTX Pool)",
       "website": "https://www.htx.com/pool",
       "fee_structure": { "standard": "3% FPPS", "notes": "Part of HTX (formerly Huobi) exchange ecosystem" },
@@ -941,7 +941,7 @@
     },
     {
       "id": "bitaxepool",
-      "status": "active",
+      "status": "legacy",
       "name": "BitAxe Pool (Community)",
       "website": "https://pool.bitaxe.org",
       "fee_structure": { "standard": "1%", "notes": "Community pool specifically for BitAxe miners" },
@@ -955,7 +955,7 @@
     },
     {
       "id": "bitcoinmergedmining",
-      "status": "active",
+      "status": "legacy",
       "name": "Bitcoin Merged Mining Pool",
       "website": "https://pool.bitcoin.com",
       "fee_structure": { "standard": "1.5%", "notes": "FPPS with merged mining for additional coins" },
@@ -1025,7 +1025,7 @@
     },
     {
       "id": "dsv_pool",
-      "status": "active",
+      "status": "legacy",
       "name": "DSV Pool",
       "website": "https://dsvpool.com",
       "fee_structure": { "standard": "1.5%", "notes": "Competitive FPPS pool" },

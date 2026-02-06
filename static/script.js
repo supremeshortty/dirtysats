@@ -756,68 +756,57 @@ function updateFleetOptimizeButton() {
 // ============================================================================
 // CHART COLOR SYSTEM - "Mission Control" Palette
 // ============================================================================
-const CHART_COLORS = {
-    // Primary metrics
-    hashrate: {
-        line: '#00d4ff',      // Electric cyan - computational flow
-        fill: 'rgba(0, 212, 255, 0.12)',
-        glow: 'rgba(0, 212, 255, 0.3)'
-    },
-    temperature: {
-        line: '#ff5252',      // Danger red - heat indicator
-        fill: 'rgba(255, 82, 82, 0.12)',
-        safe: '#00e676',      // Success green < 55°C
-        warm: '#ffab00',      // Warning amber 55-70°C
-        hot: '#ff5252',       // Danger 70-85°C
-        danger: '#ff1744'     // Critical > 85°C
-    },
-    power: {
-        line: '#f7931a',      // Bitcoin amber - electricity
-        fill: 'rgba(247, 147, 26, 0.15)'
-    },
-    profit: {
-        positive: '#00e676',  // Success green
-        negative: '#ff5252',  // Danger red
-        fillPositive: 'rgba(0, 230, 118, 0.15)',
-        fillNegative: 'rgba(255, 82, 82, 0.15)'
-    },
-    efficiency: {
-        line: '#8b5cf6',      // Purple - hero metric
-        fill: 'rgba(139, 92, 246, 0.12)'
-    },
-    shares: {
-        accepted: '#00e676',  // Success green
-        rejected: '#ef4444',  // Red
-        scoring: '#15803d'    // Dark green
-    },
-    // Hashrate colors - COOL tones (cyans, blues, purples)
-    hashrateColors: [
-        '#00d4ff',  // Electric cyan
-        '#00a8cc',  // Dim cyan
-        '#8b5cf6',  // Purple
-        '#7c3aed',  // Purple dim
-        '#3b82f6',  // Blue
-        '#0ea5e9',  // Sky
-        '#14b8a6',  // Teal
-        '#22d3ee'   // Light cyan
-    ],
-    // Temperature colors - WARM tones (reds, oranges, ambers)
-    tempColors: [
-        '#ff5252',  // Danger red
-        '#ff1744',  // Critical red
-        '#ffab00',  // Warning amber
-        '#f7931a',  // Bitcoin amber
-        '#ff6b6b',  // Light red
-        '#ff9800',  // Orange
-        '#ffc107',  // Yellow
-        '#e91e63'   // Pink
-    ],
-    // Grid and text
-    grid: 'rgba(255, 255, 255, 0.04)',
-    gridLight: 'rgba(255, 255, 255, 0.08)',
-    text: '#9ca3af',
-    textMuted: '#6b7280'
-};
+function getChartColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    return {
+        // Primary metrics
+        hashrate: {
+            line: '#00d4ff',
+            fill: 'rgba(0, 212, 255, 0.12)',
+            glow: 'rgba(0, 212, 255, 0.3)'
+        },
+        temperature: {
+            line: '#ff5252',
+            fill: 'rgba(255, 82, 82, 0.12)',
+            safe: '#00e676',
+            warm: '#ffab00',
+            hot: '#ff5252',
+            danger: '#ff1744'
+        },
+        power: {
+            line: '#f7931a',
+            fill: 'rgba(247, 147, 26, 0.15)'
+        },
+        profit: {
+            positive: '#00e676',
+            negative: '#ff5252',
+            fillPositive: 'rgba(0, 230, 118, 0.15)',
+            fillNegative: 'rgba(255, 82, 82, 0.15)'
+        },
+        efficiency: {
+            line: '#8b5cf6',
+            fill: 'rgba(139, 92, 246, 0.12)'
+        },
+        shares: {
+            accepted: '#00e676',
+            rejected: '#ef4444',
+            scoring: '#15803d'
+        },
+        hashrateColors: [
+            '#00d4ff', '#00a8cc', '#8b5cf6', '#7c3aed',
+            '#3b82f6', '#0ea5e9', '#14b8a6', '#22d3ee'
+        ],
+        tempColors: [
+            '#ff5252', '#ff1744', '#ffab00', '#f7931a',
+            '#ff6b6b', '#ff9800', '#ffc107', '#e91e63'
+        ],
+        grid: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.06)',
+        gridLight: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.1)',
+        text: isDark ? '#9ca3af' : '#64748b',
+        textMuted: isDark ? '#6b7280' : '#94a3b8',
+    };
+}
+let CHART_COLORS = getChartColors();
 
 // Get temperature color based on value
 function getTempColor(temp) {
@@ -1027,6 +1016,8 @@ function toggleTheme() {
 }
 
 function updateChartTheme() {
+    // Refresh CHART_COLORS for current theme
+    CHART_COLORS = getChartColors();
     // Get current theme colors
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridColor = isDark ? 'rgba(148, 163, 184, 0.06)' : 'rgba(148, 163, 184, 0.1)';
@@ -1100,45 +1091,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const hours = parseInt(document.getElementById('fleet-chart-timerange').value);
         loadFleetCombinedChart(hours);
     });
-
-    // Utility Rate Configuration - Tab switching
-    document.querySelectorAll('.rate-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            const targetTab = this.dataset.tab;
-            // Update tab buttons
-            document.querySelectorAll('.rate-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            // Update panels
-            document.querySelectorAll('.rate-panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(`${targetTab}-panel`).classList.add('active');
-        });
-    });
-
-    // OpenEI API Key management
-    document.getElementById('save-api-key').addEventListener('click', saveOpenEIKey);
-    document.getElementById('toggle-api-key-visibility').addEventListener('click', toggleApiKeyVisibility);
-    document.getElementById('openei-api-key').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            saveOpenEIKey();
-        }
-    });
-    // Allow clicking on status to toggle form
-    document.getElementById('api-key-status').addEventListener('click', toggleApiKeyForm);
-    // Check API key status on load
-    checkOpenEIKeyStatus();
-
-    // Utility search
-    document.getElementById('utility-search-btn').addEventListener('click', searchUtilities);
-    document.getElementById('utility-search').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            searchUtilities();
-        }
-    });
-
-    // Apply OpenEI rate button
-    document.getElementById('apply-openei-rate').addEventListener('click', applySelectedOpenEIRate);
 
     // Manual rate form
     document.getElementById('manual-rate-form').addEventListener('submit', applyManualRates);
@@ -2377,431 +2329,6 @@ function displayRateSchedule(rates) {
     container.innerHTML = tableHTML;
 }
 
-// ============================================
-// OpenEI Utility Rate Search Functions
-// ============================================
-
-// Global state for selected utility rate
-let selectedOpenEIRate = null;
-
-// Check OpenEI API key status on page load
-async function checkOpenEIKeyStatus() {
-    try {
-        const response = await fetch(`${API_BASE}/api/openei/key`);
-        const data = await response.json();
-
-        const statusEl = document.getElementById('api-key-status');
-        const formEl = document.getElementById('api-key-form');
-        const inputEl = document.getElementById('openei-api-key');
-        const apiKeySection = document.getElementById('api-key-section');
-        const searchSection = document.getElementById('utility-search-section');
-        const sectionDivider = document.querySelector('#openei-panel .section-divider');
-
-        if (data.success && data.configured) {
-            statusEl.textContent = 'Configured ✓';
-            statusEl.className = 'api-key-status configured';
-            if (inputEl) inputEl.placeholder = data.masked_key || 'API key configured';
-            // Collapse the entire API key section since key is already set
-            if (formEl) formEl.style.display = 'none';
-            // Hide the description paragraph too
-            const descParagraph = apiKeySection?.querySelector('.panel-description');
-            if (descParagraph) descParagraph.style.display = 'none';
-            // Hide the hint paragraph
-            const hintParagraph = apiKeySection?.querySelector('.panel-hint');
-            if (hintParagraph) hintParagraph.style.display = 'none';
-            // Show search section prominently
-            if (searchSection) searchSection.style.display = 'block';
-            if (sectionDivider) sectionDivider.style.display = 'block';
-        } else {
-            statusEl.textContent = 'Not Configured';
-            statusEl.className = 'api-key-status not-configured';
-            if (formEl) formEl.style.display = 'block';
-            // Show the description and hint
-            const descParagraph = apiKeySection?.querySelector('.panel-description');
-            if (descParagraph) descParagraph.style.display = 'block';
-            const hintParagraph = apiKeySection?.querySelector('.panel-hint');
-            if (hintParagraph) hintParagraph.style.display = 'block';
-            // Still show search section but it won't work without key
-            if (searchSection) searchSection.style.display = 'block';
-            if (sectionDivider) sectionDivider.style.display = 'block';
-        }
-    } catch (error) {
-        console.error('Error checking API key status:', error);
-    }
-}
-
-// Save OpenEI API key
-async function saveOpenEIKey() {
-    const inputEl = document.getElementById('openei-api-key');
-    const apiKey = inputEl.value.trim();
-
-    if (!apiKey) {
-        showAlert('Please enter an API key', 'warning');
-        return;
-    }
-
-    const saveBtn = document.getElementById('save-api-key');
-    const originalText = saveBtn.textContent;
-    saveBtn.textContent = 'Validating...';
-    saveBtn.disabled = true;
-
-    try {
-        const response = await fetch(`${API_BASE}/api/openei/key`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showAlert('API key saved successfully!', 'success');
-            inputEl.value = '';
-            inputEl.placeholder = data.masked_key || 'API key configured';
-            await checkOpenEIKeyStatus();
-        } else {
-            showAlert(data.error || 'Failed to save API key', 'error');
-        }
-    } catch (error) {
-        console.error('Error saving API key:', error);
-        showAlert('Error saving API key. Please try again.', 'error');
-    } finally {
-        saveBtn.textContent = originalText;
-        saveBtn.disabled = false;
-    }
-}
-
-// Toggle API key visibility
-function toggleApiKeyVisibility() {
-    const inputEl = document.getElementById('openei-api-key');
-    if (inputEl.type === 'password') {
-        inputEl.type = 'text';
-    } else {
-        inputEl.type = 'password';
-    }
-}
-
-// Toggle API key form visibility (for reconfiguring)
-function toggleApiKeyForm() {
-    const formEl = document.getElementById('api-key-form');
-    if (formEl.style.display === 'none') {
-        formEl.style.display = 'block';
-    } else {
-        formEl.style.display = 'none';
-    }
-}
-
-// Search utilities via OpenEI API
-async function searchUtilities() {
-    const searchInput = document.getElementById('utility-search');
-    const query = searchInput.value.trim();
-
-    if (query.length < 2) {
-        showAlert('Please enter at least 2 characters to search', 'warning');
-        return;
-    }
-
-    const utilityList = document.getElementById('utility-list');
-    const searchResultsWrapper = document.getElementById('utility-search-results');
-    const ratePlansContainer = document.getElementById('rate-plans-container');
-    const ratePlansList = document.getElementById('rate-plans-list');
-    const ratePreview = document.getElementById('rate-preview');
-
-    // Show loading state
-    utilityList.innerHTML = '<div class="loading">Searching OpenEI database for utilities matching "' + query + '"...</div>';
-    searchResultsWrapper.style.display = 'block';
-    ratePlansContainer.style.display = 'none';
-    ratePlansList.innerHTML = '';
-    ratePreview.style.display = 'none';
-    selectedOpenEIRate = null;
-    document.getElementById('apply-openei-rate').disabled = true;
-
-    try {
-        const response = await fetch(`${API_BASE}/api/utilities/search?q=${encodeURIComponent(query)}`);
-        const data = await response.json();
-
-        if (data.success && data.utilities && data.utilities.length > 0) {
-            displayUtilityResults(data.utilities);
-        } else if (data.error) {
-            // Determine error type for specific messaging
-            const errorType = data.error_type || '';
-            const isApiKeyError = errorType === 'no_api_key' || errorType === 'api_key_error' ||
-                                  data.error.includes('API key') || data.error.includes('API_KEY');
-            const isNetworkError = data.error.includes('Network error') || data.error.includes('network');
-
-            let errorHtml = `<div class="error-message">`;
-            if (isApiKeyError) {
-                errorHtml += `
-                    <p><strong>API Key Required</strong></p>
-                    <p>${data.error}</p>
-                    <p class="hint">
-                        <a href="https://openei.org/services/api/signup" target="_blank" rel="noopener">Get a free API key from OpenEI</a>,
-                        then add it using the API Key section above.
-                    </p>
-                    <p class="hint">Or use the <strong>Manual Entry</strong> tab to enter your rates directly.</p>
-                `;
-            } else if (isNetworkError) {
-                errorHtml += `
-                    <p><strong>Network Error</strong></p>
-                    <p>${data.error}</p>
-                    <p class="hint">Check your internet connection and try again. The OpenEI API may also be temporarily unavailable.</p>
-                `;
-            } else {
-                errorHtml += `
-                    <p>${data.error}</p>
-                    <p class="hint">Please try a different search term or use the <strong>Manual Entry</strong> tab.</p>
-                `;
-            }
-            errorHtml += `</div>`;
-            utilityList.innerHTML = errorHtml;
-        } else {
-            utilityList.innerHTML = `
-                <div class="no-results">
-                    <p>No utilities found matching "${query}"</p>
-                    <p class="hint">Try searching by exact utility company name (e.g., "Pacific Gas", "Duke Energy", "Xcel Energy").</p>
-                    <p class="hint">You can also search by state name or city for address-based lookup.</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('Error searching utilities:', error);
-        utilityList.innerHTML = `
-            <div class="error-message">
-                <p><strong>Connection Error</strong></p>
-                <p>Could not reach the server: ${error.message}</p>
-                <p class="hint">Check that DirtySats is running and try again, or use the <strong>Manual Entry</strong> tab.</p>
-            </div>
-        `;
-    }
-}
-
-// Display utility search results
-function displayUtilityResults(utilities) {
-    const container = document.getElementById('utility-list');
-    const wrapper = document.getElementById('utility-search-results');
-
-    const html = utilities.map(utility => {
-        const brandTag = utility.brand_name ? `<span class="utility-brand">${utility.brand_name} subsidiary</span>` : '';
-        return `
-        <div class="utility-item" data-utility-name="${utility.utility_name}" data-eia-id="${utility.eia_id || ''}">
-            <div class="utility-name">${utility.utility_name} ${brandTag}</div>
-            <div class="utility-info">${utility.state || ''} ${utility.eia_id ? `(EIA: ${utility.eia_id})` : ''}</div>
-        </div>
-    `}).join('');
-
-    container.innerHTML = html;
-    wrapper.style.display = 'block';
-
-    // Add click handlers to utility items
-    container.querySelectorAll('.utility-item').forEach(item => {
-        item.addEventListener('click', () => {
-            // Remove selection from other items
-            container.querySelectorAll('.utility-item').forEach(i => i.classList.remove('selected'));
-            // Select this item
-            item.classList.add('selected');
-            // Load rate plans for this utility
-            loadUtilityRatePlans(item.dataset.utilityName, item.dataset.eiaId);
-        });
-    });
-}
-
-// Load rate plans for a selected utility
-async function loadUtilityRatePlans(utilityName, eiaId) {
-    const container = document.getElementById('rate-plans-container');
-    const plansList = document.getElementById('rate-plans-list');
-    const ratePreview = document.getElementById('rate-preview');
-
-    // Show loading state
-    container.style.display = 'block';
-    plansList.innerHTML = '<div class="loading">Loading rate plans...</div>';
-    ratePreview.style.display = 'none';
-    selectedOpenEIRate = null;
-    document.getElementById('apply-openei-rate').disabled = true;
-
-    try {
-        let url = `${API_BASE}/api/utilities/${encodeURIComponent(utilityName)}/rates`;
-        if (eiaId) {
-            url += `?eia_id=${encodeURIComponent(eiaId)}`;
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.success && data.rate_plans && data.rate_plans.length > 0) {
-            displayRatePlans(data.rate_plans);
-        } else {
-            plansList.innerHTML = `
-                <div class="no-results">
-                    <p>No residential rate plans found for this utility</p>
-                    <p class="hint">Try a different utility or use manual entry</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        console.error('Error loading rate plans:', error);
-        plansList.innerHTML = `
-            <div class="error-message">
-                <p>Error loading rate plans: ${error.message}</p>
-            </div>
-        `;
-    }
-}
-
-// Display available rate plans
-function displayRatePlans(plans) {
-    const plansList = document.getElementById('rate-plans-list');
-
-    const html = plans.map(plan => `
-        <div class="rate-plan-item" data-rate-label="${plan.label}">
-            <div class="rate-plan-name">${plan.name || plan.label}</div>
-            <div class="rate-plan-details">
-                ${plan.startdate ? `Effective: ${plan.startdate}` : ''}
-                ${plan.is_tou ? '<span class="tou-badge">TOU</span>' : ''}
-            </div>
-        </div>
-    `).join('');
-
-    plansList.innerHTML = html;
-
-    // Add click handlers to rate plan items
-    plansList.querySelectorAll('.rate-plan-item').forEach(item => {
-        item.addEventListener('click', () => {
-            // Remove selection from other items
-            plansList.querySelectorAll('.rate-plan-item').forEach(i => i.classList.remove('selected'));
-            // Select this item
-            item.classList.add('selected');
-            // Preview this rate plan
-            previewRatePlan(item.dataset.rateLabel);
-        });
-    });
-}
-
-// Preview a rate plan's details
-async function previewRatePlan(rateLabel) {
-    const preview = document.getElementById('rate-preview');
-    const previewContent = document.getElementById('rate-preview-content');
-
-    // Show loading state
-    preview.style.display = 'block';
-    previewContent.innerHTML = '<div class="loading">Loading rate details...</div>';
-
-    try {
-        const response = await fetch(`${API_BASE}/api/utilities/rates/${encodeURIComponent(rateLabel)}`);
-        const data = await response.json();
-
-        if (data.success && data.rates) {
-            // Reshape data for display
-            const rateData = {
-                name: data.plan_name || rateLabel,
-                utility: data.utility,
-                schedules: data.rates // Backend returns 'rates', frontend uses 'schedules'
-            };
-            displayRatePreview(rateData, rateLabel);
-            selectedOpenEIRate = rateLabel;
-            document.getElementById('apply-openei-rate').disabled = false;
-        } else {
-            previewContent.innerHTML = `
-                <div class="error-message">
-                    <p>Could not load rate details: ${data.error || 'Unknown error'}</p>
-                </div>
-            `;
-            selectedOpenEIRate = null;
-            document.getElementById('apply-openei-rate').disabled = true;
-        }
-    } catch (error) {
-        console.error('Error loading rate preview:', error);
-        previewContent.innerHTML = `
-            <div class="error-message">
-                <p>Error: ${error.message}</p>
-            </div>
-        `;
-        selectedOpenEIRate = null;
-        document.getElementById('apply-openei-rate').disabled = true;
-    }
-}
-
-// Display rate preview
-function displayRatePreview(rateData, rateLabel) {
-    const content = document.getElementById('rate-preview-content');
-    const schedules = rateData.schedules || [];
-
-    let html = `
-        <div class="rate-preview-header">
-            <strong>${rateData.name || rateLabel}</strong>
-            ${rateData.utility ? `<span class="utility-name">${rateData.utility}</span>` : ''}
-        </div>
-    `;
-
-    if (schedules.length > 0) {
-        html += `
-            <div class="rate-schedule-preview">
-                <table class="rate-preview-table">
-                    <thead>
-                        <tr>
-                            <th>Time Period</th>
-                            <th>Rate</th>
-                            <th>Type</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${schedules.map(s => `
-                            <tr>
-                                <td>${s.start_time} - ${s.end_time}</td>
-                                <td>$${s.rate_per_kwh.toFixed(4)}/kWh</td>
-                                <td><span class="rate-type ${s.rate_type}">${s.rate_type}</span></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    } else {
-        html += '<p class="no-schedule">No detailed schedule available for this rate</p>';
-    }
-
-    content.innerHTML = html;
-}
-
-// Apply selected OpenEI rate
-async function applySelectedOpenEIRate() {
-    if (!selectedOpenEIRate) {
-        showAlert('Please select a rate plan first', 'warning');
-        return;
-    }
-
-    const applyBtn = document.getElementById('apply-openei-rate');
-    const originalText = applyBtn.textContent;
-    applyBtn.textContent = 'Applying...';
-    applyBtn.disabled = true;
-
-    try {
-        const response = await fetch(`${API_BASE}/api/utilities/rates/${encodeURIComponent(selectedOpenEIRate)}/apply`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showAlert('Rate plan applied successfully!', 'success');
-            // Reload energy rates to show the new schedule
-            await loadEnergyRates();
-            // Reload profitability to reflect new rates
-            await loadProfitability();
-        } else {
-            showAlert(`Failed to apply rate: ${data.error || 'Unknown error'}`, 'error');
-        }
-    } catch (error) {
-        console.error('Error applying rate:', error);
-        showAlert(`Error applying rate: ${error.message}`, 'error');
-    } finally {
-        applyBtn.textContent = originalText;
-        applyBtn.disabled = !selectedOpenEIRate;
-    }
-}
-
 // Apply manually entered rates
 async function applyManualRates(e) {
     e.preventDefault();
@@ -3715,12 +3242,16 @@ async function loadFleetCombinedChart(hours = 3, { canvasId = 'fleet-combined-ch
             });
         }
 
-        // 3. Average Temperature - White/light gray line
+        // 3. Average Temperature - Theme-aware line
+        const isDarkTheme = document.documentElement.getAttribute('data-theme') !== 'light';
+        const tempLineColor = isDarkTheme ? 'rgba(255, 255, 255, 0.85)' : 'rgba(30, 41, 59, 0.7)';
+        const tempAxisColor = isDarkTheme ? 'rgba(255, 255, 255, 0.7)' : '#475569';
+
         if (avgTempData.length > 0) {
             datasets.push({
                 label: 'ASIC Temp',
                 data: avgTempDataWithGaps,
-                borderColor: 'rgba(255, 255, 255, 0.85)',
+                borderColor: tempLineColor,
                 backgroundColor: 'transparent',
                 borderWidth: 1,
                 fill: false,
@@ -3729,8 +3260,8 @@ async function loadFleetCombinedChart(hours = 3, { canvasId = 'fleet-combined-ch
                 order: 2,
                 pointRadius: 0,
                 pointHoverRadius: 4,
-                pointBackgroundColor: 'rgba(255, 255, 255, 0.85)',
-                pointBorderColor: 'rgba(255, 255, 255, 0.85)',
+                pointBackgroundColor: tempLineColor,
+                pointBorderColor: tempLineColor,
                 pointBorderWidth: 0,
                 spanGaps: true
             });
@@ -3843,11 +3374,11 @@ async function loadFleetCombinedChart(hours = 3, { canvasId = 'fleet-combined-ch
                     title: {
                         display: true,
                         text: 'Temperature',
-                        color: 'rgba(255, 255, 255, 0.7)',
+                        color: tempAxisColor,
                         font: { size: 11, weight: '600' }
                     },
                     ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
+                        color: tempAxisColor,
                         font: { size: 10 },
                         callback: function(value) {
                             return Math.round(value) + '°C';
@@ -4309,12 +3840,15 @@ async function _loadCombinedChart_legacy(hours = 24) {
                 });
             }
 
-            // Average temperature line
+            // Average temperature line (theme-aware)
+            const legacyIsDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const legacyTempColor = legacyIsDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(30, 41, 59, 0.7)';
+
             if (avgTempData.length > 0) {
                 datasets.push({
                     label: 'Avg Temp',
                     data: tempWithGaps,
-                    borderColor: 'rgba(255, 255, 255, 0.85)',
+                    borderColor: legacyTempColor,
                     backgroundColor: 'transparent',
                     borderWidth: 1,
                     fill: false,
@@ -4323,8 +3857,8 @@ async function _loadCombinedChart_legacy(hours = 24) {
                     order: 2,
                     pointRadius: 0,
                     pointHoverRadius: 4,
-                    pointBackgroundColor: 'rgba(255, 255, 255, 0.85)',
-                    pointBorderColor: 'rgba(255, 255, 255, 0.85)',
+                    pointBackgroundColor: legacyTempColor,
+                    pointBorderColor: legacyTempColor,
                     pointBorderWidth: 0,
                     spanGaps: false
                 });
@@ -5056,6 +4590,7 @@ async function loadAlertConfig() {
                 input.type = 'checkbox';
                 input.checked = enabled;
                 input.dataset.alertType = type;
+                input.addEventListener('change', () => saveAlertConfig());
                 const slider = document.createElement('span');
                 slider.className = 'toggle-slider';
                 toggle.appendChild(input);
@@ -5536,7 +5071,7 @@ startAutoRefresh = function() {
             // Use lighter refresh that doesn't reload chart
             refreshEnergyTabData();
         } else if (currentTab === 'alerts') {
-            loadAlertsTab();
+            loadAlertHistory();
         } else if (currentTab === 'pools') {
             loadPoolsTab();
         }
