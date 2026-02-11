@@ -1,4 +1,6 @@
 *.db
+*.db-shm
+*.db-wal
 *.pyc
 __pycache__/
 .pytest_cache/
@@ -13,5 +15,6 @@ pi-config.sh
 # Social media poster (local only - DO NOT COMMIT)
 social-poster/
 
-# Business plan (CONFIDENTIAL - DO NOT COMMIT)
+# Business plans (CONFIDENTIAL - DO NOT COMMIT)
 docs/plans/2026-02-03-dirtysats-business-plan.md
+docs/plans/2026-02-10-pool-api-research.md

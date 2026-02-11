@@ -30,7 +30,7 @@ OPENEI_API_KEY = os.environ.get('OPENEI_API_KEY', None)
 # Flask settings
 FLASK_HOST = "0.0.0.0"
 FLASK_PORT = 5001
-DEBUG = True
+DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
 # Miner API settings
 BITAXE_API_TIMEOUT = 2

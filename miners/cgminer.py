@@ -78,6 +78,7 @@ class CGMinerAPIHandler(MinerAPIHandler):
 
     def _send_command(self, ip: str, command: str) -> Dict:
         """Send command to CGMiner API"""
+        sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
@@ -95,8 +96,6 @@ class CGMinerAPIHandler(MinerAPIHandler):
                     break
                 response += chunk
 
-            sock.close()
-
             # Parse response (strip null bytes that some miners append)
             response_str = response.decode().rstrip('\x00')
             return json.loads(response_str)
@@ -107,6 +106,12 @@ class CGMinerAPIHandler(MinerAPIHandler):
         except Exception as e:
             logger.error(f"Error sending command '{command}' to {ip}: {e}")
             return {'error': str(e)}
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
 
     def detect(self, ip: str) -> bool:
         """Check if this is a CGMiner-based miner"""
@@ -225,6 +230,38 @@ class CGMinerAPIHandler(MinerAPIHandler):
         # CGMiner API has limited write capabilities
         # This would need miner-specific implementation
         return False
+
+    def get_pools(self, ip: str) -> Optional[Dict]:
+        """Get pool configuration from CGMiner API"""
+        try:
+            result = self._send_command(ip, 'pools')
+            if 'error' in result:
+                return None
+
+            pool_list = result.get('POOLS', [])
+            pools = []
+            active_pool = 0
+
+            for pool in pool_list:
+                url = pool.get('URL', '')
+                user = pool.get('User', '')
+                # Track which pool is active (Status: "Alive" + Stratum Active)
+                if pool.get('Stratum Active', False) or pool.get('Status') == 'Alive':
+                    if pool.get('Stratum Active', False):
+                        active_pool = len(pools)
+                pools.append({
+                    'url': url,
+                    'user': user,
+                    'password': 'x'
+                })
+
+            return {
+                'pools': pools,
+                'active_pool': active_pool
+            }
+        except Exception as e:
+            logger.error(f"Failed to get pools from CGMiner at {ip}: {e}")
+            return None
 
     def restart(self, ip: str) -> bool:
         """Restart CGMiner"""

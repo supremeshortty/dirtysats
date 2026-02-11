@@ -5,7 +5,7 @@
 PI_IP="${1:-10.0.0.12}"
 PI_USER="${2:-pi}"
 PI_HOST="$PI_USER@$PI_IP"
-INSTALL_DIR="/home/$PI_USER/home-mining-fleet-manager-main"
+INSTALL_DIR="/home/$PI_USER/home-mining-fleet-manager"
 
 echo "========================================="
 echo "DirtySats Deployment to Raspberry Pi"

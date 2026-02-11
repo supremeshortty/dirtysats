@@ -27,8 +27,9 @@ class SatsEarnedTracker:
     Pulls from pool APIs and calculates actual sats earned.
     """
 
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, pool_manager=None):
         self.db = db
+        self.pool_manager = pool_manager
 
     def get_sats_earned(self, hours: int = None) -> Dict:
         """

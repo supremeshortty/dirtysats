@@ -1,6 +1,33 @@
 // DirtySats - Bitcoin Mining Fleet Manager
 const API_BASE = '';
 const UPDATE_INTERVAL = 5000; // 5 seconds
+
+// CSRF Protection: Wrap fetch to auto-include CSRF token on state-changing requests
+(function() {
+    const originalFetch = window.fetch;
+    function getCsrfToken() {
+        const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+        return match ? match[1] : '';
+    }
+    window.fetch = function(url, options) {
+        options = options || {};
+        if (options.method && options.method.toUpperCase() !== 'GET') {
+            if (!options.headers) {
+                options.headers = {};
+            }
+            if (options.headers instanceof Headers) {
+                if (!options.headers.has('X-CSRF-Token')) {
+                    options.headers.set('X-CSRF-Token', getCsrfToken());
+                }
+            } else {
+                if (!options.headers['X-CSRF-Token']) {
+                    options.headers['X-CSRF-Token'] = getCsrfToken();
+                }
+            }
+        }
+        return originalFetch.call(this, url, options);
+    };
+})();
 const CHART_REFRESH_INTERVAL = 30000; // 30 seconds for chart updates
 const OPTIMIZATION_INTERVAL = 300000; // 5 minutes between frequency adjustments
 const MAX_FREQ_STEP = 25; // Maximum frequency increase per step (MHz)
@@ -27,21 +54,23 @@ let fleetDataCache = {
 
 // Fetch all fleet data once per cycle, store in cache
 async function refreshFleetData() {
-    const [statsResponse, minersResponse, profResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/stats`),
-        fetch(`${API_BASE}/api/miners`),
-        fetch(`${API_BASE}/api/energy/profitability`)
+    const results = await Promise.allSettled([
+        fetch(`${API_BASE}/api/stats`).then(r => r.json()),
+        fetch(`${API_BASE}/api/miners`).then(r => r.json()),
+        fetch(`${API_BASE}/api/energy/profitability`).then(r => r.json())
     ]);
 
-    const [statsData, minersData, profData] = await Promise.all([
-        statsResponse.json(),
-        minersResponse.json(),
-        profResponse.json()
-    ]);
+    const [statsResult, minersResult, profResult] = results;
 
-    if (statsData.success) fleetDataCache.stats = statsData.stats;
-    if (minersData.success) fleetDataCache.miners = minersData.miners || [];
-    if (profData.success) fleetDataCache.profitability = profData.profitability || null;
+    if (statsResult.status === 'fulfilled' && statsResult.value.success) {
+        fleetDataCache.stats = statsResult.value.stats;
+    }
+    if (minersResult.status === 'fulfilled' && minersResult.value.success) {
+        fleetDataCache.miners = minersResult.value.miners || [];
+    }
+    if (profResult.status === 'fulfilled' && profResult.value.success) {
+        fleetDataCache.profitability = profResult.value.profitability || null;
+    }
     fleetDataCache.lastFetch = Date.now();
 
     return fleetDataCache;
@@ -365,7 +394,7 @@ function renderGroupsList() {
     container.innerHTML = groupsCache.map(group => `
         <div class="group-item" data-group-id="${group.id}">
             <div class="group-item-info">
-                <span class="group-color-dot" style="background: ${group.color}"></span>
+                <span class="group-color-dot" style="background: ${sanitizeColor(group.color)}"></span>
                 <span class="group-item-name">${escapeHtml(group.name)}</span>
                 <span class="group-item-count">(${group.member_count} miners)</span>
             </div>
@@ -391,7 +420,7 @@ function updateGroupFilterDropdown() {
         const option = document.createElement('option');
         option.value = group.id;
         option.textContent = group.name;
-        option.style.borderLeft = `3px solid ${group.color}`;
+        option.style.borderLeft = `3px solid ${sanitizeColor(group.color)}`;
         select.appendChild(option);
     });
 
@@ -432,35 +461,7 @@ function renderMinersFiltered() {
     // Render filtered miners
     const minersHTML = minersToShow.map(miner => createMinerCard(miner)).join('');
     container.innerHTML = `<div class="miners-grid">${minersHTML}</div>`;
-
-    // Attach event listeners
-    minersToShow.forEach(miner => {
-        const card = document.getElementById(`miner-card-${miner.ip.replace(/\./g, '-')}`);
-        if (card) {
-            card.addEventListener('click', (e) => {
-                if (e.target.closest('.miner-actions') || e.target.closest('.edit-name-btn') || e.target.closest('.miner-checkbox')) {
-                    return;
-                }
-                openMinerDetail(miner.ip);
-            });
-        }
-
-        const deleteBtn = document.getElementById(`delete-${miner.ip}`);
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteMiner(miner.ip);
-            });
-        }
-
-        const restartBtn = document.getElementById(`restart-${miner.ip}`);
-        if (restartBtn) {
-            restartBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                restartMiner(miner.ip);
-            });
-        }
-    });
+    // Event listeners handled by delegation on miners-container (see DOMContentLoaded)
 }
 
 // Create a new group
@@ -640,7 +641,7 @@ function renderMinerGroupTags(groups) {
         <div class="miner-groups-tags">
             ${groups.map(g => `
                 <span class="group-tag">
-                    <span class="tag-dot" style="background: ${g.color}"></span>
+                    <span class="tag-dot" style="background: ${sanitizeColor(g.color)}"></span>
                     ${escapeHtml(g.name)}
                 </span>
             `).join('')}
@@ -653,6 +654,24 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Sanitize CSS color values to prevent XSS via style attribute injection
+function sanitizeColor(color) {
+    if (!color) return '#3498db';
+    // Allow hex colors: #rgb, #rrggbb, #rrggbbaa
+    if (/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color)) {
+        return color;
+    }
+    // Allow named CSS colors (letters only)
+    if (/^[a-zA-Z]{1,20}$/.test(color)) {
+        return color;
+    }
+    // Allow rgb/rgba/hsl/hsla with only safe characters
+    if (/^(rgb|hsl)a?\(\s*[\d.,\s%]+\)$/.test(color)) {
+        return color;
+    }
+    return '#3498db';
 }
 
 // Initialize groups on page load
@@ -1078,6 +1097,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Discovery button
     document.getElementById('discover-btn').addEventListener('click', discoverMiners);
 
+    // Event delegation for miner cards (avoids re-attaching listeners on every refresh)
+    const minersContainer = document.getElementById('miners-container');
+    if (minersContainer) {
+        minersContainer.addEventListener('click', (e) => {
+            // Find the closest miner card
+            const card = e.target.closest('.miner-card');
+            if (!card) return;
+            const ip = card.dataset.ip;
+            if (!ip) return;
+
+            // Delete button
+            if (e.target.closest('[id^="delete-"]')) {
+                e.stopPropagation();
+                deleteMiner(ip);
+                return;
+            }
+            // Restart button
+            if (e.target.closest('[id^="restart-"]')) {
+                e.stopPropagation();
+                restartMiner(ip);
+                return;
+            }
+            // Skip if clicking on action buttons, edit name, or checkbox
+            if (e.target.closest('.miner-actions') || e.target.closest('.edit-name-btn') || e.target.closest('.miner-checkbox')) {
+                return;
+            }
+            // Open miner detail modal
+            openMinerDetail(ip);
+        });
+    }
+
     // Fleet page time range selectors (may not exist if folded into cards)
     const sharesTimerangeSel = document.getElementById('shares-timerange');
     const powerTimerangeSel = document.getElementById('power-timerange');
@@ -1245,7 +1295,8 @@ async function loadStats(cache) {
 
         if (sharesData.success) {
             const totalShares = sharesData.stats.total_shares_accepted ?? 0;
-            document.getElementById('total-shares').textContent = formatNumber(totalShares);
+            const totalSharesEl = document.getElementById('total-shares');
+            if (totalSharesEl) totalSharesEl.textContent = formatNumber(totalShares);
 
             // Update home screen scoring shares
             const homeScoringEl = document.getElementById('home-scoring-shares');
@@ -1624,37 +1675,8 @@ function displayMiners(miners) {
         // If miner list changed (added/removed), rebuild the grid
         if (!existingGrid || currentMinerIPs !== existingMinerIPs) {
             const minersHTML = minersToDisplay.map(miner => createMinerCard(miner)).join('');
-            container.innerHTML = `<div class="miners-grid">${minersHTML}</div>`;
-
-            // Attach event listeners for actions
-            minersToDisplay.forEach(miner => {
-                const card = document.getElementById(`miner-card-${miner.ip.replace(/\./g, '-')}`);
-                if (card) {
-                    card.addEventListener('click', (e) => {
-                        // Don't open modal if clicking on action buttons, edit name, or checkbox
-                        if (e.target.closest('.miner-actions') || e.target.closest('.edit-name-btn') || e.target.closest('.miner-checkbox')) {
-                            return;
-                        }
-                        openMinerDetail(miner.ip);
-                    });
-                }
-
-                const deleteBtn = document.getElementById(`delete-${miner.ip}`);
-                if (deleteBtn) {
-                    deleteBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        deleteMiner(miner.ip);
-                    });
-                }
-
-                const restartBtn = document.getElementById(`restart-${miner.ip}`);
-                if (restartBtn) {
-                    restartBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        restartMiner(miner.ip);
-                    });
-                }
-            });
+            container.innerHTML = `<div class="miners-grid">${minersHTML}</div>`; // eslint-disable-line -- content from createMinerCard uses escapeHtml
+            // Event listeners handled by delegation on miners-container (see DOMContentLoaded)
         } else {
             // Update existing cards in-place (live update without flickering)
             minersToDisplay.forEach(miner => {
@@ -2231,9 +2253,41 @@ async function loadEnergyRates() {
 
             // Update current rate period indicator
             updateRatePeriodIndicator(data.rates, data.current_rate_type);
+
+            // Populate form fields from saved rates
+            populateRateForm(data.rates);
         }
     } catch (error) {
         console.error('Error loading energy rates:', error);
+    }
+}
+
+// Populate manual rate form fields from saved rates
+function populateRateForm(rates) {
+    if (!rates || rates.length === 0) return;
+
+    const peakRate = rates.find(r => r.rate_type === 'peak');
+    const offPeakRate = rates.find(r => r.rate_type === 'off-peak');
+
+    if (peakRate) {
+        const peakRateEl = document.getElementById('manual-peak-rate');
+        const peakStartEl = document.getElementById('manual-peak-start');
+        const peakEndEl = document.getElementById('manual-peak-end');
+        if (peakRateEl) peakRateEl.value = peakRate.rate_per_kwh;
+        if (peakStartEl) peakStartEl.value = peakRate.start_time || '';
+        if (peakEndEl) peakEndEl.value = peakRate.end_time || '';
+    }
+
+    if (offPeakRate) {
+        const offPeakRateEl = document.getElementById('manual-offpeak-rate');
+        if (offPeakRateEl) offPeakRateEl.value = offPeakRate.rate_per_kwh;
+    }
+
+    // If all rates are the same type (flat rate), populate flat rate field
+    const allSameRate = rates.every(r => r.rate_per_kwh === rates[0].rate_per_kwh);
+    if (allSameRate && rates.length > 0) {
+        const flatRateEl = document.getElementById('manual-flat-rate');
+        if (flatRateEl) flatRateEl.value = rates[0].rate_per_kwh;
     }
 }
 
@@ -3059,6 +3113,9 @@ function showAlert(message, type) {
 
 // Auto-refresh
 function startAutoRefresh() {
+    // Clear any existing timers to prevent orphaned intervals
+    if (updateTimer) clearInterval(updateTimer);
+    if (chartRefreshTimer) clearInterval(chartRefreshTimer);
     updateTimer = setInterval(() => {
         if (currentTab === 'fleet') {
             loadDashboard();
@@ -4206,6 +4263,26 @@ async function loadProfitabilityChart(days = 7) {
         // Keep legacy reference in sync
         profitabilityChart = chartInstances.profitability;
         updateChartMeta('profitability', result.history?.length || 0, result.history?.length ? result.history[result.history.length - 1].timestamp : null);
+
+        // Calculate and display annotation values (avg revenue, cost, net profit)
+        if (sortedHistory.length > 0) {
+            const latest = sortedHistory[sortedHistory.length - 1];
+            const btcPerDay = latest.estimated_btc_per_day || 0;
+            const btcPrice = latest.btc_price || 0;
+            const avgRevenue = btcPerDay * btcPrice;
+            const avgCost = latest.energy_cost_per_day || 0;
+            const avgProfit = latest.profit_per_day || 0;
+
+            const revenueEl = document.getElementById('charts-total-revenue');
+            const costEl = document.getElementById('charts-total-cost');
+            const profitEl = document.getElementById('charts-net-profit');
+            if (revenueEl) revenueEl.textContent = `$${avgRevenue.toFixed(2)}/day`;
+            if (costEl) costEl.textContent = `$${avgCost.toFixed(2)}/day`;
+            if (profitEl) {
+                const prefix = avgProfit >= 0 ? '+' : '';
+                profitEl.textContent = `${prefix}$${avgProfit.toFixed(2)}/day`;
+            }
+        }
     } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('Error loading profitability chart:', error);
@@ -4578,8 +4655,9 @@ async function loadAlertConfig() {
                 unprofitable: 'Unprofitable Mining',
                 emergency_shutdown: 'Emergency Shutdown',
                 miner_online: 'Miner Back Online',
+                overheat_recovery: 'Overheat Recovery',
                 weather_warning: 'Weather Warning',
-                overheat_recovery: 'Overheat Recovery'
+                frequency_adjusted: 'Frequency Adjusted'
             };
 
             Object.entries(config.enabled_alert_types).forEach(([type, enabled]) => {
@@ -4587,7 +4665,8 @@ async function loadAlertConfig() {
                 card.className = 'alert-type-card';
 
                 const label = document.createElement('span');
-                label.textContent = typeLabels[type] || type;
+                // Convert unknown snake_case types to Title Case
+                label.textContent = typeLabels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
                 const toggle = document.createElement('label');
                 toggle.className = 'toggle-switch';
@@ -4679,7 +4758,13 @@ async function triggerDailyReport() {
 // Format relative time (e.g., "5 minutes ago")
 function formatRelativeTime(timestamp) {
     const now = new Date();
-    const alertTime = new Date(timestamp);
+    // DB stores timestamps in UTC without timezone indicator — append 'Z' so
+    // the browser interprets the value as UTC rather than local time.
+    let ts = String(timestamp).trim();
+    if (!ts.endsWith('Z') && !ts.includes('+') && !ts.includes('T')) {
+        ts = ts.replace(' ', 'T') + 'Z';
+    }
+    const alertTime = new Date(ts);
     const diffMs = now - alertTime;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
@@ -5068,6 +5153,9 @@ document.getElementById('telegram-alert-form')?.addEventListener('submit', async
 // Update auto-refresh to include new tabs
 const originalStartAutoRefresh = startAutoRefresh;
 startAutoRefresh = function() {
+    // Clear any existing timers to prevent orphaned intervals
+    if (updateTimer) clearInterval(updateTimer);
+    if (chartRefreshTimer) clearInterval(chartRefreshTimer);
     // Main refresh interval (5 seconds) - excludes charts (they have their own interval)
     updateTimer = setInterval(() => {
         if (currentTab === 'fleet') {

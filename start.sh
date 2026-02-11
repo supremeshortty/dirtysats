@@ -6,7 +6,7 @@ source venv/bin/activate
 
 # Start the application
 echo "Starting DirtySats..."
-echo "Dashboard will be available at: http://localhost:5000"
+echo "Dashboard will be available at: http://localhost:5001"
 echo "Press Ctrl+C to stop"
 echo ""
 

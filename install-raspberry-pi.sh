@@ -79,9 +79,9 @@ echo "[7/8] Installing systemd service..."
 SERVICE_FILE="fleet-manager.service"
 TEMP_SERVICE="/tmp/fleet-manager.service"
 
-# Update service file with actual installation path
-sed "s|/home/pi/home-mining-fleet-manager|$INSTALL_DIR|g" "$SERVICE_FILE" > "$TEMP_SERVICE"
-sed -i "s|User=pi|User=$USER|g" "$TEMP_SERVICE"
+# Replace placeholders in service file with actual values
+sed "s|__INSTALL_DIR__|$INSTALL_DIR|g" "$SERVICE_FILE" > "$TEMP_SERVICE"
+sed -i "s|__USER__|$USER|g" "$TEMP_SERVICE"
 
 sudo cp "$TEMP_SERVICE" /etc/systemd/system/fleet-manager.service
 sudo systemctl daemon-reload

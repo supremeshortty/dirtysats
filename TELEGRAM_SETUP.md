@@ -33,7 +33,7 @@ Get instant mining fleet alerts on your phone with Telegram! 📱
 
 ## ⚙️ Step 3: Configure in Dashboard
 
-1. Open your mining dashboard: `http://raspberrypi.local:5000`
+1. Open your mining dashboard: `http://raspberrypi.local:5001`
 2. Go to **Alerts** tab
 3. Scroll to **Telegram Bot** section
 4. Enter your:

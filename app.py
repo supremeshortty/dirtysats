@@ -2,7 +2,9 @@
 DirtySats - Bitcoin Mining Fleet Manager
 """
 import os
+import re
 import logging
+import secrets
 import ipaddress
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
@@ -24,9 +26,8 @@ from energy import (
 )
 from thermal import ThermalManager
 from alerts import AlertManager
-from weather import WeatherManager
 from pool_manager import PoolManager
-from metrics_real import (
+from metrics import (
     SatsEarnedTracker,
     MinerHealthMonitor,
     PowerEfficiencyMatrix,
@@ -45,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Flask app
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Maximum hours for historical data queries (30 days)
 MAX_HISTORY_HOURS = 720
@@ -55,6 +57,19 @@ def validate_hours(hours: int, default: int = 24) -> int:
     if hours < 1:
         return default
     return min(hours, MAX_HISTORY_HOURS)
+
+
+# Regex for valid CSS color values (hex, named colors only for server-side)
+_COLOR_RE = re.compile(r'^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$|^[a-zA-Z]{1,20}$')
+
+
+def validate_color(color: str, default: str = '#3498db') -> str:
+    """Validate a CSS color string, return default if invalid"""
+    if not color or not isinstance(color, str):
+        return default
+    if _COLOR_RE.match(color.strip()):
+        return color.strip()
+    return default
 
 
 class FleetManager:
@@ -91,9 +106,6 @@ class FleetManager:
 
         # Telegram setup helper
         self.telegram_helper = TelegramSetupHelper(self.db)
-
-        # Weather integration
-        self.weather_mgr = WeatherManager(self.db)
 
         # Metrics and analytics (will be re-initialized with pool_manager after load)
         self.sats_tracker = None
@@ -175,6 +187,19 @@ class FleetManager:
             logger.error(f"Invalid subnet format '{subnet}': {e}")
             raise ValueError(f"Invalid network subnet: {subnet}. Expected format: '10.0.0.0/24'")
 
+        # Security: Only allow scanning RFC1918 private IP ranges
+        if not network.is_private or network.is_loopback:
+            raise ValueError(
+                f"Subnet {subnet} is not a private network. "
+                "Only RFC1918 ranges allowed (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)"
+            )
+
+        # Limit scan size to prevent resource exhaustion (/16 = 65534 hosts max)
+        if network.prefixlen < 16:
+            raise ValueError(
+                f"Subnet /{network.prefixlen} is too large. Maximum scan size is /16 (65534 hosts)"
+            )
+
         discovered = []
 
         def check_ip(ip_str: str) -> Miner:
@@ -247,9 +272,10 @@ class FleetManager:
 
                     # Send recovery alert if miner came back from offline
                     if miner_status == 'online' and not self.miner_alert_states[miner.ip]['was_online']:
+                        raw_hr = status.get('hashrate', 0)
                         self.alert_mgr.alert_miner_online(
                             miner.ip,
-                            status.get('hashrate', 0),
+                            raw_hr / 1e9 if raw_hr else 0,
                             status.get('temperature')
                         )
 
@@ -291,7 +317,8 @@ class FleetManager:
                                 logger.info(f"Miner {miner.ip} entered overheat mode, tracking for recovery")
 
                             # Check if temperature has dropped to recovery threshold
-                            if config.OVERHEAT_AUTO_REBOOT and temp <= config.OVERHEAT_RECOVERY_TEMP:
+                            # Skip invalid/error temp readings (e.g. -1 from sensor failure)
+                            if config.OVERHEAT_AUTO_REBOOT and temp > 0 and temp <= config.OVERHEAT_RECOVERY_TEMP:
                                 logger.info(f"Miner {miner.ip} cooled to {temp:.1f}°C (threshold: {config.OVERHEAT_RECOVERY_TEMP}°C), triggering reboot")
                                 # Attempt to reboot the miner
                                 if miner.restart():
@@ -332,7 +359,7 @@ class FleetManager:
                                     if last_alert is None or (now - last_alert).total_seconds() > config.ALERT_COOLDOWN:
                                         self.alert_mgr.alert_high_temperature(
                                             miner.ip, temp, profile.warning_temp,
-                                            hashrate, status.get('frequency', 0)
+                                            hashrate / 1e9 if hashrate else 0, status.get('frequency', 0)
                                         )
                                         self.miner_alert_states[miner.ip]['last_temp_alert'] = now
 
@@ -376,6 +403,11 @@ class FleetManager:
                 except Exception as e:
                     logger.error(f"Error in update: {e}")
 
+    def _validate_frequency(self, miner_type: str, freq: int) -> int:
+        """Validate and clamp frequency to device-safe range using thermal profiles"""
+        profile = self.thermal_mgr._get_profile(miner_type)
+        return max(profile.min_freq, min(profile.max_freq, freq))
+
     def _apply_frequency(self, miner: Miner, target_freq: int, reason: str):
         """Apply frequency adjustment to a miner"""
         try:
@@ -386,6 +418,8 @@ class FleetManager:
                     logger.warning(f"Emergency shutdown for {miner.ip}: {reason}")
                     miner.apply_settings({'frequency': 400})  # Minimum safe freq
                 else:
+                    # Validate frequency against device thermal profile
+                    target_freq = self._validate_frequency(miner.type, target_freq)
                     logger.info(f"Adjusting {miner.ip} frequency to {target_freq}MHz: {reason}")
                     miner.apply_settings({'frequency': target_freq})
             else:
@@ -455,25 +489,36 @@ class FleetManager:
 
             if not should_mine:
                 logger.info(f"Mining paused: {reason}")
-                # Set frequency to minimum or stop miners
+                # Collect miners to adjust (inside lock), then apply (outside lock)
+                miners_to_adjust = []
                 with self.lock:
                     for miner in self.miners.values():
                         if config.is_esp_miner(miner.type) and miner.last_status:
-                            try:
-                                miner.apply_settings({'frequency': 100})  # Minimum safe frequency
-                                logger.info(f"Reduced {miner.ip} to minimum: {reason}")
-                            except Exception as e:
-                                logger.error(f"Failed to reduce frequency on {miner.ip}: {e}")
+                            safe_freq = self._validate_frequency(miner.type, 100)
+                            miners_to_adjust.append((miner, safe_freq))
+                # Apply settings outside lock to avoid blocking API endpoints
+                for miner, safe_freq in miners_to_adjust:
+                    try:
+                        miner.apply_settings({'frequency': safe_freq})
+                        logger.info(f"Reduced {miner.ip} to minimum ({safe_freq}MHz): {reason}")
+                    except Exception as e:
+                        logger.error(f"Failed to reduce frequency on {miner.ip}: {e}")
             elif target_frequency > 0:
                 logger.info(f"Applying schedule: target_frequency={target_frequency} ({reason})")
+                # Collect miners to adjust (inside lock), then apply (outside lock)
+                miners_to_adjust = []
                 with self.lock:
                     for miner in self.miners.values():
                         if config.is_esp_miner(miner.type) and miner.last_status:
-                            try:
-                                miner.apply_settings({'frequency': target_frequency})
-                                logger.info(f"Set {miner.ip} frequency to {target_frequency}")
-                            except Exception as e:
-                                logger.error(f"Failed to set frequency on {miner.ip}: {e}")
+                            safe_freq = self._validate_frequency(miner.type, target_frequency)
+                            miners_to_adjust.append((miner, safe_freq))
+                # Apply settings outside lock to avoid blocking API endpoints
+                for miner, safe_freq in miners_to_adjust:
+                    try:
+                        miner.apply_settings({'frequency': safe_freq})
+                        logger.info(f"Set {miner.ip} frequency to {safe_freq}")
+                    except Exception as e:
+                        logger.error(f"Failed to set frequency on {miner.ip}: {e}")
 
         except Exception as e:
             logger.error(f"Error applying mining schedule: {e}")
@@ -588,63 +633,6 @@ class FleetManager:
         except Exception as e:
             logger.error(f"Error logging profitability: {e}")
 
-    def _check_weather_predictions(self):
-        """Check weather forecast and predict thermal issues"""
-        try:
-            # Get current ambient temperature
-            current_weather = self.weather_mgr.get_current_weather()
-            if not current_weather:
-                return  # Weather not configured or unavailable
-
-            current_ambient = current_weather['temp_f']
-
-            # Get fleet average temperature
-            stats = self.get_fleet_stats()
-            avg_miner_temp = stats.get('avg_temperature', 0)
-
-            if avg_miner_temp > 0:
-                # Calculate typical delta from ambient to miner temp
-                # Convert avg_miner_temp from C to F for comparison
-                avg_miner_temp_f = (avg_miner_temp * 9/5) + 32
-                miner_temp_delta = avg_miner_temp_f - current_ambient
-
-                # Predict thermal issues
-                prediction = self.weather_mgr.predict_thermal_issues(
-                    current_ambient=current_ambient,
-                    miner_temp_delta=miner_temp_delta
-                )
-
-                # Send alerts for critical predictions
-                if prediction.get('critical'):
-                    logger.warning(f"Weather prediction: {prediction['message']}")
-                    # Alert about upcoming heat wave
-                    self.alert_mgr.send_custom_alert(
-                        title="⚠️ CRITICAL: Heat Wave Predicted",
-                        message=prediction['message'],
-                        alert_type="weather_critical",
-                        level="critical",
-                        data={
-                            'forecast_max_f': prediction['forecast_max_f'],
-                            'forecast_max_time': prediction['forecast_max_time'],
-                            'estimated_miner_temp_c': prediction['estimated_miner_temp_c'],
-                            'recommendations': prediction['recommendations']
-                        }
-                    )
-                elif prediction.get('warning'):
-                    logger.info(f"Weather warning: {prediction['message']}")
-
-                # Check if miners should pre-cool
-                for miner in self.miners.values():
-                    if miner.last_status and miner.last_status.get('temperature'):
-                        temp_c = miner.last_status['temperature']
-                        if self.weather_mgr.should_precool(temp_c, lookahead_hours=6):
-                            logger.info(f"Pre-cooling recommended for {miner.ip}")
-                            # Optionally reduce frequency preemptively
-                            # This would be a configurable option
-
-        except Exception as e:
-            logger.error(f"Error checking weather predictions: {e}")
-
     def start_monitoring(self):
         """Start background monitoring thread"""
         if self.monitoring_active:
@@ -655,8 +643,6 @@ class FleetManager:
 
         def monitor_loop():
             logger.info("Monitoring thread started")
-            weather_check_counter = 0  # Check weather every 10 iterations (2.5 minutes if UPDATE_INTERVAL=15)
-
             while self.monitoring_active:
                 try:
                     # Check if mining schedule requires frequency changes
@@ -670,12 +656,6 @@ class FleetManager:
 
                     # Log profitability (every hour)
                     self._log_profitability()
-
-                    # Check weather predictions periodically
-                    weather_check_counter += 1
-                    if weather_check_counter >= 10:  # Check weather less frequently
-                        self._check_weather_predictions()
-                        weather_check_counter = 0
 
                 except Exception as e:
                     logger.error(f"Error in monitoring loop: {e}")
@@ -829,6 +809,32 @@ class FleetManager:
 fleet = FleetManager()
 
 
+# CSRF Protection (Double Submit Cookie pattern)
+
+@app.before_request
+def csrf_protect():
+    """Validate CSRF token on state-changing requests"""
+    if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        token = request.headers.get('X-CSRF-Token', '')
+        cookie_token = request.cookies.get('csrf_token', '')
+        if not token or not cookie_token or not secrets.compare_digest(token, cookie_token):
+            return jsonify({'success': False, 'error': 'CSRF validation failed'}), 403
+
+
+@app.after_request
+def set_csrf_cookie(response):
+    """Set CSRF token cookie if not already present"""
+    if 'csrf_token' not in request.cookies:
+        token = secrets.token_hex(32)
+        response.set_cookie(
+            'csrf_token', token,
+            httponly=False,  # JS needs to read it
+            samesite='Lax',
+            secure=False  # Local network app, likely HTTP
+        )
+    return response
+
+
 # Flask Routes
 
 @app.route('/')
@@ -901,6 +907,11 @@ def discover():
             'discovered': len(discovered),
             'message': f'Discovered {len(discovered)} miners'
         })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
     except Exception as e:
         logger.error(f"Discovery error: {e}")
         return jsonify({
@@ -1280,6 +1291,29 @@ def batch_settings():
             'error': 'No settings specified'
         }), 400
 
+    # Validate settings ranges before applying to any miner
+    if 'frequency' in settings:
+        freq = int(settings['frequency'])
+        if freq < 100 or freq > 1000:
+            return jsonify({
+                'success': False,
+                'error': f'Frequency {freq}MHz is outside safe range (100-1000MHz)'
+            }), 400
+    if 'coreVoltage' in settings:
+        voltage = int(settings['coreVoltage'])
+        if voltage < 800 or voltage > 1400:
+            return jsonify({
+                'success': False,
+                'error': f'Voltage {voltage}mV is outside safe range (800-1400mV)'
+            }), 400
+    if 'fanSpeed' in settings or 'fanspeed' in settings:
+        fan = int(settings.get('fanSpeed', settings.get('fanspeed', 50)))
+        if fan < 0 or fan > 100:
+            return jsonify({
+                'success': False,
+                'error': 'Fan speed must be 0-100%'
+            }), 400
+
     results = {'success': [], 'failed': []}
 
     with fleet.lock:
@@ -1287,7 +1321,13 @@ def batch_settings():
             miner = fleet.miners.get(ip)
             if miner and config.is_esp_miner(miner.type):
                 try:
-                    miner.apply_settings(settings)
+                    # Clamp frequency to device-specific safe range
+                    safe_settings = dict(settings)
+                    if 'frequency' in safe_settings:
+                        safe_settings['frequency'] = fleet._validate_frequency(
+                            miner.type, int(safe_settings['frequency'])
+                        )
+                    miner.apply_settings(safe_settings)
                     results['success'].append(ip)
                 except Exception as e:
                     results['failed'].append({'ip': ip, 'error': str(e)})
@@ -1359,7 +1399,7 @@ def create_group():
     """Create a new miner group"""
     data = request.get_json() or {}
     name = data.get('name')
-    color = data.get('color', '#3498db')
+    color = validate_color(data.get('color', '#3498db'))
     description = data.get('description', '')
 
     if not name:
@@ -1402,12 +1442,13 @@ def get_group(group_id):
 def update_group(group_id):
     """Update a group"""
     data = request.get_json() or {}
+    color = validate_color(data['color']) if 'color' in data else None
 
     try:
         fleet.db.update_group(
             group_id,
             name=data.get('name'),
-            color=data.get('color'),
+            color=color,
             description=data.get('description')
         )
         return jsonify({
@@ -3042,7 +3083,14 @@ def force_frequency():
                 'error': 'Missing miner_ip or frequency'
             }), 400
 
-        success = fleet.thermal_mgr.force_frequency(miner_ip, int(frequency))
+        freq = int(frequency)
+        if freq < 100 or freq > 1000:
+            return jsonify({
+                'success': False,
+                'error': f'Frequency {freq}MHz is outside safe range (100-1000MHz)'
+            }), 400
+
+        success = fleet.thermal_mgr.force_frequency(miner_ip, freq)
 
         if success:
             return jsonify({
@@ -3631,150 +3679,6 @@ def save_telegram_config():
         })
     except Exception as e:
         logger.error(f"Error saving Telegram config: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-# Weather Integration Routes
-
-@app.route('/api/weather/config', methods=['GET', 'POST'])
-def weather_config():
-    """Get or set weather configuration"""
-    if request.method == 'GET':
-        return jsonify({
-            'success': True,
-            'configured': fleet.weather_mgr.api_key is not None,
-            'location': fleet.weather_mgr.location,
-            'latitude': fleet.weather_mgr.latitude,
-            'longitude': fleet.weather_mgr.longitude
-        })
-    else:
-        data = request.get_json()
-        try:
-            fleet.weather_mgr.configure(
-                api_key=data.get('api_key'),
-                location=data.get('location'),
-                latitude=data.get('latitude'),
-                longitude=data.get('longitude')
-            )
-            return jsonify({
-                'success': True,
-                'message': 'Weather configuration updated'
-            })
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
-
-
-@app.route('/api/weather/current', methods=['GET'])
-def get_current_weather():
-    """Get current weather conditions"""
-    try:
-        weather = fleet.weather_mgr.get_current_weather()
-        if weather:
-            return jsonify({
-                'success': True,
-                'weather': weather
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Weather not configured or unavailable'
-            }), 404
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/weather/forecast', methods=['GET'])
-def get_weather_forecast():
-    """Get weather forecast"""
-    try:
-        hours = int(request.args.get('hours', 24))
-        forecast = fleet.weather_mgr.get_forecast(hours=hours)
-
-        if forecast:
-            return jsonify({
-                'success': True,
-                'forecast': [f.to_dict() for f in forecast]
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Weather not configured or unavailable'
-            }), 404
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/weather/prediction', methods=['GET'])
-def get_thermal_prediction():
-    """Get thermal issue prediction based on weather"""
-    try:
-        # Get current weather and fleet stats
-        current_weather = fleet.weather_mgr.get_current_weather()
-        if not current_weather:
-            return jsonify({
-                'success': False,
-                'error': 'Weather not configured'
-            }), 404
-
-        stats = fleet.get_fleet_stats()
-        avg_miner_temp = stats.get('avg_temperature', 0)
-
-        if avg_miner_temp > 0:
-            current_ambient = current_weather['temp_f']
-            avg_miner_temp_f = (avg_miner_temp * 9/5) + 32
-            miner_temp_delta = avg_miner_temp_f - current_ambient
-
-            prediction = fleet.weather_mgr.predict_thermal_issues(
-                current_ambient=current_ambient,
-                miner_temp_delta=miner_temp_delta
-            )
-
-            return jsonify({
-                'success': True,
-                'prediction': prediction
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'No miner temperature data available'
-            }), 404
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/weather/optimal-hours', methods=['GET'])
-def get_optimal_mining_hours():
-    """Get optimal mining hours based on temperature forecast"""
-    try:
-        hours = int(request.args.get('hours', 24))
-        max_temp = float(request.args.get('max_temp_f', 80.0))
-
-        optimal = fleet.weather_mgr.get_optimal_mining_hours(
-            hours=hours,
-            max_ambient_f=max_temp
-        )
-
-        return jsonify({
-            'success': True,
-            'optimal_periods': optimal
-        })
-    except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)

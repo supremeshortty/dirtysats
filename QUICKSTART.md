@@ -15,7 +15,7 @@ cd home-mining-fleet-manager
 ```
 
 ### 3. Access
-Open browser: **http://localhost:5000**
+Open browser: **http://localhost:5001**
 
 ### 4. Discover
 Click **"Discover Miners"** button
@@ -62,7 +62,7 @@ UPDATE_INTERVAL = 10  # Faster updates (seconds)
 ### Access from Other Devices
 The dashboard is accessible from any device on your network at:
 ```
-http://<raspberry-pi-ip>:5000
+http://<raspberry-pi-ip>:5001
 ```
 
 Find your Pi's IP with: `hostname -I`
@@ -91,8 +91,8 @@ echo '{"command":"version"}' | nc <miner-ip> 4028
 # Check if Flask is running
 ps aux | grep python
 
-# Check port 5000
-netstat -tulpn | grep 5000
+# Check port 5001
+netstat -tulpn | grep 5001
 
 # View logs
 # (they'll show in terminal where you ran ./start.sh)
@@ -148,27 +148,27 @@ home-mining-fleet-manager/
 
 ### Get all miners
 ```bash
-curl http://localhost:5000/api/miners
+curl http://localhost:5001/api/miners
 ```
 
 ### Get fleet stats
 ```bash
-curl http://localhost:5000/api/stats
+curl http://localhost:5001/api/stats
 ```
 
 ### Discover miners
 ```bash
-curl -X POST http://localhost:5000/api/discover
+curl -X POST http://localhost:5001/api/discover
 ```
 
 ### Restart a miner
 ```bash
-curl -X POST http://localhost:5000/api/miner/10.0.0.100/restart
+curl -X POST http://localhost:5001/api/miner/10.0.0.100/restart
 ```
 
 ### Delete a miner
 ```bash
-curl -X DELETE http://localhost:5000/api/miner/10.0.0.100
+curl -X DELETE http://localhost:5001/api/miner/10.0.0.100
 ```
 
 ---

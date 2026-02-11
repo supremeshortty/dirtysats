@@ -39,7 +39,6 @@ class AlertType(Enum):
     UNPROFITABLE = "unprofitable"
     EMERGENCY_SHUTDOWN = "emergency_shutdown"
     MINER_ONLINE = "miner_online"
-    WEATHER_WARNING = "weather_warning"
     OVERHEAT_RECOVERY = "overheat_recovery"
 
 
@@ -74,7 +73,6 @@ class AlertConfig:
             'unprofitable': False,
             'emergency_shutdown': True,
             'miner_online': False,
-            'weather_warning': True,
             'overheat_recovery': True
         }
 
@@ -582,7 +580,7 @@ class AlertManager:
         try:
             alert_type_enum = AlertType(alert_type)
         except ValueError:
-            alert_type_enum = AlertType.WEATHER_WARNING  # Default fallback
+            alert_type_enum = AlertType.MINER_OFFLINE  # Default fallback
 
         alert = Alert(
             alert_type=alert_type_enum,

@@ -82,7 +82,7 @@ If your pool isn't auto-detected, you can configure it manually.
 
 ```bash
 # Configure custom pool
-curl -X POST http://localhost:5000/api/pool-config \
+curl -X POST http://localhost:5001/api/pool-config \
   -H "Content-Type: application/json" \
   -d '{
     "miner_ip": "192.168.1.100",

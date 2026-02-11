@@ -4,7 +4,7 @@
 
 **Goal:** Fix data accuracy issues, redesign UI components, add seasonal energy rates, fix OpenEI search, build real strategy optimizer, overhaul charts, expand miner specs, improve Telegram alerts, and expand mining pool directory.
 
-**Architecture:** Flask backend (app.py, energy.py, alerts.py, metrics_real.py, pool_manager.py) + vanilla JS frontend (script.js, style.css, dashboard.html) + SQLite (database/db.py). All changes touch existing files. No new frameworks.
+**Architecture:** Flask backend (app.py, energy.py, alerts.py, metrics.py, pool_manager.py) + vanilla JS frontend (script.js, style.css, dashboard.html) + SQLite (database/db.py). All changes touch existing files. No new frameworks.
 
 **Tech Stack:** Python/Flask, vanilla JavaScript, Chart.js, SQLite, Telegram Bot API, OpenEI API
 
@@ -73,7 +73,7 @@ Update `loadMetricsData()` in the dashboard HTML inline script (lines 1997-2178)
 
 **Step 3: Fix efficiency display to J/TH**
 
-Currently showing "W/TH" in the Power Efficiency card. Change ALL efficiency metrics across the dashboard to J/TH. In `metrics_real.py:411-474`, the `PowerEfficiencyMatrix` already calculates J/TH correctly - the issue is display-side.
+Currently showing "W/TH" in the Power Efficiency card. Change ALL efficiency metrics across the dashboard to J/TH. In `metrics.py:411-474`, the `PowerEfficiencyMatrix` already calculates J/TH correctly - the issue is display-side.
 
 Search and replace all "W/TH" labels with "J/TH" in dashboard.html and script.js.
 
@@ -364,7 +364,7 @@ Relocate the "Current Performance Metrics" bar to the top of the Charts tab, abo
 
 **Step 2: Fix efficiency display**
 
-The efficiency shows "0 J/TH" because the calculation isn't wired up correctly. The `PowerEfficiencyMatrix` in `metrics_real.py` calculates correctly but the frontend doesn't call it for this display. Wire it up.
+The efficiency shows "0 J/TH" because the calculation isn't wired up correctly. The `PowerEfficiencyMatrix` in `metrics.py` calculates correctly but the frontend doesn't call it for this display. Wire it up.
 
 **Step 3: Expand metrics shown**
 
@@ -415,9 +415,9 @@ Miners to add/verify (if not already present):
 
 **Step 2: Update alert thresholds per device**
 
-In `alerts.py` and `metrics_real.py`, use the device-specific temperature thresholds from `device_specifications.json` instead of generic defaults. The Nano 3S at 90°C should NOT trigger an alert - that's normal operation.
+In `alerts.py` and `metrics.py`, use the device-specific temperature thresholds from `device_specifications.json` instead of generic defaults. The Nano 3S at 90°C should NOT trigger an alert - that's normal operation.
 
-Currently `MinerHealthMonitor.MINER_TEMP_THRESHOLDS` in `metrics_real.py:297-311` has some thresholds but they're hardcoded. Wire them to `device_specifications.json`.
+Currently `MinerHealthMonitor.MINER_TEMP_THRESHOLDS` in `metrics.py:297-311` has some thresholds but they're hardcoded. Wire them to `device_specifications.json`.
 
 **Step 3: Make alert thresholds device-aware**
 

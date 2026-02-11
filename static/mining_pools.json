@@ -602,32 +602,6 @@
       "stratum_urls": []
     },
     {
-      "id": "sbi_crypto",
-      "status": "active",
-      "name": "SBI Crypto",
-      "website": "https://sbicrypto.com",
-      "fee_structure": {
-        "standard": "PPS / FPPS (exact percentage not publicly disclosed)",
-        "notes": "Japanese institutional mining pool. Suffered a $21 million hack in late 2025 linked to North Korean attackers. Operational status uncertain heading into 2026."
-      },
-      "payout_method": "PPS / FPPS",
-      "payout_method_description": "Standard PPS and FPPS payout models catering to institutional miners.",
-      "minimum_payout": {
-        "onchain": "Not publicly disclosed",
-        "lightning": "Not supported"
-      },
-      "supports_solo_mining": false,
-      "supports_lightning": false,
-      "requires_kyc": true,
-      "requires_account": true,
-      "unique_description": "Owned by Japanese conglomerate SBI Holdings, integrating traditional finance with Bitcoin mining. Strong Asia-Pacific focus. CAUTION: Suffered a $21 million security breach in late 2025, with SBI mentioning 'possible business restructuring' -- operational status may be uncertain.",
-      "good_for_home_miners": false,
-      "home_miner_notes": "NOT RECOMMENDED for home miners at this time due to the late-2025 security breach and uncertain operational status. Primarily serves institutional Asian miners. KYC required.",
-      "approximate_hashrate_share": "~1-2%",
-      "supported_coins": ["BTC"],
-      "stratum_urls": []
-    },
-    {
       "id": "braiins_solo",
       "status": "active",
       "name": "Braiins Solo (via Braiins Pool)",
@@ -871,15 +845,15 @@
     },
     {
       "id": "sbicrypto",
-      "status": "active",
+      "status": "caution",
       "name": "SBI Crypto Pool",
       "website": "https://sbicrypto.com",
-      "fee_structure": { "standard": "1%", "notes": "Low fee PPS pool backed by SBI Group" },
+      "fee_structure": { "standard": "1%", "notes": "Low fee PPS pool backed by SBI Group. Suffered a $21 million hack in late 2025 linked to North Korean attackers. Operational status uncertain heading into 2026." },
       "payout_method": "PPS",
       "minimum_payout": { "onchain": "0.005 BTC", "lightning": "Not supported" },
       "supports_solo_mining": false, "supports_lightning": false, "requires_kyc": true, "requires_account": true,
-      "unique_description": "Japanese financial conglomerate SBI Group's mining pool. Regulated, institutional-grade pool with Asia-Pacific focus.",
-      "good_for_home_miners": false, "home_miner_notes": "KYC required. Higher minimum payout. Better suited for Japanese or Asian miners with larger operations.",
+      "unique_description": "Japanese financial conglomerate SBI Group's mining pool. Regulated, institutional-grade pool with Asia-Pacific focus. CAUTION: Suffered a $21 million security breach in late 2025, with SBI mentioning 'possible business restructuring' -- operational status may be uncertain.",
+      "good_for_home_miners": false, "home_miner_notes": "NOT RECOMMENDED for home miners at this time due to the late-2025 security breach and uncertain operational status. KYC required. Higher minimum payout. Better suited for Japanese or Asian miners with larger operations.",
       "approximate_hashrate_share": "<1%", "supported_coins": ["BTC"],
       "stratum_urls": ["stratum+tcp://btc.sbicrypto.com:3333"]
     },

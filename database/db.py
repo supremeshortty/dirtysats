@@ -4,7 +4,8 @@ SQLite database operations for fleet manager
 import sqlite3
 import logging
 import math
-from datetime import datetime, timedelta
+import threading
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from contextlib import contextmanager
 
@@ -45,22 +46,36 @@ class Database:
 
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self._write_lock = threading.Lock()
         self._init_db()
 
     @contextmanager
-    def _get_connection(self):
-        """Context manager for database connections"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+    def _get_connection(self, readonly: bool = False):
+        """Context manager for database connections.
+
+        Args:
+            readonly: If True, skip acquiring write lock (for SELECT-only queries).
+        """
+        lock_acquired = False
+        if not readonly:
+            self._write_lock.acquire()
+            lock_acquired = True
         try:
-            yield conn
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Database error: {e}")
-            raise
+            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Database error: {e}")
+                raise
+            finally:
+                conn.close()
         finally:
-            conn.close()
+            if lock_acquired:
+                self._write_lock.release()
 
     def _init_db(self):
         """Initialize database schema"""
@@ -84,7 +99,7 @@ class Database:
             # Migration: Add auto_optimize column if it doesn't exist (for existing databases)
             try:
                 cursor.execute("ALTER TABLE miners ADD COLUMN auto_optimize INTEGER DEFAULT 0")
-            except Exception:
+            except sqlite3.OperationalError:
                 pass  # Column already exists
 
             # Stats table
@@ -131,7 +146,7 @@ class Database:
             # Add default_rate column if it doesn't exist (migration for existing databases)
             try:
                 cursor.execute("ALTER TABLE energy_config ADD COLUMN default_rate REAL DEFAULT 0.12")
-            except Exception:
+            except sqlite3.OperationalError:
                 pass  # Column already exists
 
             # Energy rates table (time-of-use pricing)
@@ -151,7 +166,7 @@ class Database:
             # Migration: Add season column if it doesn't exist
             try:
                 cursor.execute("ALTER TABLE energy_rates ADD COLUMN season TEXT DEFAULT 'all'")
-            except Exception:
+            except sqlite3.OperationalError:
                 pass  # Column already exists
 
             # Seasonal date configuration table
@@ -237,18 +252,6 @@ class Database:
                     title TEXT,
                     message TEXT,
                     data_json TEXT
-                )
-            """)
-
-            # Weather configuration table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS weather_config (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    api_key TEXT,
-                    location TEXT,
-                    latitude REAL,
-                    longitude REAL,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -370,6 +373,12 @@ class Database:
                 ON energy_rates_history(effective_date)
             """)
 
+            # Migration: Add UNIQUE constraint on pool_config(miner_ip, pool_index) for existing databases
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pool_config_unique
+                ON pool_config(miner_ip, pool_index)
+            """)
+
             # Migrations: Add custom_name column if it doesn't exist
             cursor.execute("PRAGMA table_info(miners)")
             columns = [col[1] for col in cursor.fetchall()]
@@ -404,7 +413,7 @@ class Database:
 
     def get_all_miners(self) -> List[Dict]:
         """Get all miners from database"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM miners ORDER BY ip")
             rows = cursor.fetchall()
@@ -412,7 +421,7 @@ class Database:
 
     def get_miner_by_ip(self, ip: str) -> Optional[Dict]:
         """Get specific miner by IP"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM miners WHERE ip = ?", (ip,))
             row = cursor.fetchone()
@@ -438,7 +447,7 @@ class Database:
 
     def get_latest_stats(self, miner_id: int) -> Optional[Dict]:
         """Get latest stats for a miner"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM stats
@@ -451,7 +460,7 @@ class Database:
 
     def get_historical_stats(self, miner_id: int, limit: int = 100) -> List[Dict]:
         """Get historical stats for a miner"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM stats
@@ -466,7 +475,7 @@ class Database:
         """Get stats history for a miner within time window"""
         # Calculate cutoff time in Python to avoid UTC/local time issues
         cutoff = datetime.now() - timedelta(hours=hours)
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM stats
@@ -480,7 +489,7 @@ class Database:
     def get_best_difficulty_ever(self) -> float:
         """Get the highest best_difficulty ever recorded across all miners"""
         try:
-            with self._get_connection() as conn:
+            with self._get_connection(readonly=True) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT MAX(best_difficulty) as max_diff FROM stats
@@ -490,7 +499,7 @@ class Database:
                 if row and row['max_diff'] is not None:
                     return _parse_numeric(row['max_diff']) or 0.0
                 return 0.0
-        except Exception:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError):
             return 0.0
 
     def update_miner_custom_name(self, ip: str, custom_name: str):
@@ -517,7 +526,7 @@ class Database:
 
     def get_miner_auto_optimize(self, ip: str) -> bool:
         """Get auto-optimize setting for a miner"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT auto_optimize FROM miners WHERE ip = ?", (ip,))
             row = cursor.fetchone()
@@ -525,7 +534,7 @@ class Database:
 
     def get_all_auto_optimize_settings(self) -> dict:
         """Get auto-optimize settings for all miners"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT ip, auto_optimize FROM miners")
             rows = cursor.fetchall()
@@ -564,7 +573,7 @@ class Database:
 
     def get_energy_config(self) -> Optional[Dict]:
         """Get energy configuration"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM energy_config ORDER BY id DESC LIMIT 1")
             row = cursor.fetchone()
@@ -594,7 +603,7 @@ class Database:
 
     def get_seasonal_config(self) -> List[Dict]:
         """Get seasonal date configuration"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM seasonal_config ORDER BY season_name")
             rows = cursor.fetchall()
@@ -608,7 +617,7 @@ class Database:
 
     def get_energy_rates(self) -> List[Dict]:
         """Get all energy rates"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM energy_rates ORDER BY start_time")
             rows = cursor.fetchall()
@@ -632,7 +641,7 @@ class Database:
 
     def get_mining_schedules(self) -> List[Dict]:
         """Get all mining schedules"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM mining_schedule WHERE enabled = 1 ORDER BY start_time")
             rows = cursor.fetchall()
@@ -656,8 +665,8 @@ class Database:
 
     def get_energy_consumption_history(self, hours: int = 24) -> List[Dict]:
         """Get energy consumption history"""
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
-        with self._get_connection() as conn:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM energy_consumption
@@ -676,21 +685,23 @@ class Database:
         Returns:
             Dict with total_kwh, readings_count, time_coverage_percent, and hourly breakdown
         """
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
 
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
 
             # Get all power readings ordered by timestamp
             # Group by second-level precision to aggregate all miners polled in the same cycle
+            # JOIN miners table to exclude stats from deleted/test miners
             cursor.execute("""
-                SELECT strftime('%Y-%m-%d %H:%M:%S', timestamp) as timestamp,
-                       SUM(power) as total_power
-                FROM stats
-                WHERE timestamp > ?
-                AND status IN ('online', 'overheating')
-                AND power > 0
-                GROUP BY strftime('%Y-%m-%d %H:%M:%S', timestamp)
+                SELECT strftime('%Y-%m-%d %H:%M:%S', s.timestamp) as timestamp,
+                       SUM(s.power) as total_power
+                FROM stats s
+                INNER JOIN miners m ON s.miner_id = m.id
+                WHERE s.timestamp > ?
+                AND s.status IN ('online', 'overheating')
+                AND s.power > 0
+                GROUP BY strftime('%Y-%m-%d %H:%M:%S', s.timestamp)
                 ORDER BY timestamp ASC
             """, (cutoff,))
             rows = cursor.fetchall()
@@ -785,8 +796,8 @@ class Database:
 
     def get_profitability_history(self, days: int = 7) -> List[Dict]:
         """Get profitability history"""
-        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
-        with self._get_connection() as conn:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM profitability_log
@@ -799,9 +810,9 @@ class Database:
     def get_aggregate_stats(self, hours: int = 24) -> Dict:
         """Get aggregated stats over a time period"""
         # Use Python datetime to avoid UTC/localtime issues with SQLite
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
 
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
 
             # Calculate shares earned in period (difference between latest and earliest)
@@ -901,10 +912,10 @@ class Database:
         Recent shares (0-5 min) carry most weight; shares >25 min old are negligible.
         """
         DECAY_CONSTANT = 300  # seconds
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
-        now = datetime.now()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.now(timezone.utc)
 
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
 
             query = """
@@ -984,8 +995,8 @@ class Database:
 
     def get_alert_history(self, hours: int = 24) -> List[Dict]:
         """Get alert history"""
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
-        with self._get_connection() as conn:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM alert_history
@@ -1006,7 +1017,7 @@ class Database:
 
     def get_alert_config(self, channel: str = None) -> Optional[Dict]:
         """Get alert configuration for a channel"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             if channel:
                 cursor.execute("SELECT * FROM alert_config WHERE channel = ?", (channel,))
@@ -1016,29 +1027,6 @@ class Database:
                 cursor.execute("SELECT * FROM alert_config")
                 rows = cursor.fetchall()
                 return [dict(row) for row in rows]
-
-    # Weather Configuration Methods
-
-    def save_weather_config(self, api_key: str, location: str = None,
-                           latitude: float = None, longitude: float = None):
-        """Save weather configuration"""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # Delete old config
-            cursor.execute("DELETE FROM weather_config")
-            # Insert new config
-            cursor.execute("""
-                INSERT INTO weather_config (api_key, location, latitude, longitude, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (api_key, location, latitude, longitude, datetime.now()))
-
-    def get_weather_config(self) -> Optional[Dict]:
-        """Get weather configuration"""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM weather_config ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            return dict(row) if row else None
 
     # Settings methods (key-value store)
 
@@ -1056,7 +1044,7 @@ class Database:
 
     def get_setting(self, key: str, default: str = None) -> Optional[str]:
         """Get a setting value"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
             row = cursor.fetchone()
@@ -1080,26 +1068,28 @@ class Database:
             """, (name, color, description))
             return cursor.lastrowid
 
+    # Whitelist of columns allowed in dynamic UPDATE queries
+    _GROUP_UPDATE_COLUMNS = frozenset({'name', 'color', 'description'})
+
     def update_group(self, group_id: int, name: str = None, color: str = None, description: str = None):
         """Update an existing group"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             updates = []
             params = []
-            if name is not None:
-                updates.append("name = ?")
-                params.append(name)
-            if color is not None:
-                updates.append("color = ?")
-                params.append(color)
-            if description is not None:
-                updates.append("description = ?")
-                params.append(description)
+            field_map = {'name': name, 'color': color, 'description': description}
+            for col, val in field_map.items():
+                if val is not None:
+                    if col not in self._GROUP_UPDATE_COLUMNS:
+                        raise ValueError(f"Invalid column: {col}")
+                    updates.append(f"{col} = ?")
+                    params.append(val)
             if updates:
                 params.append(group_id)
-                cursor.execute(f"""
-                    UPDATE miner_groups SET {', '.join(updates)} WHERE id = ?
-                """, params)
+                cursor.execute(
+                    f"UPDATE miner_groups SET {', '.join(updates)} WHERE id = ?",
+                    params
+                )
 
     def delete_group(self, group_id: int):
         """Delete a group (members are automatically removed via CASCADE)"""
@@ -1109,7 +1099,7 @@ class Database:
 
     def get_all_groups(self) -> List[Dict]:
         """Get all miner groups with member count"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT g.*, COUNT(m.id) as member_count
@@ -1123,7 +1113,7 @@ class Database:
 
     def get_group(self, group_id: int) -> Optional[Dict]:
         """Get a specific group"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM miner_groups WHERE id = ?", (group_id,))
             row = cursor.fetchone()
@@ -1148,7 +1138,7 @@ class Database:
 
     def get_miner_groups(self, miner_ip: str) -> List[Dict]:
         """Get all groups a miner belongs to"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT g.* FROM miner_groups g
@@ -1161,7 +1151,7 @@ class Database:
 
     def get_group_members(self, group_id: int) -> List[str]:
         """Get all miner IPs in a group"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT miner_ip FROM miner_group_members WHERE group_id = ?
@@ -1212,7 +1202,7 @@ class Database:
 
     def get_pool_config(self, miner_ip: str = None, pool_name: str = None) -> List[Dict]:
         """Get pool configuration(s)"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             if miner_ip and pool_name:
                 cursor.execute("""
@@ -1275,7 +1265,7 @@ class Database:
     def get_pool_earnings_history(self, miner_ip: str = None, pool_name: str = None,
                                   hours: int = 24) -> List[Dict]:
         """Get pool earnings history"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             since = datetime.now() - timedelta(hours=hours)
 
@@ -1321,7 +1311,7 @@ class Database:
 
     def get_historical_rate(self, timestamp: datetime) -> Optional[Dict]:
         """Get the energy rate that was active at a specific time"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             date_str = timestamp.strftime('%Y-%m-%d')
             time_str = timestamp.strftime('%H:%M:%S')
@@ -1359,7 +1349,7 @@ class Database:
     def get_energy_rate_history(self, rate_id: int = None,
                                start_date: str = None, end_date: str = None) -> List[Dict]:
         """Get energy rate history entries"""
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
 
             query = "SELECT * FROM energy_rates_history WHERE 1=1"
@@ -1384,12 +1374,12 @@ class Database:
     def get_efficiency_history(self, hours: int = 24) -> List[Dict]:
         """Get pre-computed efficiency (J/TH) history by joining power and hashrate from stats table.
         Groups by ~5min intervals and computes efficiency server-side to avoid timestamp mismatch bugs."""
-        cutoff = (datetime.now() - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
 
         # For 7d+ ranges, use hourly buckets; otherwise 5-minute buckets
         bucket_seconds = 3600 if hours > 48 else 300
 
-        with self._get_connection() as conn:
+        with self._get_connection(readonly=True) as conn:
             cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT
