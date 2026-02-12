@@ -807,6 +807,7 @@ class FleetManager:
 
 # Global fleet manager
 fleet = FleetManager()
+fleet.start_monitoring()
 
 
 # CSRF Protection (Double Submit Cookie pattern)
@@ -4425,9 +4426,6 @@ def get_miner_specs():
 
 if __name__ == '__main__':
     logger.info("Starting DirtySats")
-
-    # Start monitoring
-    fleet.start_monitoring()
 
     try:
         app.run(

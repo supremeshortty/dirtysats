@@ -7,7 +7,7 @@ Type=simple
 User=__USER__
 WorkingDirectory=__INSTALL_DIR__
 Environment="PATH=__INSTALL_DIR__/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=__INSTALL_DIR__/venv/bin/python3 app.py
+ExecStart=__INSTALL_DIR__/venv/bin/gunicorn -w 1 --threads 4 -b 0.0.0.0:5001 --timeout 120 app:app
 Restart=always
 RestartSec=10
 StandardOutput=append:__INSTALL_DIR__/logs/fleet-manager.log

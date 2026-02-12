@@ -946,9 +946,9 @@ class Database:
                 ip = row['ip']
                 ts_raw = row['timestamp']
                 try:
-                    ts = datetime.strptime(ts_raw, '%Y-%m-%d %H:%M:%S')
+                    ts = datetime.strptime(ts_raw, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
                 except ValueError:
-                    ts = datetime.strptime(ts_raw[:19], '%Y-%m-%d %H:%M:%S')
+                    ts = datetime.strptime(ts_raw[:19], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
                 shares = row['shares_accepted']
 
                 if mid != current_miner_id:
