@@ -6,11 +6,12 @@ import re
 import logging
 import secrets
 import ipaddress
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
 from datetime import datetime
 from typing import List, Dict
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, Response
 
 import config
 from database import Database
@@ -48,8 +49,15 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# Dashboard authentication (HTTP Basic Auth) — opt-in only
+# Set DIRTYSATS_USERNAME and DIRTYSATS_PASSWORD in environment to enable auth.
+_auth_username = os.environ.get('DIRTYSATS_USERNAME')
+_auth_password = os.environ.get('DIRTYSATS_PASSWORD')
+_auth_enabled = bool(_auth_username and _auth_password)
+
 # Maximum hours for historical data queries (30 days)
 MAX_HISTORY_HOURS = 720
+ENABLE_TEST_ENDPOINTS = os.environ.get('ENABLE_TEST_ENDPOINTS', 'false').lower() == 'true'
 
 
 def validate_hours(hours: int, default: int = 24) -> int:
@@ -70,6 +78,21 @@ def validate_color(color: str, default: str = '#3498db') -> str:
     if _COLOR_RE.match(color.strip()):
         return color.strip()
     return default
+
+
+def redact_pool_secrets(pools: List[Dict]) -> List[Dict]:
+    """Redact pool credential fields from API responses."""
+    redacted = []
+    for pool in pools or []:
+        p = dict(pool)
+        if 'password' in p and p.get('password') is not None:
+            p['password'] = '***'
+        if 'pass' in p and p.get('pass') is not None:
+            p['pass'] = '***'
+        if 'stratum_password' in p and p.get('stratum_password') is not None:
+            p['stratum_password'] = '***'
+        redacted.append(p)
+    return redacted
 
 
 class FleetManager:
@@ -245,7 +268,10 @@ class FleetManager:
 
     def update_all_miners(self):
         """Update status of all miners in parallel"""
-        if not self.miners:
+        with self.lock:
+            miners_snapshot = list(self.miners.values())
+
+        if not miners_snapshot:
             return
 
         def update_miner(miner: Miner):
@@ -391,10 +417,10 @@ class FleetManager:
                 logger.error(f"Error updating miner {miner.ip}: {e}")
 
         # Update all miners in parallel
-        with ThreadPoolExecutor(max_workers=len(self.miners)) as executor:
+        with ThreadPoolExecutor(max_workers=len(miners_snapshot)) as executor:
             futures = [
                 executor.submit(update_miner, miner)
-                for miner in self.miners.values()
+                for miner in miners_snapshot
             ]
             # Wait for all to complete
             for future in as_completed(futures):
@@ -807,14 +833,33 @@ class FleetManager:
 
 # Global fleet manager
 fleet = FleetManager()
-fleet.start_monitoring()
 
 
 # CSRF Protection (Double Submit Cookie pattern)
 
 @app.before_request
 def csrf_protect():
-    """Validate CSRF token on state-changing requests"""
+    """Start monitoring lazily, enforce auth, and validate CSRF token"""
+    # Avoid import-time side effects; start monitoring once on first request.
+    if not fleet.monitoring_active:
+        fleet.start_monitoring()
+
+    # Require authentication only when credentials are configured via env vars.
+    if _auth_enabled and (request.path == '/' or request.path.startswith('/api/')):
+        auth = request.authorization
+        valid_auth = (
+            auth is not None and
+            auth.username == _auth_username and
+            secrets.compare_digest(auth.password or '', _auth_password)
+        )
+        if not valid_auth:
+            return Response(
+                'Authentication required',
+                401,
+                {'WWW-Authenticate': 'Basic realm="DirtySats"'}
+            )
+
+    # Validate CSRF token on state-changing requests.
     if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
         token = request.headers.get('X-CSRF-Token', '')
         cookie_token = request.cookies.get('csrf_token', '')
@@ -945,6 +990,8 @@ def delete_miner(ip: str):
     with fleet.lock:
         if ip in fleet.miners:
             del fleet.miners[ip]
+            if ip in fleet.thermal_mgr.thermal_states:
+                del fleet.thermal_mgr.thermal_states[ip]
             fleet.db.delete_miner(ip)
             return jsonify({
                 'success': True,
@@ -1189,7 +1236,7 @@ def get_miner_pools(ip: str):
 
         return jsonify({
             'success': True,
-            'pools': pools_info.get('pools', []),
+            'pools': redact_pool_secrets(pools_info.get('pools', [])),
             'active_pool': pools_info.get('active_pool', 0)
         })
 
@@ -1197,7 +1244,7 @@ def get_miner_pools(ip: str):
 @app.route('/api/miner/<ip>/pools', methods=['POST'])
 def set_miner_pools(ip: str):
     """Set pool configuration for a specific miner"""
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     pools = data.get('pools', [])
 
     if not pools:
@@ -1363,6 +1410,8 @@ def batch_remove():
             if ip in fleet.miners:
                 try:
                     del fleet.miners[ip]
+                    if ip in fleet.thermal_mgr.thermal_states:
+                        del fleet.thermal_mgr.thermal_states[ip]
                     fleet.db.delete_miner(ip)
                     results['success'].append(ip)
                 except Exception as e:
@@ -1718,7 +1767,7 @@ def get_all_pools():
                     'type': miner.type,
                     'custom_name': miner.custom_name,
                     'name': miner.custom_name or miner.model,
-                    'pools': mock_pools,
+                    'pools': redact_pool_secrets(mock_pools),
                     'active_pool': 0,
                     'is_mock': True
                 })
@@ -1732,7 +1781,7 @@ def get_all_pools():
                         'type': miner.type,
                         'custom_name': miner.custom_name,
                         'name': miner.custom_name or miner.model,
-                        'pools': pools_info.get('pools', []),
+                        'pools': redact_pool_secrets(pools_info.get('pools', [])),
                         'active_pool': pools_info.get('active_pool', 0)
                     })
 
@@ -1750,6 +1799,7 @@ def get_pool_configs():
         pool_name = request.args.get('pool_name')
 
         configs = fleet.db.get_pool_config(miner_ip=miner_ip, pool_name=pool_name)
+        configs = redact_pool_secrets(configs)
 
         return jsonify({
             'success': True,
@@ -2066,14 +2116,13 @@ def save_openei_key():
             }), 400
 
         # Validate the key by making a test request
-        import requests as req
         test_params = {
             'version': '7',
             'format': 'json',
             'api_key': api_key,
             'limit': 1
         }
-        test_response = req.get('https://api.openei.org/utility_rates', params=test_params, timeout=10)
+        test_response = requests.get('https://api.openei.org/utility_rates', params=test_params, timeout=10)
         test_data = test_response.json()
 
         if 'error' in test_data:
@@ -2096,7 +2145,7 @@ def save_openei_key():
             'masked_key': f"****{api_key[-4:]}" if len(api_key) > 4 else None
         })
 
-    except req.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Network error validating API key: {e}")
         return jsonify({
             'success': False,
@@ -3693,6 +3742,9 @@ def save_telegram_config():
 @app.route('/api/test/mock-miners', methods=['POST'])
 def add_mock_miners():
     """Add mock miners for testing the dashboard"""
+    if not ENABLE_TEST_ENDPOINTS:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
     import random
     from datetime import datetime, timedelta
 
@@ -4040,6 +4092,9 @@ def add_mock_miners():
 @app.route('/api/test/clear-miners', methods=['POST'])
 def clear_mock_miners():
     """Clear all miners (for testing)"""
+    if not ENABLE_TEST_ENDPOINTS:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
     with fleet.lock:
         # Get all miner IPs before clearing
         miner_ips = list(fleet.miners.keys())
@@ -4133,11 +4188,9 @@ def diagnostic():
         })
     except Exception as e:
         logger.error(f"Diagnostic error: {e}")
-        import traceback
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Diagnostic failed'
         }), 500
 
 
@@ -4310,7 +4363,7 @@ def compare_pools():
     """Compare selected pools side-by-side"""
     import json as json_lib
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         pool_ids = data.get('pool_ids', [])
         if len(pool_ids) < 2 or len(pool_ids) > 4:
             return jsonify({'success': False, 'error': 'Select 2-4 pools to compare'}), 400
@@ -4322,7 +4375,8 @@ def compare_pools():
         selected = [p for p in pool_data.get('pools', []) if p['id'] in pool_ids]
         return jsonify({'success': True, 'pools': selected})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error comparing pools: {e}")
+        return jsonify({'success': False, 'error': 'Failed to compare selected pools'}), 500
 
 
 @app.route('/api/energy/seasonal-config', methods=['GET', 'POST', 'DELETE'])
@@ -4337,11 +4391,12 @@ def seasonal_config():
                 seasons = [dict(r) for r in rows]
             return jsonify({'success': True, 'seasons': seasons})
         except Exception as e:
-            return jsonify({'success': True, 'seasons': []})
+            logger.error(f"Error loading seasonal config: {e}")
+            return jsonify({'success': False, 'error': 'Failed to load seasonal configuration'}), 500
 
     elif request.method == 'POST':
         try:
-            data = request.get_json()
+            data = request.get_json(silent=True) or {}
             seasons = data.get('seasons', [])
             with fleet.db._get_connection() as conn:
                 cursor = conn.cursor()
@@ -4376,7 +4431,7 @@ def seasonal_config():
 def set_seasonal_rates():
     """Set energy rates for a specific season"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         season = data.get('season', 'all')
         rates = data.get('rates', [])
 

@@ -63,6 +63,7 @@ class Database:
         try:
             conn = sqlite3.connect(self.db_path, timeout=10)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA journal_mode=WAL")
             try:
                 yield conn
@@ -549,6 +550,10 @@ class Database:
             row = cursor.fetchone()
             if row:
                 miner_id = row['id']
+                # Delete related records keyed by IP
+                cursor.execute("DELETE FROM miner_group_members WHERE miner_ip = ?", (ip,))
+                cursor.execute("DELETE FROM pool_config WHERE miner_ip = ?", (ip,))
+                cursor.execute("DELETE FROM pool_earnings WHERE miner_ip = ?", (ip,))
                 # Delete stats
                 cursor.execute("DELETE FROM stats WHERE miner_id = ?", (miner_id,))
                 # Delete miner

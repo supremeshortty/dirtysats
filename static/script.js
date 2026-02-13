@@ -313,6 +313,7 @@ async function batchRemove() {
         });
         const result = await response.json();
         if (result.success) {
+            ips.forEach(ip => clearLocalOptimizationState(ip));
             showAlert('Removed ' + result.results.success.length + ' miners', 'success');
             batchSelectionState.selectedMiners.clear();
             updateBatchSelectionUI();
@@ -399,7 +400,7 @@ function renderGroupsList() {
                 <span class="group-item-count">(${group.member_count} miners)</span>
             </div>
             <div class="group-item-actions">
-                <button onclick="showAssignMiners(${group.id}, '${escapeHtml(group.name)}')" title="Assign miners">Assign</button>
+                <button onclick="showAssignMiners(${Number(group.id)}, '${escapeJsString(group.name)}')" title="Assign miners">Assign</button>
                 <button onclick="editGroup(${group.id})" title="Edit">Edit</button>
                 <button class="delete" onclick="deleteGroup(${group.id})" title="Delete">Delete</button>
             </div>
@@ -654,6 +655,18 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Escape string for safe insertion into single-quoted inline JS handler arguments.
+function escapeJsString(text) {
+    return String(text || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/</g, '\\x3C')
+        .replace(/>/g, '\\x3E');
 }
 
 // Sanitize CSS color values to prevent XSS via style attribute injection
@@ -1731,6 +1744,13 @@ function createMinerCard(miner) {
     // Use custom name if set, otherwise use model or type
     const displayName = miner.custom_name || miner.model || miner.type;
     const isCustomName = !!miner.custom_name;
+    const safeIp = escapeHtml(miner.ip || '');
+    const safeIpJs = escapeJsString(miner.ip || '');
+    const safeIpId = (miner.ip || '').replace(/[^a-zA-Z0-9_.:-]/g, '').replace(/\./g, '-');
+    const safeDisplayName = escapeHtml(displayName || 'Unknown');
+    const safeCustomNameJs = escapeJsString(miner.custom_name || '');
+    const safeType = escapeHtml(miner.type || 'Unknown');
+    const safeChipType = escapeHtml(chipType);
 
     // Check if this miner is currently being optimized
     const isOptimizing = optimizationState.miners[miner.ip]?.active === true;
@@ -1754,26 +1774,26 @@ function createMinerCard(miner) {
     const selectedClass = isSelected ? 'selected' : '';
 
     return `
-        <div class="miner-card ${statusClass} ${optimizingClass} ${selectedClass}" id="miner-card-${miner.ip.replace(/\./g, '-')}" data-ip="${miner.ip}">
+        <div class="miner-card ${statusClass} ${optimizingClass} ${selectedClass}" id="miner-card-${safeIpId}" data-ip="${safeIp}">
             ${batchSelectionState.selectionMode ? `
                 <div class="miner-checkbox-wrapper">
-                    <input type="checkbox" class="miner-checkbox" data-ip="${miner.ip}"
+                    <input type="checkbox" class="miner-checkbox" data-ip="${safeIp}"
                            ${isSelected ? 'checked' : ''}
-                           onclick="toggleMinerSelection('${miner.ip}', event)">
+                           onclick="toggleMinerSelection('${safeIpJs}', event)">
                 </div>
             ` : ''}
             <div class="miner-header">
-                <div class="miner-title" id="miner-title-${miner.ip.replace(/\./g, '-')}" data-ip="${miner.ip}">
-                    <span class="miner-name">${displayName}</span>
-                    <span class="edit-name-btn" onclick="editMinerName('${miner.ip}', '${(miner.custom_name || '').replace(/'/g, "\\'")}')">✏️</span>
+                <div class="miner-title" id="miner-title-${safeIpId}" data-ip="${safeIp}">
+                    <span class="miner-name">${safeDisplayName}</span>
+                    <span class="edit-name-btn" onclick="editMinerName('${safeIpJs}', '${safeCustomNameJs}')">✏️</span>
                 </div>
                 <div class="miner-badges">
                     ${statusBadge}
-                    <div class="miner-type">${miner.type}</div>
+                    <div class="miner-type">${safeType}</div>
                 </div>
             </div>
-            <div class="miner-ip">${miner.ip}</div>
-            <div class="chip-type">Chip Type: ${chipType}</div>
+            <div class="miner-ip">${safeIp}</div>
+            <div class="chip-type">Chip Type: ${safeChipType}</div>
             ${renderMinerGroupTags(miner.groups)}
 
             ${isOverheated ? `
@@ -2059,6 +2079,7 @@ async function deleteMiner(ip) {
         const data = await response.json();
 
         if (data.success) {
+            clearLocalOptimizationState(ip);
             showAlert(`Miner ${ip} removed`, 'success');
             loadDashboard();
         } else {
@@ -4828,6 +4849,9 @@ async function loadAlertHistory() {
             const relativeTime = formatRelativeTime(alert.timestamp);
             const fullTime = new Date(alert.timestamp).toLocaleString();
             const icon = getAlertIcon(alert.alert_type);
+            const level = ['info', 'warning', 'critical', 'emergency'].includes((alert.level || '').toLowerCase())
+                ? alert.level.toLowerCase()
+                : 'info';
             const minerIP = extractMinerIP(alert);
             const minerName = minerIP && minersCache[minerIP] ?
                 (minersCache[minerIP].custom_name || minersCache[minerIP].model || minerIP) :
@@ -4843,24 +4867,30 @@ async function loadAlertHistory() {
                     if (data.hashrate) details.push(`Hashrate: ${data.hashrate}`);
                     if (data.frequency) details.push(`Freq: ${data.frequency}`);
                     if (details.length > 0) {
-                        extraDetails = `<div class="alert-item-details">${details.join(' • ')}</div>`;
+                        extraDetails = `<div class="alert-item-details">${details.map(d => escapeHtml(String(d))).join(' • ')}</div>`;
                     }
                 } catch (e) { /* ignore parse errors */ }
             }
 
+            const safeTitle = escapeHtml(alert.title || 'Alert');
+            const safeMessage = escapeHtml(alert.message || '');
+            const safeMinerName = minerName ? escapeHtml(minerName) : '';
+            const safeFullTime = escapeHtml(fullTime);
+            const safeLevelLabel = escapeHtml(level.toUpperCase());
+
             html += `
-                <div class="alert-item ${alert.level}">
+                <div class="alert-item ${level}">
                     <div class="alert-item-icon">${icon}</div>
                     <div class="alert-item-content">
                         <div class="alert-item-header">
-                            <div class="alert-item-title">${alert.title || 'Alert'}</div>
-                            <div class="alert-item-time" title="${fullTime}">${relativeTime}</div>
+                            <div class="alert-item-title">${safeTitle}</div>
+                            <div class="alert-item-time" title="${safeFullTime}">${relativeTime}</div>
                         </div>
-                        ${minerName ? `<div class="alert-item-miner">${minerName}</div>` : ''}
-                        <div class="alert-item-message">${alert.message}</div>
+                        ${safeMinerName ? `<div class="alert-item-miner">${safeMinerName}</div>` : ''}
+                        <div class="alert-item-message">${safeMessage}</div>
                         ${extraDetails}
                     </div>
-                    <span class="alert-item-level ${alert.level}">${alert.level.toUpperCase()}</span>
+                    <span class="alert-item-level ${level}">${safeLevelLabel}</span>
                 </div>
             `;
         });
@@ -6543,6 +6573,22 @@ function stopMinerOptimization(ip) {
     }
 }
 
+// Clear local optimization state without backend calls (used when miner is removed).
+function clearLocalOptimizationState(ip) {
+    if (optimizationState.intervals[ip]) {
+        clearInterval(optimizationState.intervals[ip]);
+        delete optimizationState.intervals[ip];
+    }
+    if (optimizationState.miners[ip]) {
+        delete optimizationState.miners[ip];
+    }
+    const anyActive = Object.values(optimizationState.miners).some(m => m.active);
+    if (!anyActive) {
+        optimizationState.fleetOptimizing = false;
+        updateFleetOptimizeButton();
+    }
+}
+
 // Stop all optimizations
 function stopAllOptimizations() {
     for (const ip of Object.keys(optimizationState.miners)) {
@@ -7560,8 +7606,9 @@ function updateMinerCardData(ip) {
     // Update edit name button onclick with new name
     const editBtn = card.querySelector('.edit-name-btn');
     if (editBtn) {
-        const escapedName = (miner.custom_name || '').replace(/'/g, "\\'");
-        editBtn.setAttribute('onclick', `editMinerName('${ip}', '${escapedName}')`);
+        const safeIpJs = escapeJsString(ip);
+        const safeNameJs = escapeJsString(miner.custom_name || '');
+        editBtn.setAttribute('onclick', `editMinerName('${safeIpJs}', '${safeNameJs}')`);
     }
 
     // Update status classes

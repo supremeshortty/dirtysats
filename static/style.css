@@ -83,6 +83,23 @@
     --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Backward-compatible aliases used by some component blocks */
+    --accent: var(--cyan);
+    --bg: var(--void);
+    --bitcoin: var(--amber);
+    --border: var(--border-default);
+    --card-bg: var(--space-dark);
+    --font-mono: 'IBM Plex Mono', 'SF Mono', 'Monaco', 'Consolas', monospace;
+    --primary: var(--cyan);
+    --primary-bright: var(--text-bright);
+    --radius: var(--radius-md);
+    --radius-2xl: var(--radius-xl);
+    --radius-full: 9999px;
+    --surface: var(--space);
+    --surface-hover: var(--space-light);
+    --text-tertiary: var(--text-muted);
+    --transition: var(--transition-base);
 }
 
 /* Light Mode Override */
@@ -114,6 +131,7 @@
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --card-bg: var(--space-surface);
 }
 
 /* ============================================================================

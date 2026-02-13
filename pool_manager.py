@@ -400,6 +400,9 @@ class PoolManager:
                     logger.debug(f"No pool info available for {miner_ip}")
                     continue
 
+                existing_configs = self.db.get_pool_config(miner_ip=miner_ip)
+                existing_by_index = {cfg.get('pool_index', 0): cfg for cfg in existing_configs}
+
                 # Process each pool (primary + failovers)
                 for pool_data in pool_info:
                     pool_index = pool_data.get('index', 0)
@@ -408,10 +411,10 @@ class PoolManager:
                     if not pool_url:
                         continue
 
-                    # Check if already exists
-                    existing = self.db.get_pool_config(miner_ip=miner_ip)
+                    # Check if this specific pool index already exists
+                    existing = existing_by_index.get(pool_index)
                     if existing and not force_update:
-                        logger.debug(f"Pool config already exists for {miner_ip}, skipping")
+                        logger.debug(f"Pool config already exists for {miner_ip} index {pool_index}, skipping")
                         continue
 
                     # Detect pool from URL
@@ -438,6 +441,8 @@ class PoolManager:
                         pool_type=pool_config['pool_type'],
                         pool_difficulty=pool_difficulty
                     )
+
+                    existing_by_index[pool_index] = {'pool_index': pool_index}
 
                     if existing:
                         pools_updated += 1

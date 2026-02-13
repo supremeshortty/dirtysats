@@ -90,23 +90,45 @@ class SatsEarnedTracker:
 
     def _calculate_sats_for_period(self, start: Optional[datetime], end: datetime) -> float:
         """Calculate total sats earned in a period based on shares accepted"""
-        # This uses the existing miner_history table
         # Each accepted share on mainnet = ~6.25 BTC / 630000 shares per block
         # = ~0.00000992 BTC = ~992 sats (varies with difficulty)
-        
+
+        # stats.shares_accepted is typically cumulative, so use per-miner deltas.
         if start:
-            result = self.db.execute(
-                "SELECT SUM(shares_accepted) FROM miner_history WHERE timestamp BETWEEN ? AND ?",
-                (start.timestamp(), end.timestamp()),
+            result = execute_db_query(
+                self.db,
+                """
+                SELECT COALESCE(SUM(shares_delta), 0) AS total_shares
+                FROM (
+                    SELECT
+                        miner_id,
+                        MAX(COALESCE(shares_accepted, 0)) - MIN(COALESCE(shares_accepted, 0)) AS shares_delta
+                    FROM stats
+                    WHERE timestamp BETWEEN ? AND ?
+                    GROUP BY miner_id
+                )
+                """,
+                (start, end),
             )
         else:
-            result = self.db.execute(
-                "SELECT SUM(shares_accepted) FROM miner_history WHERE timestamp <= ?",
-                (end.timestamp(),),
+            result = execute_db_query(
+                self.db,
+                """
+                SELECT COALESCE(SUM(shares_delta), 0) AS total_shares
+                FROM (
+                    SELECT
+                        miner_id,
+                        MAX(COALESCE(shares_accepted, 0)) - MIN(COALESCE(shares_accepted, 0)) AS shares_delta
+                    FROM stats
+                    WHERE timestamp <= ?
+                    GROUP BY miner_id
+                )
+                """,
+                (end,),
             )
 
         total_shares = result[0][0] if result and result[0][0] else 0
-        
+
         # Pool difficulty average = 1 share per ~992 sats at current difficulty
         # Adjust multiplier as needed based on pool/solo
         sats_per_share = 992
@@ -194,8 +216,16 @@ class MinerHealthMonitor:
 
     def _check_miner_health(self, miner_ip: str) -> Dict:
         """Check individual miner health"""
-        latest = self.db.execute(
-            "SELECT temperature, hashrate, shares_rejected FROM miner_history WHERE ip = ? ORDER BY timestamp DESC LIMIT 1",
+        latest = execute_db_query(
+            self.db,
+            """
+            SELECT s.temperature, s.hashrate, s.shares_rejected
+            FROM stats s
+            JOIN miners m ON s.miner_id = m.id
+            WHERE m.ip = ?
+            ORDER BY s.timestamp DESC
+            LIMIT 1
+            """,
             (miner_ip,),
         )
 
@@ -284,8 +314,16 @@ class PowerEfficiencyMatrix:
         valid_miners = 0
 
         for miner in miners:
-            latest = self.db.execute(
-                "SELECT hashrate, power_w FROM miner_history WHERE ip = ? ORDER BY timestamp DESC LIMIT 1",
+            latest = execute_db_query(
+                self.db,
+                """
+                SELECT s.hashrate, s.power
+                FROM stats s
+                JOIN miners m ON s.miner_id = m.id
+                WHERE m.ip = ?
+                ORDER BY s.timestamp DESC
+                LIMIT 1
+                """,
                 (miner["ip"],),
             )
 
@@ -368,8 +406,9 @@ class PoolPerformanceComparator:
             }
         """
         # Get miner pool assignments from history
-        pools_data = self.db.execute(
-            "SELECT DISTINCT pool_name FROM miner_history WHERE pool_name IS NOT NULL"
+        pools_data = execute_db_query(
+            self.db,
+            "SELECT DISTINCT pool_name FROM pool_config WHERE active = 1 AND pool_name IS NOT NULL"
         )
 
         pools = {}
@@ -378,23 +417,29 @@ class PoolPerformanceComparator:
                 continue
 
             # Get stats for this pool
-            miners_on_pool = self.db.execute(
-                "SELECT COUNT(DISTINCT ip) FROM miner_history WHERE pool_name = ?",
+            miners_on_pool = execute_db_query(
+                self.db,
+                "SELECT COUNT(DISTINCT miner_ip) FROM pool_config WHERE active = 1 AND pool_name = ?",
                 (pool_name,),
             )[0][0]
 
             # Get average metrics for miners on this pool (last 24h)
-            metrics = self.db.execute(
+            metrics = execute_db_query(
+                self.db,
                 """
                 SELECT 
-                    SUM(hashrate) / COUNT(*),
-                    SUM(shares_accepted),
-                    SUM(shares_rejected),
-                    AVG(pool_fee_percent)
-                FROM miner_history 
-                WHERE pool_name = ? AND timestamp > ?
+                    AVG(s.hashrate),
+                    SUM(COALESCE(s.shares_accepted, 0)),
+                    SUM(COALESCE(s.shares_rejected, 0)),
+                    AVG(pc.fee_percent)
+                FROM stats s
+                JOIN miners m ON s.miner_id = m.id
+                JOIN pool_config pc ON pc.miner_ip = m.ip
+                WHERE pc.active = 1
+                AND pc.pool_name = ?
+                AND s.timestamp > ?
                 """,
-                (pool_name, (datetime.utcnow() - timedelta(hours=24)).timestamp()),
+                (pool_name, datetime.utcnow() - timedelta(hours=24)),
             )
 
             if metrics and metrics[0][0]:
@@ -465,16 +510,18 @@ class PredictiveRevenueModel:
             }
         """
         # Get current fleet stats
-        latest_stats = self.db.execute(
+        latest_stats = execute_db_query(
+            self.db,
             """
             SELECT 
                 SUM(hashrate),
-                AVG(power_w),
+                AVG(power),
                 MAX(timestamp)
-            FROM miner_history 
+            FROM stats
             WHERE timestamp > ?
+            AND status IN ('online', 'overheating')
             """,
-            ((datetime.utcnow() - timedelta(hours=1)).timestamp(),),
+            (datetime.utcnow() - timedelta(hours=1),),
         )
 
         if not latest_stats or not latest_stats[0][0]:

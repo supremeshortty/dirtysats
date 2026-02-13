@@ -5,6 +5,7 @@ Enables satoshi donations to support development.
 Uses LNBits API for receiving payments.
 """
 import logging
+import os
 import requests
 from typing import Dict, Optional
 from datetime import datetime
@@ -27,8 +28,8 @@ class LightningDonationManager:
             lnbits_key: LNBits admin key for receiving payments
         """
         # LNBits configuration
-        self.lnbits_url = lnbits_url or "https://legend.lnbits.com"
-        self.lnbits_key = lnbits_key  # Set via environment variable
+        self.lnbits_url = lnbits_url or os.environ.get("LNBITS_URL") or "https://legend.lnbits.com"
+        self.lnbits_key = lnbits_key or os.environ.get("LNBITS_KEY")
         
         # Donation settings
         self.donation_amounts = [500, 1000, 5000, 21000]  # sats
