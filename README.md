@@ -9,7 +9,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-brightgreen" alt="Status">
-  <img src="https://img.shields.io/badge/Python-3.7+-blue" alt="Python">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
 </p>
 
@@ -74,13 +74,19 @@ A production-ready Bitcoin mining fleet management dashboard for home-scale mine
 - **Mobile Friendly**: Access from iPhone, Android, or any device
 - **Free for Personal Use**: Up to 100 devices on free tier
 
+### Pool Directory & Configuration
+- **Pool Directory**: Browse 47+ mining pools with fees, payout methods, and status
+- **Smart Pool Config**: Auto-formats pool URLs per miner type (Bitaxe, NerdQAxe, CGMiner)
+- **Per-Miner Pool Management**: Configure primary and fallback pools for each miner
+- **Draft Preservation**: Edit pool settings without losing changes during auto-refresh
+
 ### Additional Features
 - **Solo Mining Odds**: Calculate your chance of finding a block
-- **Pool Configuration**: Manage mining pool settings per miner
 - **Data Export**: Export miners, history, and profitability data (CSV/JSON)
 - **Dark/Light Theme**: Toggle between visual modes
-- **Mobile Responsive**: Works on phones and tablets
+- **Mobile Responsive**: Full responsive layout for phones, tablets, and desktop
 - **Lightning Donations**: Support development via Lightning Network
+- **Optional Authentication**: Enable HTTP Basic Auth via environment variables
 
 ## Supported Miners
 
@@ -100,7 +106,7 @@ A production-ready Bitcoin mining fleet management dashboard for home-scale mine
 
 ## Requirements
 
-- **Python 3.7+**
+- **Python 3.10+**
 - **Local network** with miners
 - **Optional**: OpenEI API key for utility rate lookup
 
@@ -224,7 +230,7 @@ For running on your Mac/PC (not 24/7).
 **Installation:**
 
 ```bash
-git clone https://github.com/yourusername/dirtysats.git
+git clone https://github.com/supremeshortty/dirtysats.git
 cd dirtysats
 pip install -r requirements.txt
 ```
@@ -330,7 +336,9 @@ OPENEI_API_KEY = "your-api-key"   # Get free key at openei.org
 - Alert history
 
 ### Pools Tab
-- Mining pool management per miner
+- Per-miner pool configuration with primary/fallback pools
+- Pool Directory with 47+ pools, filterable by status, fees, and payout method
+- Smart URL formatting per miner type
 
 ## API Endpoints
 
@@ -369,36 +377,61 @@ GET /api/export/profitability?format=csv
 
 ```
 DirtySats/
-├── app.py                 # Flask app and FleetManager
-├── config.py              # Configuration settings
+├── app.py                   # Flask app, API routes, FleetManager
+├── config.py                # Configuration settings
+├── energy.py                # Energy rate management & profitability
+├── alerts.py                # Alert system & notifications
+├── thermal.py               # Thermal management & auto-recovery
+├── metrics.py               # Historical metrics & analytics
+├── pool_manager.py          # Pool detection & configuration
+├── lightning.py             # Lightning Network donations (LNBits)
+├── telegram_setup_helper.py # Telegram bot setup wizard
+├── requirements.txt         # Python dependencies
 ├── database/
-│   └── db.py              # SQLite operations
+│   └── db.py                # SQLite operations & schema
 ├── miners/
-│   ├── base.py            # Abstract base class
-│   ├── bitaxe.py          # ESP-Miner API handler
-│   ├── cgminer.py         # CGMiner API handler
-│   └── detector.py        # Auto-detection factory
-├── energy/
-│   ├── rates.py           # Energy rate management
-│   ├── profitability.py   # Profit calculations
-│   └── openei.py          # OpenEI API integration
-├── alerts/
-│   └── telegram.py        # Telegram notifications
+│   ├── base.py              # Abstract base class
+│   ├── bitaxe.py            # ESP-Miner API handler (Bitaxe, NerdQAxe, etc.)
+│   ├── cgminer.py           # CGMiner API handler (Antminer, Whatsminer, Avalon)
+│   └── detector.py          # Auto-detection factory
 ├── templates/
-│   └── dashboard.html     # Main dashboard template
-└── static/
-    ├── script.js          # Frontend JavaScript
-    └── style.css          # Styling
+│   └── dashboard.html       # Main dashboard template
+├── static/
+│   ├── script.js            # Frontend JavaScript
+│   ├── style.css            # Styling (responsive, dark/light themes)
+│   ├── mining_pools.json    # Pool directory data (47+ pools)
+│   └── logo.png             # DirtySats logo
+└── tests/
+    ├── test_miners.py       # Miner handler tests
+    ├── test_database.py     # Database tests
+    └── mock_responses.py    # Test fixtures
 ```
 
 ## Recent Updates
 
-### Avalon Nano 3S Support (Latest)
-- **Full CGMiner API Support**: Fixed null byte parsing issue in API responses
-- **Accurate Stats Parsing**: Temperature, fan speed, power consumption, and chip type (A3197S) now display correctly
-- **Custom Thermal Profile**: Optimized for 75°C target temperature (manufacturer spec)
-- **Auto-Tuning**: Thermal management targets 75°C optimal, 85°C warning, 92°C critical
-- **Proper Detection**: Nano 3S now correctly identified instead of generic "Antminer" label
+### Responsive Layout & Mobile Support
+- Full responsive design for mobile, tablet, and desktop
+- Sidebar auto-hides on narrow screens, content uses full width
+- Scrollable tab navigation on small screens
+
+### Security & Stability Audit
+- XSS protection across miner cards, alerts, pool config, and group modals
+- Optional HTTP Basic Auth (set `DIRTYSATS_USERNAME` and `DIRTYSATS_PASSWORD` env vars)
+- Thread-safe monitoring startup, capped thread pools
+- Hardened JSON parsing across all API endpoints
+- Pool credential redaction in API responses
+- Test endpoints gated behind `ENABLE_TEST_ENDPOINTS` env var
+
+### Pool Configuration Improvements
+- Smart URL formatting per miner type (Bitaxe expects full stratum URL, NerdQAxe expects host-only)
+- Draft preservation during auto-refresh — form fields hold focus while editing
+- Pool Directory with 47+ pools, sortable and filterable
+
+### Avalon Nano 3S Support
+- Full CGMiner API support with null byte parsing fix
+- Accurate stats parsing: temperature, fan speed, power, chip type (A3197S)
+- Custom thermal profile optimized for 75°C target temperature
+- Proper auto-detection instead of generic "Antminer" label
 
 ## Documentation
 
@@ -412,6 +445,8 @@ Detailed guides available:
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute quick start guide
 - **[TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)** - Setting up Telegram alerts
 - **[TAILSCALE_SETUP.md](TAILSCALE_SETUP.md)** - Remote access setup with Tailscale VPN
+- **[POOL_CONFIGURATION_GUIDE.md](POOL_CONFIGURATION_GUIDE.md)** - Pool setup and configuration guide
+- **[SPONSORS.md](SPONSORS.md)** - Project sponsors and supporters
 
 ## Troubleshooting
 
