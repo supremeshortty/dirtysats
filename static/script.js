@@ -723,6 +723,10 @@ async function loadAutoOptimizeSettings() {
 async function startMinerOptimizationSilent(ip) {
     const miner = minersCache[ip];
     if (!miner) return;
+    if (optimizationState.intervals[ip]) {
+        clearInterval(optimizationState.intervals[ip]);
+        delete optimizationState.intervals[ip];
+    }
 
     const status = miner.last_status || {};
     const profile = getMinerOCProfileByIP(ip);
@@ -5228,7 +5232,30 @@ let poolDirectoryData = null;
 let selectedPoolsForCompare = new Set();
 let poolDirectoryLoaded = false;
 let poolCurrentPage = 1;
+let poolFormDrafts = {};
 const POOLS_PER_PAGE = 12;
+
+function getEditingPoolFormIp(container) {
+    const active = document.activeElement;
+    if (!active || !container?.contains(active)) return null;
+    const form = active.closest('.pool-form');
+    return form?.dataset?.minerIp || null;
+}
+
+function bindPoolForm(minerIp, form) {
+    if (!form || form.dataset.bound === '1') return;
+    form.dataset.bound = '1';
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        savePoolConfig(minerIp);
+    });
+    form.addEventListener('input', (e) => {
+        const fieldName = e.target?.name;
+        if (!fieldName || !/^pool[01]_(url|user|password)$/.test(fieldName)) return;
+        if (!poolFormDrafts[minerIp]) poolFormDrafts[minerIp] = {};
+        poolFormDrafts[minerIp][fieldName] = e.target.value;
+    });
+}
 
 // -- Badge Helpers --
 
@@ -5700,26 +5727,51 @@ async function loadAllPools() {
         const result = await response.json();
 
         const container = document.getElementById('pools-container');
+        if (!container) return;
+        const editingMinerIp = getEditingPoolFormIp(container);
 
         if (!result.success || result.miners.length === 0) {
             container.innerHTML = '<p class="loading">No miners available or pool management not supported</p>';
             return;
         }
 
-        let html = '';
-        result.miners.forEach(miner => {
-            html += createPoolCard(miner);
-        });
-        container.innerHTML = html;
+        const minersByIp = new Map(result.miners.map(miner => [miner.ip, miner]));
 
-        // Attach event listeners
+        // Remove stale cards, except the one currently being edited.
+        container.querySelectorAll('.pool-card[data-miner-ip]').forEach(card => {
+            const cardIp = card.dataset.minerIp;
+            if (cardIp === editingMinerIp) return;
+            if (!minersByIp.has(cardIp)) {
+                card.remove();
+            }
+        });
+
+        // Update or insert cards per miner. Skip full re-render for the card being edited.
         result.miners.forEach(miner => {
-            const form = document.getElementById(`pool-form-${miner.ip.replace(/\./g, '-')}`);
+            const ipId = miner.ip.replace(/\./g, '-');
+            const existingCard = container.querySelector(`.pool-card[data-miner-ip="${miner.ip}"]`);
+
+            if (existingCard && miner.ip === editingMinerIp) {
+                const form = existingCard.querySelector(`#pool-form-${ipId}`);
+                if (form) bindPoolForm(miner.ip, form);
+                return;
+            }
+
+            const temp = document.createElement('div');
+            temp.innerHTML = createPoolCard(miner);
+            const newCard = temp.firstElementChild;
+            if (!newCard) return;
+
+            if (existingCard) {
+                existingCard.replaceWith(newCard);
+            } else {
+                container.appendChild(newCard);
+            }
+
+            const form = newCard.querySelector(`#pool-form-${ipId}`);
             if (form) {
-                form.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    savePoolConfig(miner.ip);
-                });
+                applyPoolFormDraft(miner.ip, form);
+                bindPoolForm(miner.ip, form);
             }
         });
     } catch (error) {
@@ -5727,9 +5779,21 @@ async function loadAllPools() {
     }
 }
 
+function applyPoolFormDraft(ip, form) {
+    const draft = poolFormDrafts[ip];
+    if (!draft) return;
+    Object.entries(draft).forEach(([name, value]) => {
+        const input = form.querySelector(`[name="${name}"]`);
+        if (input) {
+            input.value = value;
+        }
+    });
+}
+
 // Create Pool Card HTML
 function createPoolCard(miner) {
-    const ipId = miner.ip.replace(/\./g, '-');
+    const safeIp = String(miner.ip || '');
+    const ipId = safeIp.replace(/\./g, '-');
     const pools = miner.pools || [];
 
     // Only support 2 pools: Primary and Secondary (Backup)
@@ -5744,23 +5808,26 @@ function createPoolCard(miner) {
     // Use nickname from minersCache (populated from dashboard data) as primary source
     const cached = minersCache[miner.ip];
     const displayName = (cached && cached.custom_name) || miner.custom_name || miner.model || miner.type;
+    const safeDisplayName = escapeHtml(displayName);
+    const safeMinerIp = escapeHtml(safeIp);
+    const activePoolIndex = Number.isInteger(miner.active_pool) ? miner.active_pool : parseInt(miner.active_pool, 10) || 0;
 
     return `
-        <div class="pool-card">
+        <div class="pool-card" data-miner-ip="${safeMinerIp}">
             <div class="pool-card-header">
-                <h3>${displayName}</h3>
-                <div class="pool-card-ip">${miner.ip}</div>
+                <h3>${safeDisplayName}</h3>
+                <div class="pool-card-ip">${safeMinerIp}</div>
             </div>
-            <form id="pool-form-${ipId}" class="pool-form">
+            <form id="pool-form-${ipId}" class="pool-form" data-miner-ip="${safeMinerIp}">
                 <div class="pools-grid">
                     ${limitedPools.map((pool, index) => `
-                        <div class="pool-item ${index === miner.active_pool ? 'active' : ''}">
-                            <h4>${poolLabels[index]} ${index === miner.active_pool ? '✓ Active' : ''}</h4>
+                        <div class="pool-item ${index === activePoolIndex ? 'active' : ''}">
+                            <h4>${poolLabels[index]} ${index === activePoolIndex ? '✓ Active' : ''}</h4>
                             <div class="form-group">
                                 <label>Pool URL:</label>
                                 <input type="text"
                                        name="pool${index}_url"
-                                       value="${pool.url || ''}"
+                                       value="${escapeHtml(pool.url || '')}"
                                        placeholder="stratum+tcp://pool.example.com:3333"
                                        ${index === 0 ? 'required' : ''}>
                             </div>
@@ -5768,7 +5835,7 @@ function createPoolCard(miner) {
                                 <label>Worker Username:</label>
                                 <input type="text"
                                        name="pool${index}_user"
-                                       value="${pool.user || ''}"
+                                       value="${escapeHtml(pool.user || '')}"
                                        placeholder="your_bitcoin_address.worker"
                                        ${index === 0 ? 'required' : ''}>
                             </div>
@@ -5776,7 +5843,7 @@ function createPoolCard(miner) {
                                 <label>Password:</label>
                                 <input type="text"
                                        name="pool${index}_password"
-                                       value="${pool.password || 'x'}"
+                                       value="${escapeHtml(pool.password || 'x')}"
                                        placeholder="x">
                             </div>
                         </div>
@@ -5823,6 +5890,7 @@ async function savePoolConfig(ip) {
         const result = await response.json();
 
         if (result.success) {
+            delete poolFormDrafts[ip];
             showAlert(`✅ Pool configuration updated for ${ip}`, 'success');
             setTimeout(() => loadAllPools(), 1000);
         } else {
@@ -5842,6 +5910,10 @@ let minerDetailUpdateInterval = null;
 
 // Open the miner detail modal
 async function openMinerDetail(ip) {
+    if (minerDetailUpdateInterval) {
+        clearInterval(minerDetailUpdateInterval);
+        minerDetailUpdateInterval = null;
+    }
     currentMinerIP = ip;
     isUserEditingFrequency = false;
     const modal = document.getElementById('miner-detail-modal');
@@ -5870,10 +5942,12 @@ async function openMinerDetail(ip) {
         }
     }, 5000);
 
-    // Close on escape key
+    // Ensure listeners don't stack across re-opens.
+    document.removeEventListener('keydown', handleModalEscape);
     document.addEventListener('keydown', handleModalEscape);
 
     // Close on overlay click
+    modal.removeEventListener('click', handleOverlayClick);
     modal.addEventListener('click', handleOverlayClick);
 }
 
@@ -6501,6 +6575,10 @@ function toggleMinerAutoOptimize() {
 async function startMinerOptimization(ip) {
     const miner = minersCache[ip];
     if (!miner) return;
+    if (optimizationState.intervals[ip]) {
+        clearInterval(optimizationState.intervals[ip]);
+        delete optimizationState.intervals[ip];
+    }
 
     const status = miner.last_status || {};
     const profile = getMinerOCProfileByIP(ip);

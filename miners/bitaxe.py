@@ -172,9 +172,10 @@ class BitaxeAPIHandler(MinerAPIHandler):
             response.raise_for_status()
             data = response.json()
 
-            # ESP-Miner API returns hashRate in GH/s, convert to H/s
-            hashrate_ghs = float(data.get('hashRate', 0))
-            hashrate_hs = hashrate_ghs * 1e9  # Convert GH/s to H/s
+            # Firmware varies: hashRate may be GH/s or already H/s.
+            hashrate_raw = _parse_numeric(data.get('hashRate', 0))
+            hashrate_hs = hashrate_raw if hashrate_raw >= 1e7 else hashrate_raw * 1e9
+            hashrate_ghs = hashrate_hs / 1e9
 
             # Classify the device
             type_key, display_name = self._classify_device(data)
@@ -321,6 +322,7 @@ class BitaxeAPIHandler(MinerAPIHandler):
 
                 # Parse pool URL and port
                 pool_url = pool.get('url', '')
+                explicit_port = pool.get('port')
                 if ':' in pool_url:
                     url_parts = pool_url.rsplit(':', 1)
                     pool_host = url_parts[0]
@@ -328,6 +330,11 @@ class BitaxeAPIHandler(MinerAPIHandler):
                 else:
                     pool_host = pool_url
                     pool_port = 3333
+                if explicit_port is not None:
+                    try:
+                        pool_port = int(explicit_port)
+                    except (TypeError, ValueError):
+                        pass
 
                 # Set pool fields
                 if i == 0:

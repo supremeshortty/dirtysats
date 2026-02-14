@@ -7,10 +7,11 @@ import logging
 import secrets
 import ipaddress
 import requests
+from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 from flask import Flask, jsonify, render_template, request, Response
 
 import config
@@ -95,6 +96,73 @@ def redact_pool_secrets(pools: List[Dict]) -> List[Dict]:
     return redacted
 
 
+def _parse_pool_endpoint(pool_url: str) -> Dict:
+    """
+    Parse user pool URL input into normalized endpoint parts.
+
+    Accepts flexible formats such as:
+    - stratum+tcp://host:3333
+    - host:3333
+    - host
+    """
+    raw = (pool_url or '').strip()
+    if not raw:
+        return {'scheme': 'stratum+tcp', 'host': '', 'port': None}
+
+    # Handle URLs with explicit scheme first.
+    if '://' in raw:
+        parsed = urlparse(raw)
+        try:
+            parsed_port = parsed.port
+        except ValueError:
+            parsed_port = None
+        return {
+            'scheme': (parsed.scheme or 'stratum+tcp').lower(),
+            'host': (parsed.hostname or '').strip('[]'),
+            'port': parsed_port
+        }
+
+    # Handle host:port (simple format) without a scheme.
+    if raw.count(':') == 1:
+        host, port_str = raw.rsplit(':', 1)
+        if port_str.isdigit():
+            return {'scheme': 'stratum+tcp', 'host': host.strip(), 'port': int(port_str)}
+
+    # Fallback: hostname only.
+    return {'scheme': 'stratum+tcp', 'host': raw, 'port': None}
+
+
+def _normalize_pool_for_miner(pool: Dict, miner) -> Dict:
+    """
+    Normalize user-provided pool URL to the miner's native format.
+    """
+    endpoint = _parse_pool_endpoint(pool.get('url', ''))
+    host = endpoint['host']
+    port = endpoint['port'] if endpoint['port'] is not None else 3333
+    scheme = endpoint['scheme'] or 'stratum+tcp'
+
+    type_key = str(getattr(miner, 'type_key', '') or '').upper()
+    type_name = str(getattr(miner, 'type', '') or '').upper()
+    model_name = str(getattr(miner, 'model', '') or '').upper()
+    identity = ' '.join([type_key, type_name, model_name])
+
+    normalized = {
+        'url': pool.get('url', ''),
+        'user': pool.get('user', ''),
+        'password': pool.get('password', 'x') or 'x'
+    }
+
+    # NerdQAxe family: host-only stratum URL, with port stored separately.
+    if 'NERDQAXE' in identity:
+        normalized['url'] = host
+        normalized['port'] = port
+        return normalized
+
+    # BitAxe and CGMiner-like workflows: full stratum URL with host + port.
+    normalized['url'] = f"{scheme}://{host}:{port}" if host else ''
+    return normalized
+
+
 class FleetManager:
     """Manages the mining fleet"""
 
@@ -103,6 +171,7 @@ class FleetManager:
         self.detector = MinerDetector()
         self.miners: Dict[str, Miner] = {}  # ip -> Miner
         self.lock = Lock()
+        self.monitoring_lock = Lock()
         self.monitoring_thread = None
         self.monitoring_active = False
 
@@ -417,7 +486,8 @@ class FleetManager:
                 logger.error(f"Error updating miner {miner.ip}: {e}")
 
         # Update all miners in parallel
-        with ThreadPoolExecutor(max_workers=len(miners_snapshot)) as executor:
+        max_workers = max(1, min(len(miners_snapshot), config.DISCOVERY_THREADS))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(update_miner, miner)
                 for miner in miners_snapshot
@@ -661,11 +731,11 @@ class FleetManager:
 
     def start_monitoring(self):
         """Start background monitoring thread"""
-        if self.monitoring_active:
-            logger.warning("Monitoring already active")
-            return
-
-        self.monitoring_active = True
+        with self.monitoring_lock:
+            if self.monitoring_active and self.monitoring_thread and self.monitoring_thread.is_alive():
+                logger.warning("Monitoring already active")
+                return
+            self.monitoring_active = True
 
         def monitor_loop():
             logger.info("Monitoring thread started")
@@ -831,8 +901,19 @@ class FleetManager:
             return miners_data
 
 
-# Global fleet manager
-fleet = FleetManager()
+# Global fleet manager (lazy initialization to avoid heavy import-time side effects)
+fleet: Optional[FleetManager] = None
+_fleet_init_lock = Lock()
+
+
+def get_fleet() -> FleetManager:
+    """Get or initialize the global fleet manager safely."""
+    global fleet
+    if fleet is None:
+        with _fleet_init_lock:
+            if fleet is None:
+                fleet = FleetManager()
+    return fleet
 
 
 # CSRF Protection (Double Submit Cookie pattern)
@@ -840,9 +921,11 @@ fleet = FleetManager()
 @app.before_request
 def csrf_protect():
     """Start monitoring lazily, enforce auth, and validate CSRF token"""
+    current_fleet = get_fleet()
+
     # Avoid import-time side effects; start monitoring once on first request.
-    if not fleet.monitoring_active:
-        fleet.start_monitoring()
+    if not current_fleet.monitoring_active:
+        current_fleet.start_monitoring()
 
     # Require authentication only when credentials are configured via env vars.
     if _auth_enabled and (request.path == '/' or request.path.startswith('/api/')):
@@ -1261,7 +1344,19 @@ def set_miner_pools(ip: str):
                 'error': 'Miner not found'
             }), 404
 
-        success = miner.api_handler.set_pools(ip, pools)
+        normalized_pools = []
+        for pool in pools:
+            normalized = _normalize_pool_for_miner(pool, miner)
+            if normalized.get('url') and normalized.get('user'):
+                normalized_pools.append(normalized)
+
+        if not normalized_pools:
+            return jsonify({
+                'success': False,
+                'error': 'No valid pools provided'
+            }), 400
+
+        success = miner.api_handler.set_pools(ip, normalized_pools)
         if not success:
             return jsonify({
                 'success': False,
@@ -1821,7 +1916,12 @@ def update_pool_config():
     Use this to configure unknown/custom pools with correct fees and types.
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON body'
+            }), 400
 
         required_fields = ['miner_ip', 'pool_name']
         for field in required_fields:
@@ -4489,4 +4589,5 @@ if __name__ == '__main__':
             debug=config.DEBUG
         )
     finally:
-        fleet.stop_monitoring()
+        if fleet is not None:
+            fleet.stop_monitoring()

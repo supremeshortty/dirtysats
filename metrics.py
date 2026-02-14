@@ -50,15 +50,6 @@ class SatsEarnedTracker:
         """
         now = datetime.utcnow()
 
-        # Get share data for all miners
-        with self.db._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT timestamp, shares_accepted FROM stats WHERE timestamp > ?",
-                ((now - timedelta(days=30)).timestamp(),)
-            )
-            all_shares = cursor.fetchall()
-
         sats_today = self._calculate_sats_for_period(
             now - timedelta(hours=24), now
         )
@@ -330,13 +321,14 @@ class PowerEfficiencyMatrix:
             if not latest or not latest[0][0]:
                 continue
 
-            hashrate_gh, power_w = latest[0]
-            hashrate_th = hashrate_gh / 1000 if hashrate_gh else 0
+            hashrate_hs, power_w = latest[0]
+            hashrate_th = hashrate_hs / 1e12 if hashrate_hs else 0
 
             if hashrate_th > 0:
                 w_per_th = power_w / hashrate_th
                 daily_kwh = (power_w / 1000) * 24
                 daily_cost = daily_kwh * electricity_rate_per_kwh
+                hashrate_gh = hashrate_hs / 1e9
 
                 efficiency_data.append({
                     "ip": miner["ip"],
@@ -443,14 +435,14 @@ class PoolPerformanceComparator:
             )
 
             if metrics and metrics[0][0]:
-                avg_hr, total_shares_acc, total_shares_rej, avg_fee = metrics[0]
+                avg_hr_hs, total_shares_acc, total_shares_rej, avg_fee = metrics[0]
                 total_shares = (total_shares_acc or 0) + (total_shares_rej or 0)
                 reject_rate = (total_shares_rej / total_shares * 100) if total_shares > 0 else 0
 
                 pools[pool_name] = {
                     "pool_name": pool_name,
                     "miners_on_pool": miners_on_pool,
-                    "total_hashrate_th": round(avg_hr / 1000, 2),
+                    "total_hashrate_th": round((avg_hr_hs or 0) / 1e12, 2),
                     "shares_accepted": int(total_shares_acc or 0),
                     "shares_rejected": int(total_shares_rej or 0),
                     "reject_rate_percent": round(reject_rate, 2),
@@ -527,11 +519,18 @@ class PredictiveRevenueModel:
         if not latest_stats or not latest_stats[0][0]:
             return {"error": "Insufficient data"}
 
-        total_hashrate_gh, avg_power_w, _ = latest_stats[0]
-        total_hashrate_th = total_hashrate_gh / 1000 if total_hashrate_gh else 0
+        total_hashrate_hs, avg_power_w, _ = latest_stats[0]
+        total_hashrate_th = total_hashrate_hs / 1e12 if total_hashrate_hs else 0
 
-        # Calculate daily earnings
-        sats_per_day = total_hashrate_th * 10000 * 24  # Approximate based on current difficulty
+        # Calculate expected sats/day from hashrate and network difficulty:
+        # BTC/day = (hashrate_hs * 86400 * block_subsidy) / (difficulty * 2^32)
+        difficulty = None
+        if self.btc_fetcher and hasattr(self.btc_fetcher, 'get_network_difficulty'):
+            difficulty = self.btc_fetcher.get_network_difficulty()
+        difficulty = difficulty or 1
+        block_subsidy_btc = 3.125
+        btc_per_day = (total_hashrate_hs * 86400 * block_subsidy_btc) / (difficulty * (2**32)) if total_hashrate_hs else 0
+        sats_per_day = btc_per_day * 100_000_000
         sats_per_month = sats_per_day * 30
         sats_per_year = sats_per_day * 365
 

@@ -144,8 +144,7 @@ class PoolManager:
             'url_patterns': [
                 r'localhost',
                 r'127\.0\.0\.1',
-                r'192\.168\..*',
-                r'10\..*',
+                r'::1',
             ],
             'fee_percent': 0.0,
             'pool_type': 'SOLO',
@@ -501,22 +500,28 @@ class PoolManager:
 
         for miner_ip, miner in self.miners.items():
             try:
-                if hasattr(miner, 'get_stats'):
-                    stats = miner.get_stats()
-                    if stats:
-                        # Get best difficulty from miner
-                        best_diff = stats.get('best_difficulty', stats.get('best_share'))
+                stats = getattr(miner, 'last_status', None)
+                if not stats and hasattr(miner, 'update_status'):
+                    stats = miner.update_status()
 
-                        if best_diff and best_diff > 0:
-                            # Update all pool configs for this miner
-                            pool_configs = self.db.get_pool_config(miner_ip=miner_ip)
-                            for pool in pool_configs:
-                                self.db.update_pool_difficulty(
-                                    miner_ip=miner_ip,
-                                    pool_index=pool['pool_index'],
-                                    pool_difficulty=best_diff
-                                )
-                                updated += 1
+                if stats:
+                    # Get best difficulty from miner status payload
+                    best_diff = stats.get('best_difficulty', stats.get('best_share'))
+                    try:
+                        best_diff_val = float(best_diff)
+                    except (TypeError, ValueError):
+                        best_diff_val = 0.0
+
+                    if best_diff and best_diff_val > 0:
+                        # Update all pool configs for this miner
+                        pool_configs = self.db.get_pool_config(miner_ip=miner_ip)
+                        for pool in pool_configs:
+                            self.db.update_pool_difficulty(
+                                miner_ip=miner_ip,
+                                pool_index=pool['pool_index'],
+                                pool_difficulty=best_diff
+                            )
+                            updated += 1
 
             except Exception as e:
                 logger.error(f"Error updating pool difficulty for {miner_ip}: {e}")

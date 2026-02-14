@@ -416,7 +416,7 @@
       "home_miner_notes": "Decent option for home miners wanting simplicity. The renewable energy discount to 1% is a nice touch. However, the 0.005 BTC minimum payout is on the higher side for small miners, and the pool's hashrate has declined significantly from its peak.",
       "approximate_hashrate_share": "~1-2%",
       "supported_coins": ["BTC", "BCH"],
-      "stratum_urls": ["stratum+tcp://btc.ss.poolin.me:443"]
+      "stratum_urls": ["stratum+tcp://us.ss.btc.com:1800"]
     },
     {
       "id": "emcd",
@@ -911,7 +911,7 @@
       "unique_description": "Mining pool operated by HTX (formerly Huobi) cryptocurrency exchange. Integrated with HTX exchange for easy payouts.",
       "good_for_home_miners": false, "home_miner_notes": "Higher fees (3%), KYC required, exchange-operated. Better alternatives exist for home miners.",
       "approximate_hashrate_share": "<1%", "supported_coins": ["BTC"],
-      "stratum_urls": ["stratum+tcp://btc.ss.poolin.one:443"]
+      "stratum_urls": ["stratum+tcp://btc.huobipool.com:3333"]
     },
     {
       "id": "bitaxepool",

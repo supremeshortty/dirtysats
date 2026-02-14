@@ -4603,50 +4603,6 @@ input[type="date"]::-webkit-inner-spin-button {
     }
 
     .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        flex-direction: row;
-        border-right: none;
-        border-bottom: 1px solid var(--border-default);
-    }
-
-    .sidebar:hover {
-        width: 100%;
-    }
-
-    .sidebar-header {
-        height: auto;
-        border-bottom: none;
-        padding: 12px 16px;
-    }
-
-    .sidebar-logo-text {
-        opacity: 1;
-    }
-
-    .sidebar-nav {
-        flex-direction: row;
-        padding: 8px 12px;
-        overflow-x: auto;
-        flex: 1;
-    }
-
-    .nav-item::before {
-        display: none;
-    }
-
-    .nav-label {
-        opacity: 1;
-    }
-
-    .sidebar-footer {
-        padding: 12px;
-        border-top: none;
-        border-left: 1px solid var(--border-default);
-    }
-
-    .theme-label {
         display: none;
     }
 
@@ -4660,6 +4616,24 @@ input[type="date"]::-webkit-inner-spin-button {
     .header-left, .header-center, .header-right {
         width: 100%;
         justify-content: center;
+    }
+
+    .header-center {
+        flex-wrap: wrap;
+    }
+
+    .tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 12px 0 4px;
+        margin-bottom: 8px;
+        scrollbar-width: thin;
+    }
+
+    .tab-btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
     }
 }
 
@@ -4692,6 +4666,20 @@ input[type="date"]::-webkit-inner-spin-button {
 
     .chart-controls {
         width: 100%;
+    }
+
+    .header-center {
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+
+    .header-right {
+        justify-content: flex-start;
+    }
+
+    .header-donation {
+        max-width: 100%;
     }
 
     .alert {

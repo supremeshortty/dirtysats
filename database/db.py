@@ -17,6 +17,11 @@ _SUFFIX_MULTIPLIERS = {
 }
 
 
+def _db_timestamp(dt: Optional[datetime] = None) -> str:
+    """Serialize datetime to SQLite-compatible text format."""
+    return (dt or datetime.now(timezone.utc)).strftime('%Y-%m-%d %H:%M:%S')
+
+
 def _parse_numeric(value) -> Optional[float]:
     """Parse a numeric value that may have a suffix like K, M, G, T, P, E.
 
@@ -396,7 +401,7 @@ class Database:
             cursor.execute("""
                 INSERT INTO miners (ip, miner_type, model, discovered_at, last_seen)
                 VALUES (?, ?, ?, ?, ?)
-            """, (ip, miner_type, model, datetime.now(), datetime.now()))
+            """, (ip, miner_type, model, _db_timestamp(), _db_timestamp()))
             return cursor.lastrowid
 
     def update_miner(self, ip: str, miner_type: str, model: str = None):
@@ -410,7 +415,7 @@ class Database:
                     miner_type = excluded.miner_type,
                     model = excluded.model,
                     last_seen = excluded.last_seen
-            """, (ip, miner_type, model, datetime.now(), datetime.now()))
+            """, (ip, miner_type, model, _db_timestamp(), _db_timestamp()))
 
     def get_all_miners(self) -> List[Dict]:
         """Get all miners from database"""
@@ -435,7 +440,7 @@ class Database:
                   best_difficulty: float = None, timestamp: datetime = None):
         """Add stats entry for a miner"""
         if timestamp is None:
-            timestamp = datetime.now()
+            timestamp = datetime.now(timezone.utc)
         best_difficulty = _parse_numeric(best_difficulty)
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -444,7 +449,7 @@ class Database:
                                    shares_accepted, shares_rejected, best_difficulty, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (miner_id, hashrate, temperature, power, fan_speed, status,
-                  shares_accepted, shares_rejected, best_difficulty, timestamp))
+                  shares_accepted, shares_rejected, best_difficulty, _db_timestamp(timestamp)))
 
     def get_latest_stats(self, miner_id: int) -> Optional[Dict]:
         """Get latest stats for a miner"""

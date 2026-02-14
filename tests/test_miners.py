@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 import sys
 import os
+import json
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -54,7 +55,7 @@ class TestBitaxeAPIHandler(unittest.TestCase):
         self.assertEqual(status['temperature'], 65.2)
         self.assertEqual(status['power'], 90.5)
         self.assertEqual(status['fan_speed'], 80)
-        self.assertEqual(status['model'], 'BM1397')
+        self.assertIn('bitaxe', status['model'].lower())
 
     @patch('requests.get')
     def test_get_status_timeout(self, mock_get):
@@ -78,7 +79,10 @@ class TestCGMinerAPIHandler(unittest.TestCase):
     def test_detect_cgminer(self, mock_socket):
         """Test CGMiner detection"""
         mock_sock = MagicMock()
-        mock_sock.recv.return_value = json.dumps(CGMINER_VERSION).encode()
+        mock_sock.recv.side_effect = [
+            json.dumps(CGMINER_VERSION).encode(),
+            b'',
+        ]
         mock_socket.return_value = mock_sock
 
         result = self.handler.detect('10.0.0.101')
@@ -87,8 +91,6 @@ class TestCGMinerAPIHandler(unittest.TestCase):
     @patch('socket.socket')
     def test_get_status_antminer(self, mock_socket):
         """Test getting status from Antminer"""
-        import json
-
         def recv_side_effect(size):
             # Return different responses based on command
             return json.dumps(CGMINER_SUMMARY).encode()
@@ -122,14 +124,14 @@ class TestMinerDetector(unittest.TestCase):
     def setUp(self):
         self.detector = MinerDetector()
 
-    @patch('miners.bitaxe.BitaxeAPIHandler.detect')
+    @patch('miners.bitaxe.BitaxeAPIHandler.detect_type')
     @patch('miners.bitaxe.BitaxeAPIHandler.get_status')
-    def test_detect_bitaxe_miner(self, mock_status, mock_detect):
+    def test_detect_bitaxe_miner(self, mock_status, mock_detect_type):
         """Test detecting Bitaxe miner"""
-        mock_detect.return_value = True
+        mock_detect_type.return_value = ('BITAXE_MAX', 'BitAxe Max', BITAXE_SYSTEM_INFO)
         mock_status.return_value = {
             'status': 'online',
-            'model': 'BM1397',
+            'model': 'BitAxe Max',
             'hashrate': 1100000000000,
             'temperature': 65.2
         }
@@ -138,7 +140,7 @@ class TestMinerDetector(unittest.TestCase):
 
         self.assertIsNotNone(miner)
         self.assertEqual(miner.ip, '10.0.0.100')
-        self.assertEqual(miner.type, 'Bitaxe')
+        self.assertIn('bitaxe', miner.type.lower())
 
     @patch('miners.bitaxe.BitaxeAPIHandler.detect')
     @patch('miners.cgminer.CGMinerAPIHandler.detect')

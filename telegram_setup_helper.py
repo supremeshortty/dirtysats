@@ -235,15 +235,14 @@ Questions? Check: https://core.telegram.org/bots/faq
             return {"error": "Database not initialized"}
 
         try:
-            # Retrieve from database (implementation depends on your DB structure)
-            # This is a placeholder - adjust based on your actual DB schema
-            result = self.db.execute(
-                "SELECT key, value FROM settings WHERE key LIKE 'telegram_%'"
-            )
+            with self.db._get_connection(readonly=True) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT key, value FROM settings WHERE key LIKE 'telegram_%'")
+                result = cursor.fetchall()
 
             config = {}
-            for key, value in result:
-                config[key] = value
+            for row in result:
+                config[row[0]] = row[1]
 
             return {
                 "configured": bool(config.get("telegram_bot_token")),
@@ -277,22 +276,24 @@ Questions? Check: https://core.telegram.org/bots/faq
                 return False, msg
 
             # Store in database
-            self.db.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                ("telegram_bot_token", bot_token)
-            )
-            self.db.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                ("telegram_chat_id", str(chat_id))
-            )
-            self.db.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                ("telegram_enabled", "true")
-            )
-            self.db.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                ("telegram_config_timestamp", datetime.utcnow().isoformat())
-            )
+            with self.db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    ("telegram_bot_token", bot_token)
+                )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    ("telegram_chat_id", str(chat_id))
+                )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    ("telegram_enabled", "true")
+                )
+                cursor.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    ("telegram_config_timestamp", datetime.utcnow().isoformat())
+                )
 
             logger.info("Telegram configuration saved successfully")
             return True, "✅ Configuration saved and validated!"

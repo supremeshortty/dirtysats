@@ -220,6 +220,8 @@ class CGMinerAPIHandler(MinerAPIHandler):
 
                 return result
 
+            return {'status': 'error', 'error': 'Invalid CGMiner summary response'}
+
         except Exception as e:
             logger.error(f"Error getting status from CGMiner at {ip}: {e}")
             return {'status': 'error', 'error': str(e)}
